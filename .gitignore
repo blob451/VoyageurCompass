@@ -205,3 +205,27 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Virtual Environment
+VoyageurEnv/
+
+# VS Code
+.vscode/
+
+# Environment variables
+.env
+
+# Temp directory
+Temp/*
+!Temp/.gitkeep
+
+# Database
+*.sqlite3
+*.db
+
+# Node modules (for React later)
+node_modules/
+
+# Build directories
+build/
+dist/
