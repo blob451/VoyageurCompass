@@ -152,44 +152,23 @@ class YahooFinanceService:
         Returns:
             Dictionary containing market status information
         """
-        from Core.services.utils import is_market_open
-        
-        is_open = is_market_open()
         now = datetime.now()
         
-        status = {
+        # Simple market hours check (9:30 AM - 4:00 PM EST, weekdays)
+        is_weekday = now.weekday() < 5
+        market_open_time = now.replace(hour=9, minute=30, second=0, microsecond=0)
+        market_close_time = now.replace(hour=16, minute=0, second=0, microsecond=0)
+        
+        is_open = is_weekday and market_open_time <= now <= market_close_time
+        
+        return {
             'is_open': is_open,
             'current_time': now.isoformat(),
             'market_hours': {
                 'open': '09:30 EST',
                 'close': '16:00 EST'
-            },
-            'next_open': None,
-            'next_close': None
+            }
         }
-        
-        # Calculate next open/close times
-        if is_open:
-            status['next_close'] = now.replace(hour=16, minute=0, second=0, microsecond=0).isoformat()
-        else:
-            # If it's a weekday after hours
-            if now.weekday() < 5 and now.hour >= 16:
-                next_open = now + timedelta(days=1)
-                next_open = next_open.replace(hour=9, minute=30, second=0, microsecond=0)
-            # If it's a weekday before hours
-            elif now.weekday() < 5 and now.hour < 9:
-                next_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
-            # If it's weekend
-            else:
-                days_until_monday = (7 - now.weekday()) % 7
-                if days_until_monday == 0:
-                    days_until_monday = 1
-                next_open = now + timedelta(days=days_until_monday)
-                next_open = next_open.replace(hour=9, minute=30, second=0, microsecond=0)
-            
-            status['next_open'] = next_open.isoformat()
-        
-        return status
     
     def search_symbols(self, query: str) -> List[Dict]:
         """

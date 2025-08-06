@@ -26,17 +26,19 @@ env = environ.Env(
     CSRF_COOKIE_SECURE=(bool, False),
 )
 
-# Read .env file
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+# Read .env file if it exists
+env_file = os.path.join(BASE_DIR, '.env')
+if os.path.exists(env_file):
+    environ.Env.read_env(env_file)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY')
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-temporary-key-replace-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG')
+DEBUG = env('DEBUG', default=True)
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
@@ -55,7 +57,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     
-    # Our custom apps (we'll add these in the next step!)
+    # Our custom apps
     'Analytics',
     'Core',
     'Data',
@@ -85,6 +87,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # Add media context processor for templates
+                'django.template.context_processors.media',
             ],
         },
     },
@@ -101,7 +105,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': env('DB_NAME', default='voyageur_compass_db'),
         'USER': env('DB_USER', default='voyageur_user'),
-        'PASSWORD': env('DB_PASSWORD'),
+        'PASSWORD': env('DB_PASSWORD', default='your_password_here'),
         'HOST': env('DB_HOST', default='localhost'),
         'PORT': env('DB_PORT', default='5432'),
         'OPTIONS': {
@@ -152,15 +156,23 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
+# URL prefix for static files
 STATIC_URL = '/static/'
+
+# Directory where Django will collect all static files for production
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Additional directories to search for static files
 STATICFILES_DIRS = [
     BASE_DIR / 'Design' / 'static',
 ]
 
-# Media files
+# Media files (User uploads)
+# URL prefix for media files
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+
+# Directory where uploaded files will be stored
+MEDIA_ROOT = BASE_DIR / 'Design' / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -199,9 +211,9 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Security Settings (configure these for production)
 if not DEBUG:
-    SECURE_SSL_REDIRECT = env('SECURE_SSL_REDIRECT')
-    SESSION_COOKIE_SECURE = env('SESSION_COOKIE_SECURE')
-    CSRF_COOKIE_SECURE = env('CSRF_COOKIE_SECURE')
+    SECURE_SSL_REDIRECT = env('SECURE_SSL_REDIRECT', default=False)
+    SESSION_COOKIE_SECURE = env('SESSION_COOKIE_SECURE', default=False)
+    CSRF_COOKIE_SECURE = env('CSRF_COOKIE_SECURE', default=False)
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
@@ -224,24 +236,38 @@ LOGGING = {
         },
         'file': {
             'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'debug.log',
+            'filename': BASE_DIR / 'logs' / 'debug.log',
             'formatter': 'verbose'
         },
     },
     'root': {
-        'handlers': ['console', 'file'],
+        'handlers': ['console'],
         'level': 'INFO' if not DEBUG else 'DEBUG',
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
     },
 }
 
+# Create logs directory if it doesn't exist
+LOGS_DIR = BASE_DIR / 'logs'
+if not LOGS_DIR.exists():
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
 
 # Custom Settings for VoyageurCompass
 YAHOO_FINANCE_API_TIMEOUT = int(env('YAHOO_FINANCE_API_TIMEOUT', default=30))
 DATA_REFRESH_INTERVAL = int(env('DATA_REFRESH_INTERVAL', default=3600))  # in seconds
+
+# File upload settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
+
+# Temp directory for processing files
+TEMP_DIR = BASE_DIR / 'Temp'
+if not TEMP_DIR.exists():
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
