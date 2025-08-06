@@ -97,29 +97,34 @@ TEMPLATES = [
 WSGI_APPLICATION = 'VoyageurCompass.wsgi.application'
 
 
-# Database
+# Database Configuration with Native Django Connection Management
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'django.db.backends.postgresql',  # Standard PostgreSQL backend
         'NAME': env('DB_NAME', default='voyageur_compass_db'),
         'USER': env('DB_USER', default='voyageur_user'),
         'PASSWORD': env('DB_PASSWORD', default='your_password_here'),
         'HOST': env('DB_HOST', default='localhost'),
         'PORT': env('DB_PORT', default='5432'),
+        
+        # Connection Management Settings
+        'CONN_MAX_AGE': 600,  # Keep connections alive for 10 minutes
+        'CONN_HEALTH_CHECKS': True,  # Check connection health before using
+        
+        # Database Optimization Settings
         'OPTIONS': {
             'connect_timeout': 10,
-        }
+            'options': '-c statement_timeout=30000',  # 30 second statement timeout
+            'isolation_level': 2,  # READ COMMITTED
+            'client_encoding': 'UTF8',
+        },
+        
+        # Transaction Settings
+        'ATOMIC_REQUESTS': True,  # Wrap each request in a transaction
     }
 }
-
-# For development, you can use SQLite as a fallback
-if DEBUG and not env('DB_PASSWORD', default=None):
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
 
 
 # Password validation
@@ -131,6 +136,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 8,
+        }
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -228,15 +236,33 @@ LOGGING = {
             'format': '{levelname} {asctime} {module} {message}',
             'style': '{',
         },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
     },
     'handlers': {
         'console': {
+            'level': 'INFO',
+            'filters': ['require_debug_true'],
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose'
+            'formatter': 'simple'
         },
         'file': {
+            'level': 'DEBUG',
             'class': 'logging.FileHandler',
             'filename': BASE_DIR / 'logs' / 'debug.log',
+            'formatter': 'verbose'
+        },
+        'db_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'database.log',
             'formatter': 'verbose'
         },
     },
@@ -246,8 +272,13 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             'level': 'INFO',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['db_file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
     },
