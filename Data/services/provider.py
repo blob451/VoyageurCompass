@@ -38,14 +38,14 @@ class DataProvider:
             yf.Ticker object or None if failed
         """
         try:
-            # Add random delay to avoid rate limiting
+            # Add longer delay to avoid rate limiting
             if retries > 0:
-                delay = self.base_delay * (2 ** retries) + random.uniform(0, 1)
+                delay = self.base_delay * (3 ** retries) + random.uniform(1, 3)
                 logger.info(f"Waiting {delay:.1f} seconds before retry...")
                 time.sleep(delay)
             else:
-                # Small random delay even on first attempt
-                time.sleep(random.uniform(0.5, 1.5))
+                # Longer initial delay to avoid rate limiting
+                time.sleep(random.uniform(2, 4))
             
             ticker = yf.Ticker(ticker_symbol)
             
@@ -64,6 +64,10 @@ class DataProvider:
                 logger.warning(f"Rate limited on {ticker_symbol}, attempt {retries + 1}/{self.max_retries}")
                 if retries < self.max_retries - 1:
                     return self._safe_fetch(ticker_symbol, retries + 1)
+                else:
+                    # Return None and use mock data when rate limited
+                    logger.warning(f"Max retries reached for {ticker_symbol}, will use mock data")
+                    return None
             else:
                 logger.error(f"Error fetching ticker {ticker_symbol}: {error_str}")
             return None
