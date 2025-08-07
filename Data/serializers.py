@@ -1,0 +1,150 @@
+"""
+Serializers for Data app models.
+Handles data serialization/deserialization for API endpoints.
+"""
+
+from rest_framework import serializers
+from django.contrib.auth.models import User
+from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding
+
+
+class StockPriceSerializer(serializers.ModelSerializer):
+    """Serializer for StockPrice model."""
+    
+    daily_range = serializers.ReadOnlyField()
+    is_gain = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = StockPrice
+        fields = [
+            'id', 'date', 'open', 'high', 'low', 'close',
+            'adjusted_close', 'volume', 'change_amount', 
+            'change_percent', 'daily_range', 'is_gain'
+        ]
+        read_only_fields = ['id', 'daily_range', 'is_gain']
+
+
+class StockSerializer(serializers.ModelSerializer):
+    """Serializer for Stock model."""
+    
+    latest_price = StockPriceSerializer(source='get_latest_price', read_only=True)
+    needs_sync = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = Stock
+        fields = [
+            'id', 'symbol', 'short_name', 'long_name', 'currency',
+            'exchange', 'sector', 'industry', 'country', 'website',
+            'description', 'market_cap', 'shares_outstanding',
+            'is_active', 'last_sync', 'latest_price', 'needs_sync',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'latest_price', 'needs_sync']
+
+
+class StockDetailSerializer(StockSerializer):
+    """Detailed serializer for Stock with price history."""
+    
+    price_history = serializers.SerializerMethodField()
+    
+    class Meta(StockSerializer.Meta):
+        fields = StockSerializer.Meta.fields + ['price_history']
+    
+    def get_price_history(self, obj):
+        """Get recent price history for the stock."""
+        days = self.context.get('price_history_days', 30)
+        prices = obj.get_price_history(days)
+        return StockPriceSerializer(prices, many=True).data
+
+
+class PortfolioHoldingSerializer(serializers.ModelSerializer):
+    """Serializer for PortfolioHolding model."""
+    
+    stock = StockSerializer(read_only=True)
+    stock_symbol = serializers.CharField(write_only=True, required=False)
+    total_cost = serializers.ReadOnlyField()
+    current_value = serializers.ReadOnlyField()
+    gain_loss = serializers.ReadOnlyField()
+    gain_loss_percent = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = PortfolioHolding
+        fields = [
+            'id', 'stock', 'stock_symbol', 'quantity', 'purchase_price',
+            'purchase_date', 'notes', 'total_cost', 'current_value',
+            'gain_loss', 'gain_loss_percent', 'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'stock', 'total_cost', 'current_value',
+            'gain_loss', 'gain_loss_percent', 'created_at', 'updated_at'
+        ]
+    
+    def create(self, validated_data):
+        """Create a new holding with stock lookup."""
+        stock_symbol = validated_data.pop('stock_symbol', None)
+        
+        if stock_symbol:
+            try:
+                stock = Stock.objects.get(symbol=stock_symbol.upper())
+                validated_data['stock'] = stock
+            except Stock.DoesNotExist:
+                raise serializers.ValidationError(
+                    {'stock_symbol': f'Stock with symbol {stock_symbol} not found'}
+                )
+        
+        return super().create(validated_data)
+
+
+class PortfolioSerializer(serializers.ModelSerializer):
+    """Serializer for Portfolio model."""
+    
+    user = serializers.ReadOnlyField(source='user.username')
+    holdings_count = serializers.SerializerMethodField()
+    total_value = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Portfolio
+        fields = [
+            'id', 'name', 'description', 'user', 'is_active',
+            'holdings_count', 'total_value', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'user', 'created_at', 'updated_at']
+    
+    def get_holdings_count(self, obj):
+        """Get the number of holdings in the portfolio."""
+        return obj.holdings.count()
+    
+    def get_total_value(self, obj):
+        """Calculate total portfolio value."""
+        total = sum(holding.current_value for holding in obj.holdings.all())
+        return float(total)
+
+
+class PortfolioDetailSerializer(PortfolioSerializer):
+    """Detailed serializer for Portfolio with holdings."""
+    
+    holdings = PortfolioHoldingSerializer(many=True, read_only=True)
+    
+    class Meta(PortfolioSerializer.Meta):
+        fields = PortfolioSerializer.Meta.fields + ['holdings']
+
+
+class StockSearchSerializer(serializers.Serializer):
+    """Serializer for stock search results."""
+    
+    symbol = serializers.CharField()
+    name = serializers.CharField()
+    type = serializers.CharField(default='Stock')
+    exchange = serializers.CharField(required=False)
+    sector = serializers.CharField(required=False)
+    from_cache = serializers.BooleanField(default=False)
+
+
+class MarketStatusSerializer(serializers.Serializer):
+    """Serializer for market status."""
+    
+    is_open = serializers.BooleanField()
+    current_time = serializers.DateTimeField()
+    market_hours = serializers.DictField()
+    indicators = serializers.DictField()
+    next_open = serializers.DateTimeField()
