@@ -1,0 +1,112 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+*.log
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+VoyageurEnv/
+
+# Django
+*.sqlite3
+*.sqlite3-journal
+db.sqlite3
+staticfiles/
+media/
+*.pot
+*.pyc
+local_settings.py
+
+# React / Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+Design/frontend/node_modules/
+Design/frontend/build/
+Design/frontend/dist/
+Design/frontend/.env.local
+Design/frontend/.env.development.local
+Design/frontend/.env.test.local
+Design/frontend/.env.production.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment files (we'll use env_file in docker-compose)
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Temporary directory
+Temp/
+temp/
+tmp/
+cache/
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+*.md
+docs/
+README.md
+LICENSE
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Backups
+*.bak
+*.backup
+backups/
+*.sql
+*.dump
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Project specific
+Project Planning.docx
+*.docx
+*.xlsx
+*.pdf

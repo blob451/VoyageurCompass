@@ -1,0 +1,101 @@
+services:
+  # PostgreSQL Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: voyageur-db
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups  # Optional: for database backups
+    environment:
+      - POSTGRES_DB=${DB_NAME:-voyageur_compass_db}
+      - POSTGRES_USER=${DB_USER:-voyageur_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-your_password_here}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-voyageur_user} -d ${DB_NAME:-voyageur_compass_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - voyageur-network
+
+  # Django Backend Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voyageur-backend
+    restart: unless-stopped
+    volumes:
+      # Mount entire project for hot-reloading
+      - .:/app:delegated
+      # Prevent node_modules from frontend being copied
+      - /app/Design/frontend/node_modules
+      # Use named volume for static files
+      - static_volume:/app/staticfiles
+      - media_volume:/app/Design/media
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DEBUG=${DEBUG:-True}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        while ! nc -z db 5432; do sleep 1; done &&
+        echo 'Database is ready!' &&
+        python manage.py migrate &&
+        python manage.py runserver 0.0.0.0:8000
+      "
+    networks:
+      - voyageur-network
+
+  # React Frontend Service (Vite)
+  frontend:
+    build:
+      context: ./Design/frontend
+      dockerfile: Dockerfile
+    container_name: voyageur-frontend
+    restart: unless-stopped
+    volumes:
+      # Mount frontend source for hot-reloading
+      - ./Design/frontend:/app:delegated
+      # Use anonymous volume for node_modules to prevent conflicts
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+      - WATCHPACK_POLLING=true  # For file watching on Windows
+      - CHOKIDAR_USEPOLLING=true  # For hot reload on Windows
+    depends_on:
+      - backend
+    stdin_open: true  # Keep STDIN open
+    tty: true  # Allocate a pseudo-TTY
+    networks:
+      - voyageur-network
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    name: voyageur_postgres_data
+  static_volume:
+    name: voyageur_static
+  media_volume:
+    name: voyageur_media
+
+# Custom network for service communication
+networks:
+  voyageur-network:
+    name: voyageur-network
+    driver: bridge

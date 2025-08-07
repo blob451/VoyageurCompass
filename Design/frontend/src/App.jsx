@@ -7,6 +7,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 
+// Blurp
+
 const theme = createTheme({
   palette: {
     mode: 'light',
