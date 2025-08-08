@@ -21,6 +21,24 @@ services:
     networks:
       - voyageur-network
 
+  # Redis Cache Service
+  redis:
+    image: redis:alpine
+    container_name: voyageur-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - voyageur-network
+
   # Django Backend Service
   backend:
     build:
@@ -44,18 +62,112 @@ services:
       - DEBUG=${DEBUG:-True}
       - DB_HOST=db
       - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: >
       sh -c "
         echo 'Waiting for database...' &&
         while ! nc -z db 5432; do sleep 1; done &&
         echo 'Database is ready!' &&
+        echo 'Waiting for Redis...' &&
+        while ! nc -z redis 6379; do sleep 1; done &&
+        echo 'Redis is ready!' &&
         python manage.py migrate &&
         python manage.py runserver 0.0.0.0:8000
+      "
+    networks:
+      - voyageur-network
+
+  # Celery Worker Service
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voyageur-celery-worker
+    restart: unless-stopped
+    volumes:
+      # Mount entire project
+      - .:/app:delegated
+      # Prevent node_modules from frontend being copied
+      - /app/Design/frontend/node_modules
+      # Share media volume with backend
+      - media_volume:/app/Design/media
+    env_file:
+      - .env
+    environment:
+      - DEBUG=${DEBUG:-True}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - C_FORCE_ROOT=true  # Allow celery to run as root in container
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        while ! nc -z db 5432; do sleep 1; done &&
+        echo 'Waiting for Redis...' &&
+        while ! nc -z redis 6379; do sleep 1; done &&
+        echo 'Starting Celery Worker...' &&
+        celery -A VoyageurCompass worker -l info --concurrency=2
+      "
+    networks:
+      - voyageur-network
+
+  # Celery Beat Scheduler Service
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voyageur-celery-beat
+    restart: unless-stopped
+    volumes:
+      # Mount entire project
+      - .:/app:delegated
+      # Prevent node_modules from frontend being copied
+      - /app/Design/frontend/node_modules
+      # Celery beat schedule file
+      - celerybeat_schedule:/app/celerybeat-schedule
+    env_file:
+      - .env
+    environment:
+      - DEBUG=${DEBUG:-True}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        while ! nc -z db 5432; do sleep 1; done &&
+        echo 'Waiting for Redis...' &&
+        while ! nc -z redis 6379; do sleep 1; done &&
+        echo 'Starting Celery Beat...' &&
+        celery -A VoyageurCompass beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
       "
     networks:
       - voyageur-network
@@ -89,10 +201,14 @@ services:
 volumes:
   postgres_data:
     name: voyageur_postgres_data
+  redis_data:
+    name: voyageur_redis_data
   static_volume:
     name: voyageur_static
   media_volume:
     name: voyageur_media
+  celerybeat_schedule:
+    name: voyageur_celerybeat_schedule
 
 # Custom network for service communication
 networks:

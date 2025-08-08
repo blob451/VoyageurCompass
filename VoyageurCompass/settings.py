@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'drf_spectacular',
+    'django_celery_beat',  # Add this line
     
     # Our custom apps
     'Analytics',
@@ -103,9 +104,10 @@ WSGI_APPLICATION = 'VoyageurCompass.wsgi.application'
 # Database Configuration with Native Django Connection Management
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Database Configuration
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',  # Standard PostgreSQL backend
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': env('DB_NAME', default='voyageur_compass_db'),
         'USER': env('DB_USER', default='voyageur_user'),
         'PASSWORD': env('DB_PASSWORD', default='your_password_here'),
@@ -113,21 +115,88 @@ DATABASES = {
         'PORT': env('DB_PORT', default='5432'),
         
         # Connection Management Settings
-        'CONN_MAX_AGE': 600,  # Keep connections alive for 10 minutes
-        'CONN_HEALTH_CHECKS': True,  # Check connection health before using
+        'CONN_MAX_AGE': 600,
+        'CONN_HEALTH_CHECKS': True,
         
         # Database Optimization Settings
         'OPTIONS': {
             'connect_timeout': 10,
-            'options': '-c statement_timeout=30000',  # 30 second statement timeout
-            'isolation_level': 2,  # READ COMMITTED
+            'options': '-c statement_timeout=30000',
+            'isolation_level': 2,
             'client_encoding': 'UTF8',
         },
         
         # Transaction Settings
-        'ATOMIC_REQUESTS': True,  # Wrap each request in a transaction
+        'ATOMIC_REQUESTS': True,
     }
 }
+
+# Redis Cache Configuration
+REDIS_HOST = env('REDIS_HOST', default='redis')
+REDIS_PORT = env('REDIS_PORT', default='6379')
+REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': REDIS_URL,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 50,
+                'retry_on_timeout': True,
+            },
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
+            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
+            'IGNORE_EXCEPTIONS': True,
+        },
+        'KEY_PREFIX': 'voyageur',
+        'TIMEOUT': 300,
+    }
+}
+
+# Celery Configuration
+CELERY_BROKER_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/1'
+CELERY_RESULT_BACKEND = f'redis://{REDIS_HOST}:{REDIS_PORT}/2'
+
+# Redis Cache Configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': env('REDIS_URL', default='redis://redis:6379/0'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 50,
+                'retry_on_timeout': True,
+            },
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
+            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
+            'IGNORE_EXCEPTIONS': True,
+        },
+        'KEY_PREFIX': 'voyageur',
+        'TIMEOUT': 300,  # 5 minutes default timeout
+    }
+}
+
+
+# Celery Configuration
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://redis:6379/1')
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='redis://redis:6379/2')
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'America/Vancouver'  # Match Django timezone
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
+
+# Celery Beat Settings (schedules defined in celery.py)
+CELERY_BEAT_SCHEDULE = {}
 
 
 # Password validation
@@ -278,7 +347,7 @@ if not DEBUG:
     X_FRAME_OPTIONS = 'DENY'
 
 
-# Logging Configuration
+# Logging Configuration - Enhanced with Celery logging
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -316,6 +385,12 @@ LOGGING = {
             'filename': BASE_DIR / 'logs' / 'database.log',
             'formatter': 'verbose'
         },
+        'celery_file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'celery.log',
+            'formatter': 'verbose'
+        },
     },
     'root': {
         'handlers': ['console'],
@@ -330,6 +405,11 @@ LOGGING = {
         'django.db.backends': {
             'handlers': ['db_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'celery': {
+            'handlers': ['console', 'celery_file'],
+            'level': 'INFO',
             'propagate': False,
         },
     },
