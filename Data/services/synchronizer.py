@@ -1,6 +1,7 @@
 """
 Data Synchronizer Service Module
 Manages data synchronization between Yahoo Finance and the database for VoyageurCompass.
+Enhanced with Celery task integration and caching support.
 """
 
 import logging
@@ -9,6 +10,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
+from django.core.cache import cache
 
 from Data.models import Stock, StockPrice
 from Data.services.provider import data_provider
@@ -19,11 +21,14 @@ logger = logging.getLogger(__name__)
 class DataSynchronizer:
     """
     Service class for synchronizing market data with the database.
+    Now integrated with Celery for background processing and Redis for caching.
     """
     
     def __init__(self):
         """Initialize the Data Synchronizer."""
         self.provider = data_provider
+        self.cache_timeout = 3600  # 1 hour default cache
+        self.batch_size = 100
         logger.info("Data Synchronizer Service initialized")
     
     @transaction.atomic
@@ -40,6 +45,14 @@ class DataSynchronizer:
         """
         try:
             logger.info(f"Starting sync for {symbol}")
+            
+            # Check cache for recent sync
+            cache_key = f"voyageur:sync:stock:{symbol.upper()}"
+            cached_result = cache.get(cache_key)
+            
+            if cached_result and self._is_recently_synced(cached_result):
+                logger.info(f"Using cached data for {symbol}")
+                return cached_result
             
             # Fetch data from Yahoo Finance
             stock_data = self.provider.fetch_stock_data(symbol, period)
@@ -71,6 +84,9 @@ class DataSynchronizer:
                 'total_prices': StockPrice.objects.filter(stock=stock).count(),
                 'sync_time': datetime.now().isoformat()
             }
+            
+            # Cache the successful result
+            cache.set(cache_key, result, timeout=self.cache_timeout)
             
             logger.info(f"Sync completed for {symbol}: {prices_synced} prices synced")
             return result
@@ -258,10 +274,25 @@ class DataSynchronizer:
         
         for symbol in symbols:
             try:
+                # Check cache first
+                cache_key = f"voyageur:price:realtime:{symbol.upper()}"
+                cached_price = cache.get(cache_key)
+                
+                if cached_price:
+                    results[symbol] = {
+                        'success': True,
+                        'price': cached_price,
+                        'cached': True
+                    }
+                    continue
+                
                 # Get current price from Yahoo Finance
                 current_price = self.provider.fetch_realtime_price(symbol)
                 
                 if current_price:
+                    # Cache the price for 60 seconds
+                    cache.set(cache_key, current_price, timeout=60)
+                    
                     # Update today's price record
                     stock = Stock.objects.get(symbol=symbol.upper())
                     today = datetime.now().date()
@@ -280,7 +311,8 @@ class DataSynchronizer:
                     
                     results[symbol] = {
                         'success': True,
-                        'price': current_price
+                        'price': current_price,
+                        'cached': False
                     }
                 else:
                     results[symbol] = {
@@ -344,7 +376,121 @@ class DataSynchronizer:
         
         # If valid, proceed with sync
         return self.sync_stock_data(symbol)
-
+    
+    # New methods for Celery integration
+    
+    def sync_all_data(self) -> Dict[str, any]:
+        """
+        Main synchronization method called by Celery task.
+        Synchronizes all active stocks in the database.
+        
+        Returns:
+            Dictionary with sync results
+        """
+        start_time = timezone.now()
+        results = {
+            'started_at': start_time.isoformat(),
+            'stocks_synced': [],
+            'total_records': 0,
+            'errors': []
+        }
+        
+        try:
+            # Get all active stocks that need syncing
+            stocks_to_sync = Stock.objects.filter(
+                is_active=True
+            ).exclude(
+                last_sync__gte=timezone.now() - timedelta(hours=1)
+            )
+            
+            logger.info(f"Starting sync for {stocks_to_sync.count()} stocks")
+            
+            # Sync each stock
+            for stock in stocks_to_sync:
+                try:
+                    result = self.sync_stock_data(stock.symbol)
+                    if result['success']:
+                        results['stocks_synced'].append(stock.symbol)
+                        results['total_records'] += result.get('prices_synced', 0)
+                    else:
+                        results['errors'].append({
+                            'symbol': stock.symbol,
+                            'error': result.get('error', 'Unknown error')
+                        })
+                except Exception as e:
+                    error_msg = f"Error syncing {stock.symbol}: {str(e)}"
+                    logger.error(error_msg)
+                    results['errors'].append({
+                        'symbol': stock.symbol,
+                        'error': str(e)
+                    })
+            
+            # Clear market data cache after sync
+            cache.delete_pattern('voyageur:market:*')
+            
+            results['completed_at'] = timezone.now().isoformat()
+            results['duration'] = (timezone.now() - start_time).total_seconds()
+            
+            # Cache the results
+            cache.set('voyageur:sync:last_result', results, timeout=86400)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Critical error in sync_all_data: {str(e)}")
+            results['errors'].append(f"Critical error: {str(e)}")
+            results['status'] = 'failed'
+            return results
+    
+    def get_sync_status(self) -> Dict[str, any]:
+        """
+        Get the current synchronization status.
+        Used by API endpoints to check sync progress.
+        
+        Returns:
+            Dictionary with sync status
+        """
+        # Check for active sync task
+        status = cache.get('market_data_sync_status')
+        
+        if not status:
+            # Check last result if no current sync
+            last_result = cache.get('voyageur:sync:last_result')
+            if last_result:
+                return {
+                    'status': 'idle',
+                    'last_sync': last_result
+                }
+            else:
+                return {
+                    'status': 'never_synced',
+                    'message': 'No synchronization has been performed yet'
+                }
+        
+        return status
+    
+    def _is_recently_synced(self, cached_data: Dict) -> bool:
+        """
+        Check if cached data is still fresh.
+        
+        Args:
+            cached_data: Cached sync result
+        
+        Returns:
+            True if data is fresh, False otherwise
+        """
+        if not cached_data or 'sync_time' not in cached_data:
+            return False
+        
+        try:
+            # Use timezone-aware datetime
+            sync_time = datetime.fromisoformat(cached_data['sync_time'])
+            if timezone.is_naive(sync_time):
+                sync_time = timezone.make_aware(sync_time)
+            time_since_sync = timezone.now() - sync_time
+            return time_since_sync < timedelta(hours=1)
+        except:
+            return False
 
 # Singleton instance
 data_synchronizer = DataSynchronizer()
