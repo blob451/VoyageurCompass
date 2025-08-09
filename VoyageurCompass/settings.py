@@ -12,8 +12,10 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import environ
 import os
+import sys
 from pathlib import Path
 from datetime import timedelta
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -35,11 +37,16 @@ if os.path.exists(env_file):
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-temporary-key-replace-in-production')
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG', default=True)
+DEBUG = env('DEBUG', default=False)
+
+# SECURITY: Enforce secret key in production
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-dev-only-key-replace-in-production')
+if not DEBUG and SECRET_KEY == 'django-insecure-dev-only-key-replace-in-production':
+    raise ImproperlyConfigured(
+        "SECRET_KEY must be set in environment for production. "
+        "Generate with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'"
+    )
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
@@ -128,6 +135,25 @@ DATABASES = {
     }
 }
 
+# SQLite Guard - Prevent SQLite usage
+def checkDatabaseEngine():
+    """Ensure PostgreSQL is used, not SQLite"""
+    if 'sqlite' in DATABASES['default']['ENGINE'].lower():
+        if not ('test' in sys.argv or 'pytest' in sys.modules):
+            raise ImproperlyConfigured(
+                "SQLite is not allowed! Configure PostgreSQL in DATABASES setting."
+            )
+checkDatabaseEngine()
+
+# Override database for testing
+if 'test' in sys.argv or 'pytest' in sys.modules:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
+
 # Redis Cache Configuration
 REDIS_HOST = env('REDIS_HOST', default='redis')
 REDIS_PORT = env('REDIS_PORT', default='6379')
@@ -198,9 +224,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [
-    BASE_DIR / 'Design' / 'static',
-]
+# Only add static dir if it exists
+staticDir = BASE_DIR / 'Design' / 'static'
+STATICFILES_DIRS = [staticDir] if staticDir.exists() else []
 
 # WhiteNoise Configuration for static file compression
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
@@ -262,11 +288,24 @@ SIMPLE_JWT = {
 }
 
 
-# CORS Configuration
-CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[] if not DEBUG else [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-])
+# CORS Configuration - Strict allow-list based on environment
+if DEBUG:
+    corsOrigins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+else:
+    # Production: require explicit origins from environment
+    corsOrigins = env.list('CORS_ALLOWED_ORIGINS', default=[])
+    if not corsOrigins:
+        raise ImproperlyConfigured(
+            "CORS_ALLOWED_ORIGINS must be set in production!"
+        )
+
+CORS_ALLOWED_ORIGINS = corsOrigins
+
+# CSRF Configuration
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=corsOrigins)
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -307,14 +346,39 @@ SPECTACULAR_SETTINGS = {
 }
 
 
-# Security Settings
+# Security Settings - Apply security headers in all environments
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# CSRF cookie security
+CSRF_COOKIE_SECURE = env('CSRF_COOKIE_SECURE', default=not DEBUG)
+CSRF_COOKIE_SAMESITE = 'Strict'
+CSRF_COOKIE_HTTPONLY = True
+
 if not DEBUG:
+    # HTTPS enforcement
     SECURE_SSL_REDIRECT = env('SECURE_SSL_REDIRECT', default=True)
     SESSION_COOKIE_SECURE = env('SESSION_COOKIE_SECURE', default=True)
-    CSRF_COOKIE_SECURE = env('CSRF_COOKIE_SECURE', default=True)
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY'
+    
+    # HSTS settings
+    SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=31536000)  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Proxy headers for nginx
+    USE_X_FORWARDED_HOST = True
+    USE_X_FORWARDED_PORT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    
+    # Session security
+    SESSION_COOKIE_SAMESITE = 'Strict'
+    SESSION_COOKIE_AGE = 86400  # 24 hours
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# Session cookie security (apply in all environments)
+SESSION_COOKIE_HTTPONLY = True
 
 
 # Logging Configuration

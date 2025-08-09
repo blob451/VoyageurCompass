@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+# Claude
+prompts/
+.claude/
+CLAUDE.md
+code-review-output.md
+
 # Distribution / packaging
 .Python
 build/

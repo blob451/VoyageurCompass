@@ -18,8 +18,7 @@ class StockPriceSerializer(serializers.ModelSerializer):
         model = StockPrice
         fields = [
             'id', 'date', 'open', 'high', 'low', 'close',
-            'adjusted_close', 'volume', 'change_amount', 
-            'change_percent', 'daily_range', 'is_gain'
+            'adjusted_close', 'volume', 'daily_range', 'is_gain'
         ]
         read_only_fields = ['id', 'daily_range', 'is_gain']
 
@@ -62,21 +61,21 @@ class PortfolioHoldingSerializer(serializers.ModelSerializer):
     
     stock = StockSerializer(read_only=True)
     stock_symbol = serializers.CharField(write_only=True, required=False)
-    total_cost = serializers.ReadOnlyField()
+    cost_basis = serializers.ReadOnlyField()
     current_value = serializers.ReadOnlyField()
-    gain_loss = serializers.ReadOnlyField()
-    gain_loss_percent = serializers.ReadOnlyField()
+    unrealized_gain_loss = serializers.ReadOnlyField()
+    unrealized_gain_loss_percent = serializers.ReadOnlyField()
     
     class Meta:
         model = PortfolioHolding
         fields = [
-            'id', 'stock', 'stock_symbol', 'quantity', 'purchase_price',
-            'purchase_date', 'notes', 'total_cost', 'current_value',
-            'gain_loss', 'gain_loss_percent', 'created_at', 'updated_at'
+            'id', 'stock', 'stock_symbol', 'quantity', 'average_price',
+            'purchase_date', 'cost_basis', 'current_value',
+            'unrealized_gain_loss', 'unrealized_gain_loss_percent', 'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'stock', 'total_cost', 'current_value',
-            'gain_loss', 'gain_loss_percent', 'created_at', 'updated_at'
+            'id', 'stock', 'cost_basis', 'current_value',
+            'unrealized_gain_loss', 'unrealized_gain_loss_percent', 'created_at', 'updated_at'
         ]
     
     def create(self, validated_data):

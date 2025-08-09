@@ -5,12 +5,14 @@ This module acts as the main interface for Yahoo Finance operations.
 """
 
 import logging
+import re
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 from Data.services.provider import data_provider
 from Data.services.synchronizer import data_synchronizer
+from django.db import models
 from Data.models import Stock, StockPrice
 
 logger = logging.getLogger(__name__)
@@ -28,7 +30,60 @@ class YahooFinanceService:
         self.synchronizer = data_synchronizer
         self.timeout = 30  # Default timeout
         logger.info("Yahoo Finance Service initialized with yfinance integration")
+    
+    # =====================================================================
+    # Input validation methods (camelCase)
+    # =====================================================================
+    
+    def validateSymbol(self, symbol: str) -> str:
+        """Validate and sanitize stock symbol"""
+        if not symbol or not isinstance(symbol, str):
+            raise ValueError("Symbol must be a non-empty string")
+        symbol = symbol.strip().upper()
+        # Allow only valid stock symbols
+        if not re.match(r'^[A-Z0-9\.\-\^]{1,10}$', symbol):
+            raise ValueError(f"Invalid symbol format: {symbol}")
+        return symbol
+    
+    def validatePeriod(self, period: str) -> str:
+        """Validate period parameter"""
+        validPeriods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
+        if period not in validPeriods:
+            raise ValueError(f"Invalid period: {period}. Must be one of {validPeriods}")
+        return period
+    
+    def validateDateRange(self, startDate: datetime, endDate: datetime) -> bool:
+        """Validate date range parameters"""
+        if not isinstance(startDate, datetime) or not isinstance(endDate, datetime):
+            raise ValueError("Date parameters must be datetime objects")
+        if endDate < startDate:
+            raise ValueError("End date must be after start date")
+        # Reasonable limit: no more than 10 years
+        if (endDate - startDate).days > 3650:
+            raise ValueError("Date range cannot exceed 10 years")
+        return True
         
+    def validateSymbolList(self, symbols: List[str]) -> List[str]:
+        """Validate list of symbols"""
+        if not isinstance(symbols, list) or len(symbols) == 0:
+            raise ValueError("Symbols must be a non-empty list")
+        if len(symbols) > 100:  # Reasonable limit
+            raise ValueError("Cannot process more than 100 symbols at once")
+        
+        validatedSymbols = []
+        for symbol in symbols:
+            validatedSymbols.append(self.validateSymbol(symbol))
+        
+        return validatedSymbols
+        
+    # =====================================================================
+    # camelCase wrapper methods
+    # =====================================================================
+    
+    def getStockData(self, symbol: str, period: str = "1mo", syncDb: bool = True) -> Dict:
+        """camelCase wrapper for get_stock_data"""
+        return self.get_stock_data(symbol, period, syncDb)
+    
     def get_stock_data(self, symbol: str, period: str = "1mo", sync_db: bool = True) -> Dict:
         """
         Fetch stock data for a given symbol.
@@ -42,6 +97,10 @@ class YahooFinanceService:
             Dictionary containing stock data
         """
         try:
+            # Validate inputs
+            symbol = self.validateSymbol(symbol)
+            period = self.validatePeriod(period)
+            
             logger.info(f"Getting data for {symbol} with period {period}")
             
             if sync_db:
@@ -83,6 +142,10 @@ class YahooFinanceService:
             logger.error(f"Error fetching stock data for {symbol}: {str(e)}")
             return {'error': str(e)}
     
+    def getStockInfo(self, symbol: str) -> Dict:
+        """camelCase wrapper for get_stock_info"""
+        return self.get_stock_info(symbol)
+    
     def get_stock_info(self, symbol: str) -> Dict:
         """
         Get detailed information about a stock.
@@ -94,6 +157,9 @@ class YahooFinanceService:
             Dictionary containing stock information
         """
         try:
+            # Validate input
+            symbol = self.validateSymbol(symbol)
+            
             logger.info(f"Fetching stock info for {symbol}")
             
             # Try to get from database first
@@ -294,10 +360,10 @@ class YahooFinanceService:
                     price = self.provider.fetch_realtime_price(symbol)
                     if price:
                         market_indicators[symbol] = price
-                except:
-                    pass
-        except:
-            pass
+                except Exception as e:
+                    logger.warning(f"Failed to fetch price for {symbol}: {e}")
+        except Exception as e:
+            logger.error(f"Error retrieving market indicators: {e}")
         
         return {
             'is_open': is_open,
@@ -390,6 +456,10 @@ class YahooFinanceService:
         """
         return self.synchronizer.update_realtime_prices(symbols)
     
+    def validateSymbolExists(self, symbol: str) -> bool:
+        """camelCase wrapper for validate_symbol"""
+        return self.validate_symbol(symbol)
+    
     def validate_symbol(self, symbol: str) -> bool:
         """
         Validate if a stock symbol exists.
@@ -400,7 +470,12 @@ class YahooFinanceService:
         Returns:
             True if valid, False otherwise
         """
-        return self.provider.validate_symbol(symbol)
+        try:
+            # First validate format
+            symbol = self.validateSymbol(symbol)
+            return self.provider.validate_symbol(symbol)
+        except ValueError:
+            return False
 
 
 # Singleton instance
