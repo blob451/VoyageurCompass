@@ -6,7 +6,8 @@ Based on the Maple Trade prototype logic with additional technical indicators.
 
 import logging
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Union
+import re
+from typing import Dict, List, Optional, Tuple, Union, Any
 from datetime import datetime, timedelta
 from decimal import Decimal
 from django.db.models import Q
@@ -57,10 +58,60 @@ class AnalyticsEngine:
     def __init__(self):
         """Initialize the analytics engine."""
         logger.info("Analytics Engine initialized with Maple Trade logic")
+        
+    # =====================================================================
+    # Input Validation (camelCase)
+    # =====================================================================
+    
+    def validateSymbol(self, symbol: str) -> str:
+        """Validate and sanitize stock symbol input"""
+        if not symbol or not isinstance(symbol, str):
+            raise ValueError("Symbol must be a non-empty string")
+        symbol = symbol.strip().upper()
+        # Allow only alphanumeric and common stock suffixes
+        if not re.match(r'^[A-Z0-9\.\-]{1,10}$', symbol):
+            raise ValueError(f"Invalid symbol format: {symbol}")
+        return symbol
+    
+    def validatePeriod(self, period: int) -> int:
+        """Validate period input for calculations"""
+        if not isinstance(period, (int, float)) or period <= 0 or period > 3650:
+            raise ValueError(f"Period must be between 1 and 3650 days: {period}")
+        return int(period)
+    
+    def validateNumericInput(self, value: Any, minVal: float = None, maxVal: float = None) -> bool:
+        """Validate numeric input parameters"""
+        try:
+            numValue = float(value)
+            if minVal is not None and numValue < minVal:
+                return False
+            if maxVal is not None and numValue > maxVal:
+                return False
+            return True
+        except (TypeError, ValueError):
+            return False
+    
+    def sanitizePriceList(self, prices: List[float]) -> List[float]:
+        """Validate and sanitize price list"""
+        if not isinstance(prices, list) or len(prices) == 0:
+            raise ValueError("Prices must be a non-empty list")
+        
+        sanitized = []
+        for price in prices:
+            if not self.validateNumericInput(price, minVal=0, maxVal=1000000):
+                raise ValueError(f"Invalid price value: {price}")
+            sanitized.append(float(price))
+        
+        return sanitized
     
     # =====================================================================
     # Basic Calculations (from prototype)
     # =====================================================================
+    
+    # camelCase wrapper methods
+    def calculateReturns(self, prices: List[float], period: str = 'daily') -> List[float]:
+        """camelCase wrapper for calculate_returns"""
+        return self.calculate_returns(prices, period)
     
     def calculate_returns(self, prices: List[float], period: str = 'daily') -> List[float]:
         """
@@ -73,6 +124,12 @@ class AnalyticsEngine:
         Returns:
             List of calculated returns as percentages
         """
+        # Input validation
+        prices = self.sanitizePriceList(prices)
+        valid_periods = ['daily', 'weekly', 'monthly']
+        if period not in valid_periods:
+            raise ValueError(f"Period must be one of {valid_periods}")
+        
         if len(prices) < 2:
             return []
         
@@ -87,6 +144,10 @@ class AnalyticsEngine:
         
         return returns
     
+    def calculatePeriodReturn(self, prices: List[float]) -> Optional[float]:
+        """camelCase wrapper for calculate_period_return"""
+        return self.calculate_period_return(prices)
+        
     def calculate_period_return(self, prices: List[float]) -> Optional[float]:
         """
         Calculate total return over the entire period (from prototype logic).
@@ -97,6 +158,9 @@ class AnalyticsEngine:
         Returns:
             Total return as percentage or None
         """
+        # Input validation
+        prices = self.sanitizePriceList(prices)
+        
         if len(prices) < 2:
             return None
         
@@ -415,6 +479,10 @@ class AnalyticsEngine:
     # Database Integration
     # =====================================================================
     
+    def getStockData(self, symbol: str, days: int = 180) -> Optional[Dict]:
+        """camelCase wrapper for get_stock_data"""
+        return self.get_stock_data(symbol, days)
+    
     def get_stock_data(self, symbol: str, days: int = 180) -> Optional[Dict]:
         """
         Fetch stock data from database.
@@ -427,6 +495,9 @@ class AnalyticsEngine:
             Dictionary with stock info and price history
         """
         try:
+            # Input validation
+            symbol = self.validateSymbol(symbol)
+            days = self.validatePeriod(days)
             # Get stock record
             stock = Stock.objects.get(symbol=symbol.upper())
             
@@ -514,6 +585,10 @@ class AnalyticsEngine:
     # Main Analysis Pipeline
     # =====================================================================
     
+    def runFullAnalysis(self, symbol: str, analysisMonths: int = 6) -> Dict:
+        """camelCase wrapper for run_full_analysis"""
+        return self.run_full_analysis(symbol, analysisMonths)
+    
     def run_full_analysis(self, symbol: str, analysis_months: int = 6) -> Dict:
         """
         Run complete analysis pipeline for a stock (main entry point).
@@ -526,6 +601,11 @@ class AnalyticsEngine:
             Dictionary with all analysis results
         """
         try:
+            # Input validation
+            symbol = self.validateSymbol(symbol)
+            if not self.validateNumericInput(analysis_months, minVal=1, maxVal=120):  # Max 10 years
+                raise ValueError(f"Analysis months must be between 1 and 120: {analysis_months}")
+            
             logger.info(f"Running full analysis for {symbol}")
             
             # Convert months to days
@@ -662,6 +742,10 @@ class AnalyticsEngine:
         else:
             return 'within_bands'
     
+    def analyzePortfolio(self, portfolioId: int) -> Dict:
+        """camelCase wrapper for analyze_portfolio"""
+        return self.analyze_portfolio(portfolioId)
+    
     def analyze_portfolio(self, portfolio_id: int) -> Dict:
         """
         Analyze all stocks in a portfolio.
@@ -673,6 +757,9 @@ class AnalyticsEngine:
             Dictionary with analysis results for all holdings
         """
         try:
+            # Input validation
+            if not isinstance(portfolio_id, int) or portfolio_id <= 0:
+                raise ValueError("Invalid portfolio ID")
             portfolio = Portfolio.objects.get(id=portfolio_id)
             holdings = PortfolioHolding.objects.filter(portfolio=portfolio)
             
@@ -687,11 +774,11 @@ class AnalyticsEngine:
                 
                 # Add holding-specific data
                 analysis['quantity'] = float(holding.quantity)
-                analysis['purchase_price'] = float(holding.purchase_price)
+                analysis['purchase_price'] = float(holding.average_price)
                 analysis['current_value'] = analysis['current_price'] * float(holding.quantity) if analysis.get('current_price') else None
-                analysis['purchase_value'] = float(holding.total_cost)
-                analysis['gain_loss'] = float(holding.gain_loss)
-                analysis['gain_loss_percent'] = float(holding.gain_loss_percent)
+                analysis['purchase_value'] = float(holding.cost_basis)
+                analysis['gain_loss'] = float(holding.unrealized_gain_loss)
+                analysis['gain_loss_percent'] = float(holding.unrealized_gain_loss_percent)
                 
                 results['holdings'].append(analysis)
             
