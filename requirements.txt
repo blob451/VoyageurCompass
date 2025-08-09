@@ -11,6 +11,7 @@ click-didyoumean==0.3.1
 click-plugins==1.1.1.2
 click-repl==0.3.0
 colorama==0.4.6
+coverage==7.10.2
 cron-descriptor==1.4.5
 Django==5.2.5
 django-celery-beat==2.8.1
@@ -25,6 +26,7 @@ frozendict==2.4.6
 html5lib==1.1
 idna==3.10
 inflection==0.5.1
+iniconfig==2.1.0
 jsonschema==4.25.0
 jsonschema-specifications==2025.4.1
 kombu==5.5.4
@@ -35,10 +37,15 @@ packaging==25.0
 pandas==2.3.1
 peewee==3.18.2
 platformdirs==4.3.8
+pluggy==1.6.0
 prompt_toolkit==3.0.51
 psycopg2==2.9.10
 psycopg2-binary==2.9.10
+Pygments==2.19.2
 PyJWT==2.10.1
+pytest==8.4.1
+pytest-cov==6.2.1
+pytest-django==4.11.1
 python-crontab==3.3.0
 python-dateutil==2.9.0.post0
 python-decouple==3.8

@@ -9,11 +9,18 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        // When running in Docker, the backend service is accessible as 'backend'
-        // When running locally without Docker, change this to 'http://localhost:8000'
         target: 'http://backend:8000',
         changeOrigin: true,
       },
     },
   },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+    css: true
+  },
+  define: {
+    'import.meta.vitest': 'undefined',
+  }
 })
