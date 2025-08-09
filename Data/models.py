@@ -1,14 +1,8 @@
 from django.db import models
-
-# Create your models here.
-"""
-Data Models Module
-Database models for storing financial market data in VoyageurCompass.
-"""
-
-from django.db import models
 from django.core.validators import MinValueValidator
 from django.utils import timezone
+from datetime import timedelta
+from decimal import Decimal
 
 
 class Stock(models.Model):
@@ -112,36 +106,28 @@ class Stock(models.Model):
         return self.prices.order_by('-date').first()
     
     def get_price_history(self, days=30):
-        """Get price history for specified number of days."""
-        return self.prices.order_by('-date')[:days]
-    
-    @property
-    def needs_sync(self):
-        """Check if stock data needs to be synced (older than 1 day)."""
-        if not self.last_sync:
-            return True
-        time_since_sync = timezone.now() - self.last_sync
-        return time_since_sync.total_seconds() > 86400  # 24 hours
+        """Get price history for the specified number of days."""
+        cutoff_date = timezone.now().date() - timedelta(days=days)
+        return self.prices.filter(date__gte=cutoff_date).order_by('-date')
 
 
 class StockPrice(models.Model):
     """
-    Model to store daily stock price data.
+    Model to store historical stock price data.
     """
     
-    # Relationship to Stock
     stock = models.ForeignKey(
         Stock, 
         on_delete=models.CASCADE, 
         related_name='prices',
         help_text="Related stock"
     )
-    
-    # Date and price data
     date = models.DateField(
         db_index=True,
         help_text="Trading date"
     )
+    
+    # Price data
     open = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
@@ -152,13 +138,13 @@ class StockPrice(models.Model):
         max_digits=10, 
         decimal_places=2,
         validators=[MinValueValidator(0)],
-        help_text="Daily high price"
+        help_text="Highest price of the day"
     )
     low = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
         validators=[MinValueValidator(0)],
-        help_text="Daily low price"
+        help_text="Lowest price of the day"
     )
     close = models.DecimalField(
         max_digits=10, 
@@ -172,30 +158,13 @@ class StockPrice(models.Model):
         validators=[MinValueValidator(0)],
         null=True,
         blank=True,
-        help_text="Adjusted closing price (for splits/dividends)"
+        help_text="Adjusted closing price (accounts for splits, dividends)"
     )
     
     # Volume data
     volume = models.BigIntegerField(
         default=0,
-        validators=[MinValueValidator(0)],
         help_text="Trading volume"
-    )
-    
-    # Calculated fields
-    change_amount = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="Price change from previous close"
-    )
-    change_percent = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="Percentage change from previous close"
     )
     
     # Metadata
@@ -209,42 +178,28 @@ class StockPrice(models.Model):
         unique_together = [['stock', 'date']]
         indexes = [
             models.Index(fields=['stock', '-date']),
-            models.Index(fields=['-date']),
+            models.Index(fields=['date']),
         ]
     
     def __str__(self):
         return f"{self.stock.symbol} - {self.date}: ${self.close}"
     
-    def save(self, *args, **kwargs):
-        """Calculate change fields before saving."""
-        if self.pk is None:  # New record
-            # Try to get previous day's closing price
-            previous_price = StockPrice.objects.filter(
-                stock=self.stock,
-                date__lt=self.date
-            ).order_by('-date').first()
-            
-            if previous_price:
-                self.change_amount = self.close - previous_price.close
-                if previous_price.close > 0:
-                    self.change_percent = (self.change_amount / previous_price.close) * 100
-        
-        super().save(*args, **kwargs)
+    @property
+    def daily_change(self):
+        """Calculate the daily price change using Decimal precision."""
+        return self.close - self.open
     
     @property
-    def daily_range(self):
-        """Get the daily price range as a string."""
-        return f"${self.low} - ${self.high}"
-    
-    @property
-    def is_gain(self):
-        """Check if this day was a gain."""
-        return self.change_amount and self.change_amount > 0
+    def daily_change_percent(self):
+        """Calculate the daily price change percentage using Decimal precision."""
+        if self.open and self.open != 0:
+            return (self.daily_change / self.open) * Decimal('100')
+        return Decimal('0')
 
 
 class Portfolio(models.Model):
     """
-    Model to store user portfolios.
+    Model to store user portfolio information.
     """
     
     name = models.CharField(
@@ -255,12 +210,36 @@ class Portfolio(models.Model):
         blank=True,
         help_text="Portfolio description"
     )
-    user = models.ForeignKey(
-        'auth.User',
-        on_delete=models.CASCADE,
-        related_name='portfolios',
-        help_text="Portfolio owner"
+    
+    # Portfolio value tracking
+    initial_value = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text="Initial investment amount"
     )
+    current_value = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text="Current portfolio value"
+    )
+    
+    # Risk parameters
+    risk_tolerance = models.CharField(
+        max_length=20,
+        choices=[
+            ('conservative', 'Conservative'),
+            ('moderate', 'Moderate'),
+            ('aggressive', 'Aggressive'),
+        ],
+        default='moderate',
+        help_text="Risk tolerance level"
+    )
+    
+    # Metadata
     is_active = models.BooleanField(
         default=True,
         help_text="Whether this portfolio is active"
@@ -274,19 +253,34 @@ class Portfolio(models.Model):
         verbose_name_plural = 'Portfolios'
     
     def __str__(self):
-        return f"{self.name} - {self.user.username}"
+        return self.name
+    
+    def calculate_returns(self):
+        """Calculate portfolio returns."""
+        if self.initial_value and self.initial_value != 0:
+            return ((self.current_value - self.initial_value) / self.initial_value) * Decimal('100')
+        return Decimal('0')
+    
+    def update_value(self):
+        """Update the current portfolio value based on holdings."""
+        total_value = sum(
+            (holding.current_value for holding in self.holdings.filter(is_active=True)),
+            start=Decimal('0')
+        )
+        self.current_value = total_value
+        self.save(update_fields=['current_value', 'updated_at'])
 
 
 class PortfolioHolding(models.Model):
     """
-    Model to store individual stock holdings in a portfolio.
+    Model to store individual holdings within a portfolio.
     """
     
     portfolio = models.ForeignKey(
         Portfolio,
         on_delete=models.CASCADE,
         related_name='holdings',
-        help_text="Related portfolio"
+        help_text="Parent portfolio"
     )
     stock = models.ForeignKey(
         Stock,
@@ -294,30 +288,71 @@ class PortfolioHolding(models.Model):
         related_name='portfolio_holdings',
         help_text="Stock being held"
     )
+    
+    # Position details
     quantity = models.DecimalField(
         max_digits=12,
         decimal_places=4,
         validators=[MinValueValidator(0)],
         help_text="Number of shares"
     )
-    purchase_price = models.DecimalField(
+    average_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         validators=[MinValueValidator(0)],
         help_text="Average purchase price per share"
     )
-    purchase_date = models.DateField(
-        help_text="Date of purchase"
+    current_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text="Current market price per share"
     )
-    notes = models.TextField(
-        blank=True,
-        help_text="Additional notes about this holding"
+    
+    # Value calculations
+    cost_basis = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text="Total investment cost"
+    )
+    current_value = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text="Current market value"
+    )
+    
+    # Performance metrics
+    unrealized_gain_loss = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Unrealized profit/loss"
+    )
+    unrealized_gain_loss_percent = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=0,
+        help_text="Unrealized profit/loss percentage"
+    )
+    
+    # Metadata
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this holding is active"
+    )
+    purchase_date = models.DateField(
+        help_text="Date of initial purchase"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        ordering = ['stock__symbol']
+        ordering = ['-current_value']
         verbose_name = 'Portfolio Holding'
         verbose_name_plural = 'Portfolio Holdings'
         unique_together = [['portfolio', 'stock']]
@@ -325,27 +360,22 @@ class PortfolioHolding(models.Model):
     def __str__(self):
         return f"{self.portfolio.name} - {self.stock.symbol}: {self.quantity} shares"
     
-    @property
-    def total_cost(self):
-        """Calculate total cost of this holding."""
-        return self.quantity * self.purchase_price
-    
-    @property
-    def current_value(self):
-        """Calculate current value based on latest price."""
-        latest_price = self.stock.get_latest_price()
-        if latest_price:
-            return self.quantity * latest_price.close
-        return 0
-    
-    @property
-    def gain_loss(self):
-        """Calculate gain/loss for this holding."""
-        return self.current_value - self.total_cost
-    
-    @property
-    def gain_loss_percent(self):
-        """Calculate gain/loss percentage."""
-        if self.total_cost > 0:
-            return (self.gain_loss / self.total_cost) * 100
-        return 0
+    def save(self, *args, **kwargs):
+        """Override save to calculate derived fields and update portfolio."""
+        # Calculate cost basis
+        self.cost_basis = self.quantity * self.average_price
+        
+        # Calculate current value
+        self.current_value = self.quantity * self.current_price
+        
+        # Calculate unrealized gains/losses
+        self.unrealized_gain_loss = self.current_value - self.cost_basis
+        
+        # Calculate percentage
+        if self.cost_basis > 0:
+            self.unrealized_gain_loss_percent = (self.unrealized_gain_loss / self.cost_basis) * Decimal('100')
+        
+        super().save(*args, **kwargs)
+        
+        # Update portfolio total value after saving
+        self.portfolio.update_value()
