@@ -32,12 +32,18 @@ RUN pip install --upgrade pip && \
 # Copy project files
 COPY . .
 
+# Create necessary directories for static files and logs
+RUN mkdir -p /app/staticfiles /app/logs /app/Design/media /app/Design/static
+
 # Create a non-root user to run the application
 RUN useradd -m -u 1001 voyageur && \
     chown -R voyageur:voyageur /app
 
 # Switch to non-root user
 USER voyageur
+
+# Collect static files for WhiteNoise to serve
+RUN python manage.py collectstatic --noinput
 
 # Expose port
 EXPOSE 8000

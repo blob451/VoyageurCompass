@@ -1,14 +1,70 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { CircularProgress, Box, Typography } from '@mui/material';
 import Layout from './components/Layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
 
-// Blurp
+// Lazy load page components for code splitting
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 
+// Loading component with accessibility support
+const PageLoader = () => (
+  <Box
+    role="status"
+    aria-live="polite"
+    sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh',
+      backgroundColor: '#f5f5f5',
+    }}
+  >
+    <CircularProgress 
+      size={60} 
+      thickness={4} 
+      aria-label="Loading page"
+    />
+    <Typography 
+      variant="srOnly" 
+      component="span"
+      sx={{ position: 'absolute', left: '-9999px' }}
+    >
+      Loading page content...
+    </Typography>
+  </Box>
+);
+
+// 404 Not Found component
+const NotFound = () => (
+  <Box
+    sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh',
+      backgroundColor: '#f5f5f5',
+    }}
+  >
+    <Typography variant="h1" component="h1" gutterBottom>
+      404
+    </Typography>
+    <Typography variant="h5" component="h2" gutterBottom>
+      Page Not Found
+    </Typography>
+    <Typography variant="body1" color="text.secondary" paragraph>
+      The page you are looking for doesn't exist.
+    </Typography>
+    <Navigate to="/dashboard" replace />
+  </Box>
+);
+
+// Theme configuration
 const theme = createTheme({
   palette: {
     mode: 'light',
@@ -56,15 +112,19 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="login" element={<LoginPage />} />
-            <Route element={<ProtectedRoute />}>
-              <Route path="dashboard" element={<DashboardPage />} />
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="login" element={<LoginPage />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="dashboard" element={<DashboardPage />} />
+              </Route>
+              {/* Catch-all route for 404 */}
+              <Route path="*" element={<NotFound />} />
             </Route>
-          </Route>
-        </Routes>
+          </Routes>
+        </Suspense>
       </Router>
     </ThemeProvider>
   );
