@@ -5,6 +5,14 @@ from django.conf import settings
 from datetime import timedelta
 from decimal import Decimal
 
+from .managers import StockManager, RealDataManager
+
+
+class DataSourceChoices(models.TextChoices):
+    """Data source choices for tracking data origin."""
+    YAHOO = 'yahoo', 'Yahoo Finance'
+    MOCK = 'mock', 'Mock Data'
+
 
 class Stock(models.Model):
     """
@@ -89,6 +97,18 @@ class Stock(models.Model):
         help_text="Last time data was synced from Yahoo Finance"
     )
     
+    # Data source tracking
+    dataSource = models.CharField(
+        max_length=10,
+        choices=DataSourceChoices.choices,
+        default=DataSourceChoices.YAHOO,
+        help_text="Source of the stock data"
+    )
+    
+    # Custom managers
+    objects = StockManager()
+    real_data = RealDataManager()
+    
     class Meta:
         ordering = ['symbol']
         verbose_name = 'Stock'
@@ -97,6 +117,7 @@ class Stock(models.Model):
             models.Index(fields=['symbol']),
             models.Index(fields=['sector', 'industry']),
             models.Index(fields=['is_active', 'symbol']),
+            models.Index(fields=['dataSource', 'symbol']),
         ]
     
     def __str__(self):
@@ -182,6 +203,18 @@ class StockPrice(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    # Data source tracking
+    dataSource = models.CharField(
+        max_length=10,
+        choices=DataSourceChoices.choices,
+        default=DataSourceChoices.YAHOO,
+        help_text="Source of the price data"
+    )
+    
+    # Custom managers
+    objects = models.Manager()
+    real_data = RealDataManager()
+    
     class Meta:
         ordering = ['-date']
         verbose_name = 'Stock Price'
@@ -190,6 +223,7 @@ class StockPrice(models.Model):
         indexes = [
             models.Index(fields=['stock', '-date']),
             models.Index(fields=['date']),
+            models.Index(fields=['dataSource', 'stock', '-date']),
         ]
     
     def __str__(self):
@@ -249,6 +283,72 @@ class StockPrice(models.Model):
             stacklevel=2
         )
         return self.daily_change_percent
+
+
+class PriceBar(models.Model):
+    """
+    Model for OHLCV time-series data with interval support.
+    """
+    
+    INTERVAL_CHOICES = [
+        ('1m', '1 Minute'),
+        ('5m', '5 Minutes'),
+        ('15m', '15 Minutes'),
+        ('30m', '30 Minutes'),
+        ('1h', '1 Hour'),
+        ('1d', '1 Day'),
+        ('1wk', '1 Week'),
+        ('1mo', '1 Month'),
+    ]
+    
+    stock = models.ForeignKey(
+        Stock,
+        on_delete=models.CASCADE,
+        related_name='priceBars',
+        help_text="Related stock"
+    )
+    date = models.DateTimeField(
+        db_index=True,
+        help_text="Bar timestamp"
+    )
+    interval = models.CharField(
+        max_length=5,
+        choices=INTERVAL_CHOICES,
+        default='1d',
+        help_text="Time interval"
+    )
+    
+    # OHLCV data
+    open = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    high = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    low = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    close = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    volume = models.BigIntegerField(default=0, validators=[MinValueValidator(0)])
+    
+    # Data source tracking
+    dataSource = models.CharField(
+        max_length=10,
+        choices=DataSourceChoices.choices,
+        default=DataSourceChoices.YAHOO,
+        help_text="Source of the price bar data"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Custom managers  
+    objects = models.Manager()
+    real_data = RealDataManager()
+    
+    class Meta:
+        ordering = ['-date']
+        unique_together = [['stock', 'date', 'interval']]
+        indexes = [
+            models.Index(fields=['stock', 'interval', '-date']),
+            models.Index(fields=['dataSource', 'stock', '-date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.stock.symbol} - {self.date} ({self.interval}): ${self.close}"
 
 
 class Portfolio(models.Model):

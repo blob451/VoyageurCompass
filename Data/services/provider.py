@@ -243,7 +243,8 @@ class DataProvider:
             },
             'history': history,
             'fetched_at': datetime.now().isoformat(),
-            'is_mock_data': True  # Flag to indicate this is mock data
+            'is_mock_data': True,  # Flag to indicate this is mock data
+            'dataSource': 'mock'  # Explicit data source
         }
     
     def fetch_multiple_stocks(self, symbols: List[str], period: str = "1mo") -> Dict[str, Dict]:
@@ -397,7 +398,8 @@ class DataProvider:
                 'grossProfit': random.randint(5000000, 50000000000),
                 'ebitda': random.randint(1000000, 20000000000),
             },
-            'is_mock_data': True
+            'is_mock_data': True,
+            'dataSource': 'mock'
         }
     
     def validate_symbol(self, symbol: str) -> bool:
