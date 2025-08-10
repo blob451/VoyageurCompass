@@ -3,6 +3,7 @@ API Views for Core app.
 Handles authentication, user management, and system utilities.
 """
 
+import logging
 from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -11,6 +12,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth.models import User
+from django.http import JsonResponse
+from django.db import connection
 from drf_spectacular.utils import extend_schema
 
 from Core.serializers import (
@@ -203,6 +206,47 @@ def health_check(request):
         'version': '1.0.0',
         'service': 'VoyageurCompass API'
     })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def healthCheck(request):
+    """Liveness probe - simple health check"""
+    from datetime import datetime, timezone
+    return JsonResponse({
+        'status': 'healthy',
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'requestId': getattr(request, 'correlation_id', None),
+    })
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def readinessCheck(request):
+    """Readiness probe - checks database connectivity"""
+    logger = logging.getLogger('VoyageurCompass.health')
+    
+    try:
+        # Simple DB ping
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        
+        from datetime import datetime, timezone
+        return JsonResponse({
+            'status': 'ready',
+            'database': 'connected',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'requestId': getattr(request, 'correlation_id', None),
+        })
+    except Exception as e:
+        logger.error('Readiness check failed', exc_info=True)
+        from datetime import datetime, timezone
+        return JsonResponse({
+            'status': 'not ready',
+            'database': 'disconnected',
+            'error': 'database connection failure',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'requestId': getattr(request, 'correlation_id', None),
+        }, status=503)
 
 
 @extend_schema(

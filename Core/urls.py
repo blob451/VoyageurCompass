@@ -10,7 +10,9 @@ from Core.views import (
     UserProfileView,
     ChangePasswordView,
     health_check,
-    user_stats
+    user_stats,
+    healthCheck,
+    readinessCheck
 )
 
 app_name = 'core'
@@ -28,4 +30,6 @@ urlpatterns = [
     
     # System
     path('health/', health_check, name='health_check'),
+    path('healthz/', healthCheck, name='health_liveness'),
+    path('readyz/', readinessCheck, name='health_readiness'),
 ]
