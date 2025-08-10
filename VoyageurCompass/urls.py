@@ -23,9 +23,14 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView
 )
+from Core.views import healthCheck as health_check_liveness, readinessCheck as readiness_check
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    
+    # Health checks at root level
+    path('healthz', health_check_liveness, name='health_liveness_root'),
+    path('readyz', readiness_check, name='health_readiness_root'),
     
     # API endpoints
     path('api/v1/', include('Core.urls')),

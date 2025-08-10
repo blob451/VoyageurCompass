@@ -10,7 +10,9 @@ from Core.views import (
     UserProfileView,
     ChangePasswordView,
     health_check,
-    user_stats
+    user_stats,
+    healthCheck as health_check_liveness,
+    readinessCheck as readiness_check
 )
 
 app_name = 'core'
@@ -26,6 +28,7 @@ urlpatterns = [
     path('user/change-password/', ChangePasswordView.as_view(), name='change_password'),
     path('user/stats/', user_stats, name='user_stats'),
     
-    # System
+    # System - main health check endpoint only
+    # Root-level health checks available at /healthz and /readyz
     path('health/', health_check, name='health_check'),
 ]

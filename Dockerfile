@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     libxslt-dev \
     python3-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
@@ -47,6 +48,10 @@ RUN python manage.py collectstatic --noinput
 
 # Expose port
 EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -fsS http://localhost:8000/healthz -o /dev/null
 
 # Run Django development server
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

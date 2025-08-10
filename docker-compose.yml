@@ -88,6 +88,12 @@ services:
       - REDIS_PORT=6379
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
+      # Logging and monitoring
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - APP_ENV=${APP_ENV:-development}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       # Security settings
       - SECURE_SSL_REDIRECT=${SECURE_SSL_REDIRECT:-False}
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-False}
@@ -112,10 +118,11 @@ services:
         python manage.py runserver 0.0.0.0:8000
       "
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/admin/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
     networks:
       - voyageur-network
 

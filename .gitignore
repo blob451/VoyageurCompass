@@ -11,6 +11,7 @@ prompts/
 .claude/
 CLAUDE.md
 code-review-output.md
+codeReview.md
 
 # Distribution / packaging
 .Python

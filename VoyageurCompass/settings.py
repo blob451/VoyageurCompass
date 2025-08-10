@@ -13,9 +13,17 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import environ
 import os
 import sys
+import json
 from pathlib import Path
 from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
+
+# Guard Sentry import to prevent crashes when package not installed
+try:
+    import sentry_sdk
+    SENTRY_AVAILABLE = True
+except ImportError:
+    SENTRY_AVAILABLE = False
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -49,6 +57,7 @@ if not DEBUG and SECRET_KEY == 'django-insecure-dev-only-key-replace-in-producti
     )
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+APP_ENV = env('APP_ENV', default='development')
 
 
 # Application definition
@@ -77,13 +86,14 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Add WhiteNoise for static file serving
-    'corsheaders.middleware.CorsMiddleware',
+    'Core.middleware.CustomCorsMiddleware',  # Use custom CORS middleware with preflight handling
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'Core.middleware.RequestLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'VoyageurCompass.urls'
@@ -138,11 +148,12 @@ DATABASES = {
 # SQLite Guard - Prevent SQLite usage
 def checkDatabaseEngine():
     """Ensure PostgreSQL is used, not SQLite"""
-    if 'sqlite' in DATABASES['default']['ENGINE'].lower():
-        if not ('test' in sys.argv or 'pytest' in sys.modules):
-            raise ImproperlyConfigured(
-                "SQLite is not allowed! Configure PostgreSQL in DATABASES setting."
-            )
+    if ('sqlite' in DATABASES['default']['ENGINE'].lower()
+            and 'test' not in sys.argv
+            and 'pytest' not in sys.modules):
+        raise ImproperlyConfigured(
+            "SQLite is not allowed! Configure PostgreSQL in DATABASES setting."
+        )
 checkDatabaseEngine()
 
 # Override database for testing
@@ -381,78 +392,91 @@ if not DEBUG:
 SESSION_COOKIE_HTTPONLY = True
 
 
-# Logging Configuration
+# Structured Logging Configuration
+LOG_LEVEL = env('LOG_LEVEL', default='INFO')
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
+        'json': {
+            'format': '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "environment": ' + json.dumps(APP_ENV) + ', "message": "%(message)s"}',
+            'datefmt': '%Y-%m-%dT%H:%M:%S',
         },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
-    'filters': {
-        'require_debug_true': {
-            '()': 'django.utils.log.RequireDebugTrue',
+        'structured': {
+            'format': 'timestamp=%(asctime)s level=%(levelname)s logger=%(name)s environment=' + json.dumps(APP_ENV) + ' message="%(message)s"',
+            'datefmt': '%Y-%m-%dT%H:%M:%S',
         },
     },
     'handlers': {
         'console': {
-            'level': 'INFO',
-            'filters': ['require_debug_true'],
             'class': 'logging.StreamHandler',
-            'formatter': 'simple'
-        },
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'debug.log',
-            'formatter': 'verbose'
-        },
-        'db_file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'database.log',
-            'formatter': 'verbose'
-        },
-        'celery_file': {
-            'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'celery.log',
-            'formatter': 'verbose'
+            'formatter': 'json' if env('LOG_FORMAT', default='') == 'json' else 'structured',
+            'level': LOG_LEVEL,
         },
     },
     'root': {
         'handlers': ['console'],
-        'level': 'INFO' if not DEBUG else 'DEBUG',
+        'level': LOG_LEVEL,
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
             'propagate': False,
         },
-        'django.db.backends': {
-            'handlers': ['db_file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False,
-        },
-        'celery': {
-            'handlers': ['console', 'celery_file'],
-            'level': 'INFO',
+        'VoyageurCompass': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
             'propagate': False,
         },
     },
 }
 
-# Create logs directory if it doesn't exist
-LOGS_DIR = BASE_DIR / 'logs'
-if not LOGS_DIR.exists():
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+# Logs directory creation removed - no file handlers configured
+# LOGS_DIR = BASE_DIR / 'logs'
+# if not LOGS_DIR.exists():
+#     LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Sentry Error Tracking
+SENTRY_DSN = env('SENTRY_DSN', default=None)
+if SENTRY_AVAILABLE and SENTRY_DSN:
+    def before_send(event, hint):
+        """Redact sensitive data instead of dropping entire events"""
+        # List of sensitive keys to redact
+        sensitive_keys = ['password', 'token', 'secret', 'api_key', 'private_key', 'ssn']
+        
+        def redact_dict(d):
+            """Recursively redact sensitive keys in dictionary"""
+            if not isinstance(d, dict):
+                return d
+            for key in list(d.keys()):
+                if any(sensitive in str(key).lower() for sensitive in sensitive_keys):
+                    d[key] = '[REDACTED]'
+                elif isinstance(d[key], dict):
+                    redact_dict(d[key])
+                elif isinstance(d[key], list):
+                    for item in d[key]:
+                        if isinstance(item, dict):
+                            redact_dict(item)
+            return d
+        
+        if isinstance(event, dict):
+            event = redact_dict(event.copy())
+        return event
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        before_send=before_send,
+        send_default_pii=False,  # Don't send PII by default
+        integrations=[
+            sentry_sdk.integrations.django.DjangoIntegration(),
+            sentry_sdk.integrations.redis.RedisIntegration(),
+        ],
+        traces_sample_rate=float(env('SENTRY_TRACES_SAMPLE_RATE', default='0.1')),
+        environment=APP_ENV,
+        release=env('APP_VERSION', default='unknown'),
+    )
 
 
 # Custom Settings for VoyageurCompass
