@@ -6,13 +6,39 @@ This module acts as the main interface for Yahoo Finance operations.
 
 import logging
 import re
-from typing import Dict, List
-from datetime import datetime, timedelta
+import time
+import random
+import os
+import yfinance as yf
+import pandas as pd
+from typing import Dict, List, Optional, Any, Tuple
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
+# Configure yfinance with proper headers to handle consent pages
+# SSL verification remains enabled for security
+import requests
+
+# Configure session with proper headers for Yahoo Finance
+session = requests.Session()
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate',
+    'DNT': '1',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1'
+})
+
+# Note: requests.Session doesn't support a default `timeout` attribute.
+# Keep a module-level default to pass explicitly to HTTP calls.
+DEFAULT_TIMEOUT = 30
 
 from Data.services.provider import data_provider
 from Data.services.synchronizer import data_synchronizer
-from django.db import models
-from Data.models import Stock, StockPrice
+from django.db import models, transaction
+from Data.models import Stock, StockPrice, PriceBar
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +49,18 @@ class YahooFinanceService:
     Coordinates between provider, synchronizer, and database.
     """
     
+    # Class-level constants for validation
+    VALID_PERIODS = frozenset(['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'])
+    VALID_INTERVALS = frozenset(['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', '3mo'])
+    
     def __init__(self):
         """Initialize the Yahoo Finance service."""
         self.provider = data_provider
         self.synchronizer = data_synchronizer
         self.timeout = 30  # Default timeout
+        self.maxRetries = 5
+        self.baseDelay = 2
+        self.maxBackoff = 60
         logger.info("Yahoo Finance Service initialized with yfinance integration")
     
     # =====================================================================
@@ -46,10 +79,15 @@ class YahooFinanceService:
     
     def validatePeriod(self, period: str) -> str:
         """Validate period parameter"""
-        validPeriods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
-        if period not in validPeriods:
-            raise ValueError(f"Invalid period: {period}. Must be one of {validPeriods}")
+        if period not in self.VALID_PERIODS:
+            raise ValueError(f"Invalid period: {period}. Must be one of {sorted(self.VALID_PERIODS)}")
         return period
+    
+    def validateInterval(self, interval: str) -> str:
+        """Validate interval parameter"""
+        if interval not in self.VALID_INTERVALS:
+            raise ValueError(f"Invalid interval: {interval}. Must be one of {sorted(self.VALID_INTERVALS)}")
+        return interval
     
     def validateDateRange(self, startDate: datetime, endDate: datetime) -> bool:
         """Validate date range parameters"""
@@ -474,6 +512,404 @@ class YahooFinanceService:
             return self.provider.validate_symbol(symbol)
         except ValueError:
             return False
+
+
+    def _retryWithBackoff(self, func, *args, **kwargs):
+        """Execute function with exponential backoff on rate limiting."""
+        for attempt in range(self.maxRetries):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                if '429' in str(e) or 'Too Many Requests' in str(e):
+                    if attempt < self.maxRetries - 1:
+                        delay = min(
+                            self.baseDelay * (2 ** attempt) + random.uniform(0, 1),
+                            self.maxBackoff
+                        )
+                        logger.warning(f"Rate limited, attempt {attempt + 1}/{self.maxRetries}, waiting {delay:.1f}s")
+                        time.sleep(delay)
+                    else:
+                        raise
+                else:
+                    raise
+        raise Exception(f"Max retries ({self.maxRetries}) exceeded")
+    
+    def fetchBatchHistorical(self, tickers: List[str], period: str = '6mo', interval: str = '1d') -> Dict[str, List[Dict]]:
+        """
+        Fetch historical data for multiple tickers with rate limit handling.
+        Process each ticker individually to avoid overwhelming the API.
+        """
+        results = {}
+        
+        for i, ticker in enumerate(tickers):
+            logger.info(f"Fetching {ticker} ({i+1}/{len(tickers)}) - {period} @ {interval}")
+            
+            # Add delay between tickers to avoid rate limiting
+            if i > 0:
+                time.sleep(random.uniform(1, 2))
+            
+            try:
+                data = self._retryWithBackoff(self._fetchSingleTicker, ticker, period, interval)
+                results[ticker] = data
+                logger.info(f"Successfully fetched {len(data)} bars for {ticker}")
+            except Exception as e:
+                logger.error(f"Failed to fetch {ticker}: {str(e)}")
+                results[ticker] = []
+        
+        return results
+    
+    def fetchSingleHistorical(self, ticker: str, period: str = '1wk', interval: str = '1d') -> List[Dict]:
+        """Fetch historical data for a single ticker."""
+        logger.info(f"Fetching single ticker {ticker} - {period} @ {interval}")
+        
+        try:
+            data = self._retryWithBackoff(self._fetchSingleTicker, ticker, period, interval)
+            logger.info(f"Successfully fetched {len(data)} bars for {ticker}")
+            return data
+        except Exception as e:
+            logger.error(f"Failed to fetch {ticker}: {str(e)}")
+            return []
+    
+    def _validate_period_interval(self, period: str, interval: str) -> None:
+        """
+        Validate period and interval parameters for yf.download.
+        
+        Args:
+            period: Time period for data (e.g., '1d', '5d', '1mo', etc.)
+            interval: Data interval (e.g., '1m', '5m', '1d', etc.)
+        
+        Raises:
+            ValueError: If period or interval values are invalid
+        """
+        # Validate using centralized validation functions
+        period = self.validatePeriod(period)
+        interval = self.validateInterval(interval)
+        
+        # Additional validation for period-interval combinations
+        # Intraday intervals (< 1d) have restrictions on period
+        intraday_intervals = {'1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h'}
+        max_intraday_periods = {'1d', '5d', '1mo'}
+        
+        if interval in intraday_intervals and period not in max_intraday_periods:
+            raise ValueError(
+                f"Intraday interval '{interval}' can only be used with periods: {', '.join(sorted(max_intraday_periods))}"
+            )
+        
+        logger.debug(f"Validated period='{period}' and interval='{interval}'")
+    
+    def _find_matching_ticker(self, columns: pd.MultiIndex, ticker: str) -> Optional[str]:
+        """
+        Find the matching ticker symbol in MultiIndex columns, handling case and format differences.
+        
+        Args:
+            columns: MultiIndex columns from pandas DataFrame
+            ticker: Original ticker symbol to match
+        
+        Returns:
+            Matched ticker symbol from columns, or None if not found
+        """
+        if not isinstance(columns, pd.MultiIndex) or len(columns.levels) < 2:
+            return None
+        
+        # Get all ticker symbols from the second level (assuming structure like ('Close', 'AAPL'))
+        ticker_level = columns.levels[1]
+        
+        # Normalize the input ticker for comparison
+        normalized_ticker = ticker.upper().strip()
+        
+        # Try exact match first
+        if normalized_ticker in ticker_level:
+            return normalized_ticker
+        
+        # Try case-insensitive matching
+        for col_ticker in ticker_level:
+            if col_ticker.upper().strip() == normalized_ticker:
+                return col_ticker
+        
+        # Try partial matching for cases like 'BRK-B' vs 'BRK.B'
+        for col_ticker in ticker_level:
+            normalized_col = col_ticker.upper().strip().replace('-', '.').replace('_', '.')
+            normalized_input = normalized_ticker.replace('-', '.').replace('_', '.')
+            if normalized_col == normalized_input:
+                return col_ticker
+        
+        logger.warning(f"Could not find matching ticker for '{ticker}' in MultiIndex levels: {list(ticker_level)}")
+        return None
+    
+    def _safe_multiindex_access(self, row: pd.Series, column_type: str, ticker: str):
+        """
+        Safely access MultiIndex columns with fallback mechanisms.
+        
+        Args:
+            row: Pandas Series row from DataFrame
+            column_type: Type of column ('Close', 'Open', etc.)
+            ticker: Ticker symbol
+        
+        Returns:
+            Column value or None if not accessible
+        """
+        try:
+            # Try different variations of the column access
+            variations = [
+                (column_type, ticker),
+                (column_type, ticker.upper()),
+                (column_type, ticker.lower()),
+                (column_type.lower(), ticker),
+                (column_type.lower(), ticker.upper()),
+                (column_type.lower(), ticker.lower())
+            ]
+            
+            for col_tuple in variations:
+                try:
+                    if col_tuple in row.index:
+                        return row[col_tuple]
+                except (KeyError, TypeError):
+                    continue
+            
+            # Last resort: try to find any column that contains the column_type
+            for idx in row.index:
+                if isinstance(idx, tuple) and len(idx) >= 2:
+                    if (isinstance(idx[0], str) and column_type.lower() in idx[0].lower()):
+                        return row[idx]
+            
+            logger.warning(f"Could not access {column_type} for ticker {ticker} in MultiIndex row")
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error accessing MultiIndex column {column_type} for {ticker}: {str(e)}")
+            return None
+    
+    def _fetchSingleTicker(self, ticker: str, period: str, interval: str) -> List[Dict]:
+        """Internal method to fetch data for one ticker."""
+        try:
+            # Validate period and interval parameters before calling yf.download
+            self._validate_period_interval(period, interval)
+            
+            # Try using yf.download with default session handling
+            history = yf.download(
+                ticker, 
+                period=period, 
+                interval=interval, 
+                auto_adjust=False,  # Preserve unadjusted close prices for consistency
+                prepost=False,
+                threads=False,
+                progress=False
+            )
+            
+            if history.empty:
+                logger.warning(f"No data returned for {ticker}")
+                return []
+            
+            
+            bars = []
+            for date, row in history.iterrows():
+                try:
+                    # Handle MultiIndex columns with robust ticker matching
+                    if isinstance(history.columns, pd.MultiIndex):
+                        # Find the correct ticker symbol in MultiIndex levels
+                        matched_ticker = self._find_matching_ticker(history.columns, ticker)
+                        
+                        if matched_ticker:
+                            # Use the matched ticker for column access
+                            close_val = row[('Close', matched_ticker)]
+                            open_val = row[('Open', matched_ticker)]
+                            high_val = row[('High', matched_ticker)]
+                            low_val = row[('Low', matched_ticker)]
+                            volume_val = row[('Volume', matched_ticker)]
+                        else:
+                            # Fallback: try to find columns by pattern matching
+                            close_val = self._safe_multiindex_access(row, 'Close', ticker)
+                            open_val = self._safe_multiindex_access(row, 'Open', ticker)
+                            high_val = self._safe_multiindex_access(row, 'High', ticker)
+                            low_val = self._safe_multiindex_access(row, 'Low', ticker)
+                            volume_val = self._safe_multiindex_access(row, 'Volume', ticker)
+                    else:
+                        # Simple column names
+                        close_val = row['Close']
+                        open_val = row['Open'] 
+                        high_val = row['High']
+                        low_val = row['Low']
+                        volume_val = row['Volume']
+                    
+                    # Skip if no valid close price
+                    if pd.isna(close_val):
+                        continue
+                    
+                    # Convert to appropriate types, handling NaN values
+                    open_val = float(open_val) if pd.notna(open_val) else float(close_val)
+                    high_val = float(high_val) if pd.notna(high_val) else float(close_val)
+                    low_val = float(low_val) if pd.notna(low_val) else float(close_val)
+                    close_val = float(close_val)
+                    volume_val = int(volume_val) if pd.notna(volume_val) else 0
+                    
+                    # Handle timezone - check if date has timezone info
+                    if hasattr(date, 'tzinfo') and date.tzinfo is not None:
+                        date_utc = date.tz_convert('UTC')
+                    else:
+                        date_utc = date.replace(tzinfo=timezone.utc)
+                    
+                    bars.append({
+                        'symbol': ticker.upper(),
+                        'date': date_utc,
+                        'open': Decimal(str(round(open_val, 2))),
+                        'high': Decimal(str(round(high_val, 2))),
+                        'low': Decimal(str(round(low_val, 2))),
+                        'close': Decimal(str(round(close_val, 2))),
+                        'volume': volume_val,
+                        'interval': interval,
+                        'data_source': 'yahoo'
+                    })
+                except Exception as e:
+                    logger.warning(f"Skipping row for {ticker} due to: {str(e)}")
+                    continue
+            
+            return bars
+        except Exception as e:
+            logger.error(f"Error fetching data for {ticker}: {str(e)}")
+            return []
+    
+    def normalizeBars(self, bars: List[Dict]) -> List[Dict]:
+        """Normalize bar data for database insertion."""
+        # Already normalized in _fetchSingleTicker
+        return bars
+    
+    def saveBars(self, bars: List[Dict]) -> Tuple[int, int]:
+        """
+        Save bars to database using bulk operations.
+        Returns (created_count, skipped_count).
+        """
+        from Data.models import Stock, PriceBar
+        
+        if not bars:
+            return 0, 0
+        
+        # Ensure stocks exist using bulk operations for efficiency
+        symbols = list(set(bar['symbol'] for bar in bars))
+        
+        # Query existing stocks in one database call
+        existing_stocks = Stock.objects.filter(symbol__in=symbols)
+        existing_symbols = set(stock.symbol for stock in existing_stocks)
+        
+        # Identify missing symbols and bulk create them
+        missing_symbols = set(symbols) - existing_symbols
+        if missing_symbols:
+            stocks_to_create = [
+                Stock(symbol=symbol, short_name=symbol, data_source='yahoo')
+                for symbol in missing_symbols
+            ]
+            
+            try:
+                # Attempt bulk create without ignoring conflicts first
+                created_stocks = Stock.objects.bulk_create(stocks_to_create, ignore_conflicts=False)
+                logger.info(f"Successfully created {len(created_stocks)} new Stock records: {list(missing_symbols)}")
+            except Exception as e:
+                # Handle conflicts explicitly with detailed logging
+                logger.warning(f"Conflicts detected during Stock creation for symbols {list(missing_symbols)}: {str(e)}")
+                
+                # Retry with ignore_conflicts to handle race conditions
+                try:
+                    created_stocks = Stock.objects.bulk_create(stocks_to_create, ignore_conflicts=True)
+                    actual_created = len(created_stocks)
+                    skipped = len(stocks_to_create) - actual_created
+                    
+                    if skipped > 0:
+                        logger.info(f"Stock creation: {actual_created} created, {skipped} skipped due to conflicts")
+                        # Log which specific symbols may have been skipped
+                        if actual_created == 0:
+                            logger.debug(f"All Stock symbols already existed: {list(missing_symbols)}")
+                    else:
+                        logger.info(f"Successfully created {actual_created} Stock records after retry")
+                        
+                except Exception as retry_error:
+                    logger.error(f"Failed to create Stock records even with ignore_conflicts: {str(retry_error)}")
+                    raise
+        
+        # Create a stock lookup dictionary for efficient access
+        all_stocks = Stock.objects.filter(symbol__in=symbols)
+        stock_lookup = {stock.symbol: stock for stock in all_stocks}
+        
+        # Bulk create with conflict handling
+        price_bars = []
+        skipped_bars = 0
+        missing_stocks = {}  # Track missing stocks with sample dates for diagnosis
+        
+        for bar in bars:
+            # Safely check if stock exists in lookup to avoid KeyError
+            stock = stock_lookup.get(bar['symbol'])
+            if stock is None:
+                # Aggregate missing stock info instead of logging per bar
+                symbol = bar['symbol']
+                if symbol not in missing_stocks:
+                    missing_stocks[symbol] = []
+                # Store sample dates for diagnosis (limit to 3 samples per symbol)
+                if len(missing_stocks[symbol]) < 3:
+                    missing_stocks[symbol].append(bar.get('date', 'unknown date'))
+                skipped_bars += 1
+                continue
+                
+            price_bars.append(PriceBar(
+                stock=stock,
+                date=bar['date'],
+                interval=bar['interval'],
+                open=bar['open'],
+                high=bar['high'],
+                low=bar['low'],
+                close=bar['close'],
+                volume=bar['volume'],
+                data_source=bar['data_source']
+            ))
+        
+        try:
+            # Use ignore_conflicts from the start to handle duplicates gracefully
+            with transaction.atomic():
+                created = PriceBar.objects.bulk_create(
+                    price_bars,
+                    ignore_conflicts=True,
+                    batch_size=500
+                )
+                
+            created_count = len(created)
+            skipped_count = len(price_bars) - created_count
+            
+            if skipped_count > 0:
+                logger.info(f"PriceBar creation: {created_count} created, {skipped_count} skipped due to duplicates")
+            else:
+                logger.info(f"Successfully created all {created_count} PriceBar records")
+                
+        except Exception as e:
+            logger.error(f"Failed to create PriceBar records: {str(e)}")
+            raise
+            
+        # Include skipped bars due to missing stocks in the final count
+        total_skipped = skipped_count + skipped_bars
+        
+        # Log aggregated missing stock information to avoid log noise
+        if missing_stocks:
+            missing_count = len(missing_stocks)
+            sample_symbols = list(missing_stocks.keys())[:5]  # Show up to 5 symbols
+            sample_info = []
+            
+            for symbol in sample_symbols:
+                dates = missing_stocks[symbol]
+                date_str = ', '.join(str(d) for d in dates)
+                if len(missing_stocks[symbol]) == 3:
+                    date_str += "..."  # Indicate more dates exist
+                sample_info.append(f"{symbol} (dates: {date_str})")
+            
+            logger.warning(f"Skipped {skipped_bars} bars due to {missing_count} missing stocks. "
+                          f"This may indicate race conditions or symbol normalization issues. "
+                          f"Sample symbols: {'; '.join(sample_info)}")
+            
+            if missing_count > 5:
+                remaining = missing_count - 5
+                logger.debug(f"Additional {remaining} missing symbols not shown in sample")
+        
+        if skipped_bars > 0:
+            logger.info(f"Final result: {created_count} bars saved, {skipped_count} duplicates skipped, {skipped_bars} skipped due to missing stocks")
+        else:
+            logger.info(f"Final result: {created_count} bars saved, {skipped_count} duplicates skipped")
+            
+        return created_count, total_skipped
 
 
 # Singleton instance

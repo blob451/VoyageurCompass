@@ -91,9 +91,9 @@ class DataProvider:
             ticker = self._safe_fetch(symbol)
             
             if not ticker:
-                # If Yahoo Finance is blocking, return mock data for testing
-                logger.warning(f"Using mock data for {symbol} due to API limitations")
-                return self._get_mock_data(symbol, period)
+                # If Yahoo Finance is blocking, return error
+                logger.warning(f"Unable to fetch data for {symbol} due to API limitations")
+                return {'success': False, 'symbol': symbol, 'error': 'API unavailable'}
             
             # Fetch stock info with error handling
             info = {}
@@ -106,7 +106,7 @@ class DataProvider:
             # Fetch historical market data with error handling
             history = None
             try:
-                history = ticker.history(period=period)
+                history = ticker.history(period=period, auto_adjust=False)
             except Exception as e:
                 logger.warning(f"Could not fetch history for {symbol}: {str(e)}")
             
@@ -153,99 +153,17 @@ class DataProvider:
                     })
                 logger.info(f"Successfully fetched data for {symbol} - {len(stock_data['history'])} days of history")
             else:
-                # Use mock data if history is not available
-                logger.warning(f"No history available for {symbol}, using mock data")
-                mock_data = self._get_mock_data(symbol, period)
-                stock_data['history'] = mock_data['history']
+                # No history available
+                logger.warning(f"No history available for {symbol}")
+                stock_data['history'] = []
             
             return stock_data
             
         except Exception as e:
             logger.error(f"Error fetching stock data for {symbol}: {str(e)}")
-            # Return mock data on error
-            return self._get_mock_data(symbol, period)
+            # Return error on exception
+            return {'success': False, 'symbol': symbol, 'error': str(e)}
     
-    def _get_mock_data(self, symbol: str, period: str = "1mo") -> Dict[str, Any]:
-        """
-        Generate mock data for testing when Yahoo Finance is unavailable.
-        
-        Args:
-            symbol: Stock ticker symbol
-            period: Time period
-        
-        Returns:
-            Dictionary with mock stock data
-        """
-        logger.info(f"Generating mock data for {symbol}")
-        
-        # Determine number of days based on period
-        period_days = {
-            '1d': 1, '5d': 5, '1mo': 30, '3mo': 90,
-            '6mo': 180, '1y': 365, '2y': 730, '5y': 1825,
-            '10y': 3650, 'ytd': 200, 'max': 365
-        }
-        days = period_days.get(period, 30)
-        
-        # Generate mock price data
-        base_price = 150.0 + random.uniform(-50, 50)
-        history = []
-        current_date = datetime.now()
-        
-        for i in range(days):
-            date = current_date - timedelta(days=days-i-1)
-            # Skip weekends
-            if date.weekday() >= 5:
-                continue
-                
-            # Generate realistic price movements
-            daily_change = random.uniform(-0.03, 0.03)  # ±3% daily change
-            open_price = base_price * (1 + daily_change)
-            close_price = open_price * (1 + random.uniform(-0.02, 0.02))
-            high_price = max(open_price, close_price) * (1 + random.uniform(0, 0.01))
-            low_price = min(open_price, close_price) * (1 - random.uniform(0, 0.01))
-            volume = random.randint(10000000, 50000000)
-            
-            history.append({
-                'date': date.strftime('%Y-%m-%d'),
-                'open': round(open_price, 2),
-                'high': round(high_price, 2),
-                'low': round(low_price, 2),
-                'close': round(close_price, 2),
-                'volume': volume,
-            })
-            
-            base_price = close_price
-        
-        return {
-            'success': True,
-            'symbol': symbol.upper(),
-            'info': {
-                'shortName': f'{symbol} Corp',
-                'longName': f'{symbol} Corporation',
-                'currency': 'USD',
-                'exchange': 'NASDAQ',
-                'sector': 'Technology',
-                'industry': 'Software',
-                'marketCap': random.randint(100000000, 1000000000000),
-                'currentPrice': round(base_price, 2),
-                'previousClose': round(base_price * 0.99, 2),
-                'dayHigh': round(base_price * 1.02, 2),
-                'dayLow': round(base_price * 0.98, 2),
-                'volume': random.randint(10000000, 50000000),
-                'averageVolume': random.randint(15000000, 35000000),
-                'fiftyTwoWeekHigh': round(base_price * 1.3, 2),
-                'fiftyTwoWeekLow': round(base_price * 0.7, 2),
-                'dividendYield': round(random.uniform(0, 0.03), 4),
-                'beta': round(random.uniform(0.8, 1.5), 2),
-                'trailingPE': round(random.uniform(15, 35), 2),
-                'forwardPE': round(random.uniform(12, 30), 2),
-                'priceToBook': round(random.uniform(2, 10), 2),
-            },
-            'history': history,
-            'fetched_at': datetime.now().isoformat(),
-            'is_mock_data': True,  # Flag to indicate this is mock data
-            'dataSource': 'mock'  # Explicit data source
-        }
     
     def fetch_multiple_stocks(self, symbols: List[str], period: str = "1mo") -> Dict[str, Dict]:
         """
@@ -287,8 +205,8 @@ class DataProvider:
             ticker = self._safe_fetch(symbol)
             
             if not ticker:
-                # Return mock price if API is unavailable
-                return round(150.0 + random.uniform(-50, 50), 2)
+                # Return None if API is unavailable
+                return None
             
             info = ticker.info
             
@@ -300,17 +218,17 @@ class DataProvider:
                     return float(info[field])
             
             # If no price found in info, try to get latest from history
-            history = ticker.history(period="1d")
+            history = ticker.history(period="1d", auto_adjust=False)
             if not history.empty:
                 return float(history['Close'].iloc[-1])
             
-            # Return mock price as fallback
-            return round(150.0 + random.uniform(-50, 50), 2)
+            # Return None as fallback
+            return None
             
         except Exception as e:
             logger.error(f"Error fetching real-time price for {symbol}: {str(e)}")
-            # Return mock price on error
-            return round(150.0 + random.uniform(-50, 50), 2)
+            # Return None on error
+            return None
     
     def fetch_company_info(self, symbol: str) -> Dict[str, Any]:
         """
@@ -326,8 +244,8 @@ class DataProvider:
             ticker = self._safe_fetch(symbol)
             
             if not ticker:
-                # Return mock company info if API is unavailable
-                return self._get_mock_company_info(symbol)
+                # Return error if API is unavailable
+                return {'symbol': symbol, 'error': 'API unavailable'}
             
             info = ticker.info
             
@@ -373,34 +291,8 @@ class DataProvider:
             
         except Exception as e:
             logger.error(f"Error fetching company info for {symbol}: {str(e)}")
-            return self._get_mock_company_info(symbol)
+            return {'symbol': symbol, 'error': str(e)}
     
-    def _get_mock_company_info(self, symbol: str) -> Dict[str, Any]:
-        """Generate mock company info for testing."""
-        return {
-            'symbol': symbol.upper(),
-            'company': {
-                'name': f'{symbol} Corporation',
-                'sector': 'Technology',
-                'industry': 'Software',
-                'website': f'https://www.{symbol.lower()}.com',
-                'description': f'{symbol} is a leading technology company.',
-                'employees': random.randint(1000, 100000),
-                'country': 'United States',
-                'city': 'San Francisco',
-                'state': 'CA',
-                'address': '123 Tech Street',
-            },
-            'financials': {
-                'marketCap': random.randint(100000000, 1000000000000),
-                'enterpriseValue': random.randint(100000000, 1000000000000),
-                'revenue': random.randint(10000000, 100000000000),
-                'grossProfit': random.randint(5000000, 50000000000),
-                'ebitda': random.randint(1000000, 20000000000),
-            },
-            'is_mock_data': True,
-            'dataSource': 'mock'
-        }
     
     def validate_symbol(self, symbol: str) -> bool:
         """

@@ -34,34 +34,34 @@ class Command(BaseCommand):
             count = model.objects.count()
             self.stdout.write(f'  [OK] {model._meta.db_table}: {count} records')
         
-        # Check critical fields exist
+        # Check critical fields exist using Django's introspection API
         with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name = 'Data_stock' AND column_name = 'dataSource'
-            """)
-            if cursor.fetchone():
-                self.stdout.write('  [OK] dataSource field exists in Stock table')
+            # Get table description for Data_stock table
+            table_description = connection.introspection.get_table_description(cursor, 'Data_stock')
+            column_names = [col.name for col in table_description]
+            
+            if 'data_source' in column_names:
+                self.stdout.write('  [OK] data_source field exists in Stock table')
             else:
-                raise Exception('dataSource field missing in Stock table')
+                raise Exception('data_source field missing in Stock table')
     
     def checkDataSeparation(self):
         """Verify mock vs real data separation."""
         self.stdout.write('[INFO] Checking data separation...')
         
         # Check Stock data sources
-        yahooCount = Stock.objects.filter(dataSource='yahoo').count()
-        mockCount = Stock.objects.filter(dataSource='mock').count()
+        yahooCount = Stock.objects.filter(data_source='yahoo').count()
+        mockCount = Stock.objects.filter(data_source='mock').count()
         self.stdout.write(f'  [DATA] Stocks - Yahoo: {yahooCount}, Mock: {mockCount}')
         
         # Check StockPrice data sources
-        yahooPrice = StockPrice.objects.filter(dataSource='yahoo').count()
-        mockPrice = StockPrice.objects.filter(dataSource='mock').count()
+        yahooPrice = StockPrice.objects.filter(data_source='yahoo').count()
+        mockPrice = StockPrice.objects.filter(data_source='mock').count()
         self.stdout.write(f'  [DATA] Prices - Yahoo: {yahooPrice}, Mock: {mockPrice}')
         
         # Check PriceBar data sources
-        yahooBars = PriceBar.objects.filter(dataSource='yahoo').count()
-        mockBars = PriceBar.objects.filter(dataSource='mock').count()
+        yahooBars = PriceBar.objects.filter(data_source='yahoo').count()
+        mockBars = PriceBar.objects.filter(data_source='mock').count()
         self.stdout.write(f'  [DATA] PriceBars - Yahoo: {yahooBars}, Mock: {mockBars}')
     
     def checkIndexes(self):
@@ -69,22 +69,32 @@ class Command(BaseCommand):
         self.stdout.write('[INFO] Checking indexes...')
         
         with connection.cursor() as cursor:
-            # Check for time-series indexes
-            cursor.execute("""
-                SELECT indexname FROM pg_indexes 
-                WHERE tablename IN ('Data_stock', 'Data_stockprice', 'Data_pricebar')
-                ORDER BY indexname
-            """)
-            indexes = [row[0] for row in cursor.fetchall()]
+            # Check for time-series indexes using Django's introspection API
+            table_names = ['Data_stock', 'Data_stockprice', 'Data_pricebar']
+            all_indexes = []
             
-            expectedIndexes = [
-                'Data_stock_dataSou',  # Django truncates long index names
-                'Data_stockp_dataSou', 
-                'Data_priceb_stock_i'
+            for table_name in table_names:
+                try:
+                    # Get indexes for each table
+                    table_indexes = connection.introspection.get_indexes(cursor, table_name)
+                    # Extract index names (keys from the dictionary)
+                    all_indexes.extend(table_indexes.keys())
+                except Exception as e:
+                    self.stdout.write(f'  [WARN] Could not get indexes for {table_name}: {str(e)}')
+            
+            # Expected index prefixes for robust verification
+            expected_index_prefixes = [
+                ('Data_stock_dataSou', 'Stock dataSource index'),
+                ('Data_stockp_dataSou', 'StockPrice dataSource index'), 
+                ('Data_priceb_stock_i', 'PriceBar stock/interval index'),
+                ('Data_priceb_dataSou', 'PriceBar dataSource index')
             ]
             
-            for expected in expectedIndexes:
-                if any(expected in idx for idx in indexes):
-                    self.stdout.write(f'  [OK] Index found: {expected}')
+            for prefix, description in expected_index_prefixes:
+                found_indexes = [idx for idx in all_indexes if idx.startswith(prefix)]
+                if found_indexes:
+                    # Show the actual index name found
+                    actual_name = found_indexes[0]  # Take first match
+                    self.stdout.write(f'  [OK] {description}: {actual_name}')
                 else:
-                    self.stdout.write(f'  [WARN] Missing index: {expected}')
+                    self.stdout.write(f'  [WARN] Missing {description} (expected prefix: {prefix})')

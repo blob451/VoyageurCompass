@@ -98,7 +98,7 @@ class Stock(models.Model):
     )
     
     # Data source tracking
-    dataSource = models.CharField(
+    data_source = models.CharField(
         max_length=10,
         choices=DataSourceChoices.choices,
         default=DataSourceChoices.YAHOO,
@@ -117,7 +117,7 @@ class Stock(models.Model):
             models.Index(fields=['symbol']),
             models.Index(fields=['sector', 'industry']),
             models.Index(fields=['is_active', 'symbol']),
-            models.Index(fields=['dataSource', 'symbol']),
+            models.Index(fields=['data_source', 'symbol']),
         ]
     
     def __str__(self):
@@ -204,7 +204,7 @@ class StockPrice(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     # Data source tracking
-    dataSource = models.CharField(
+    data_source = models.CharField(
         max_length=10,
         choices=DataSourceChoices.choices,
         default=DataSourceChoices.YAHOO,
@@ -223,7 +223,7 @@ class StockPrice(models.Model):
         indexes = [
             models.Index(fields=['stock', '-date']),
             models.Index(fields=['date']),
-            models.Index(fields=['dataSource', 'stock', '-date']),
+            models.Index(fields=['data_source', 'stock', '-date']),
         ]
     
     def __str__(self):
@@ -319,14 +319,38 @@ class PriceBar(models.Model):
     )
     
     # OHLCV data
-    open = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
-    high = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
-    low = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
-    close = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
-    volume = models.BigIntegerField(default=0, validators=[MinValueValidator(0)])
+    open = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        validators=[MinValueValidator(0)],
+        help_text="Opening price for the time period"
+    )
+    high = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        validators=[MinValueValidator(0)],
+        help_text="Highest price during the time period"
+    )
+    low = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        validators=[MinValueValidator(0)],
+        help_text="Lowest price during the time period"
+    )
+    close = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        validators=[MinValueValidator(0)],
+        help_text="Closing price for the time period"
+    )
+    volume = models.BigIntegerField(
+        default=0, 
+        validators=[MinValueValidator(0)],
+        help_text="Trading volume during the time period"
+    )
     
     # Data source tracking
-    dataSource = models.CharField(
+    data_source = models.CharField(
         max_length=10,
         choices=DataSourceChoices.choices,
         default=DataSourceChoices.YAHOO,
@@ -344,7 +368,7 @@ class PriceBar(models.Model):
         unique_together = [['stock', 'date', 'interval']]
         indexes = [
             models.Index(fields=['stock', 'interval', '-date']),
-            models.Index(fields=['dataSource', 'stock', '-date']),
+            models.Index(fields=['data_source', 'stock', '-date']),
         ]
     
     def __str__(self):
