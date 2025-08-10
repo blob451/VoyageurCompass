@@ -1,7 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.utils import timezone
-from django.contrib.auth.models import User
+from django.conf import settings
 from datetime import timedelta
 from decimal import Decimal
 
@@ -116,8 +116,10 @@ class Stock(models.Model):
         """Check if the stock data needs synchronization."""
         if not self.last_sync:
             return True
-        # Consider data stale after 1 hour
-        return (timezone.now() - self.last_sync).total_seconds() > 3600
+        # Use configurable threshold from settings
+        from django.conf import settings
+        threshold = getattr(settings, 'STOCK_DATA_SYNC_THRESHOLD_SECONDS', 3600)
+        return (timezone.now() - self.last_sync).total_seconds() > threshold
 
 
 class StockPrice(models.Model):
@@ -201,9 +203,10 @@ class StockPrice(models.Model):
     @property
     def daily_change_percent(self):
         """Calculate the daily price change percentage using Decimal precision."""
-        if self.open and self.open != 0:
-            return (self.daily_change / self.open) * Decimal('100')
-        return Decimal('0')
+        if self.open and self.open != Decimal('0'):
+            percentage = (self.daily_change / self.open) * Decimal('100')
+            return percentage.quantize(Decimal('0.01'))
+        return Decimal('0').quantize(Decimal('0.01'))
     
     @property
     def daily_range(self):
@@ -217,12 +220,34 @@ class StockPrice(models.Model):
     
     @property
     def change_amount(self):
-        """Calculate the daily price change amount."""
+        """
+        Calculate the daily price change amount.
+        
+        .. deprecated:: 1.0
+           Use :attr:`daily_change` instead. This property will be removed in a future version.
+        """
+        import warnings
+        warnings.warn(
+            "change_amount is deprecated, use daily_change instead",
+            DeprecationWarning,
+            stacklevel=2
+        )
         return self.daily_change
     
     @property
     def change_percent(self):
-        """Calculate the daily price change percentage."""
+        """
+        Calculate the daily price change percentage.
+        
+        .. deprecated:: 1.0
+           Use :attr:`daily_change_percent` instead. This property will be removed in a future version.
+        """
+        import warnings
+        warnings.warn(
+            "change_percent is deprecated, use daily_change_percent instead",
+            DeprecationWarning,
+            stacklevel=2
+        )
         return self.daily_change_percent
 
 
@@ -232,11 +257,9 @@ class Portfolio(models.Model):
     """
     
     user = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='portfolios',
-        null=True,  # Temporarily nullable for migration
-        blank=True,
         help_text="Portfolio owner"
     )
     name = models.CharField(

@@ -6,9 +6,8 @@ This module acts as the main interface for Yahoo Finance operations.
 
 import logging
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 from datetime import datetime, timedelta
-from decimal import Decimal
 
 from Data.services.provider import data_provider
 from Data.services.synchronizer import data_synchronizer
@@ -245,8 +244,8 @@ class YahooFinanceService:
                                 'low': float(p.low),
                                 'close': float(p.close),
                                 'volume': p.volume,
-                                'change_amount': float(p.change_amount) if p.change_amount else None,
-                                'change_percent': float(p.change_percent) if p.change_percent else None,
+                                'change_amount': float(p.daily_change) if p.daily_change else None,
+                                'change_percent': float(p.daily_change_percent) if p.daily_change_percent else None,
                             }
                             for p in prices
                         ],
@@ -422,8 +421,7 @@ class YahooFinanceService:
                 })
             
             # If no results in database, validate the symbol with Yahoo Finance
-            if not results and len(query) <= 5:
-                if self.provider.validate_symbol(query):
+            if not results and len(query) <= 5 and self.provider.validate_symbol(query):
                     # Valid symbol, fetch and sync
                     self.synchronizer.sync_stock_data(query)
                     try:

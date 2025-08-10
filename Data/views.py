@@ -14,6 +14,7 @@ from django.shortcuts import get_object_or_404
 from django.db import models  
 from django.db.models import Q
 from datetime import datetime, timedelta
+from django.utils import timezone
 
 from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding
 from Data.serializers import (
@@ -65,15 +66,12 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = StockPriceSerializer(prices, many=True)
         return Response(serializer.data)
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def sync(self, request, pk=None):
         """
         Sync stock data from Yahoo Finance.
         Requires authentication.
         """
-        self.permission_classes = [IsAuthenticated]
-        self.check_permissions(request)
-        
         stock = self.get_object()
         period = request.data.get('period', '1mo')
         
@@ -134,17 +132,36 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
         """
         stock = self.get_object()
         
-        from datetime import datetime
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
         
-        if not start_date or not end_date:
-            # Default to last 3 months
-            end_date = datetime.now()
+        if not start_date_str or not end_date_str:
+            # Default to last 3 months using timezone-aware datetime
+            end_date = timezone.now()
             start_date = end_date - timedelta(days=90)
         else:
-            start_date = datetime.fromisoformat(start_date)
-            end_date = datetime.fromisoformat(end_date)
+            try:
+                start_date = datetime.fromisoformat(start_date_str)
+                end_date = datetime.fromisoformat(end_date_str)
+                
+                # Make timezone-aware if not already
+                if timezone.is_naive(start_date):
+                    start_date = timezone.make_aware(start_date)
+                if timezone.is_naive(end_date):
+                    end_date = timezone.make_aware(end_date)
+                
+                # Validate date range
+                if start_date > end_date:
+                    return Response(
+                        {'error': 'start_date must be before end_date'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                    
+            except (ValueError, TypeError) as e:
+                return Response(
+                    {'error': 'Invalid date format. Use ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         
         historical_data = yahoo_finance_service.get_historical_data(
             stock.symbol, start_date, end_date
@@ -158,18 +175,34 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
         Get detailed company information for a stock.
         """
         stock = self.get_object()
-        info = yahoo_finance_service.get_stock_info(stock.symbol)
-        return Response(info)
+        
+        try:
+            info = yahoo_finance_service.get_stock_info(stock.symbol)
+            
+            if 'error' in info:
+                return Response(
+                    {'error': 'Failed to retrieve stock information. Please try again later.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            return Response(info)
+        except Exception as e:
+            # Log detailed error for debugging but return generic message
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Stock info retrieval failed for {stock.symbol}: {str(e)}")
+            
+            return Response(
+                {'error': 'Failed to retrieve stock information. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def batch_sync(self, request):
         """
         Synchronize multiple stocks at once.
         Body: { "symbols": ["AAPL", "MSFT", ...], "period": "1mo" }
         """
-        self.permission_classes = [IsAuthenticated]
-        self.check_permissions(request)
-        
         symbols = request.data.get('symbols', [])
         period = request.data.get('period', '1mo')
         
@@ -185,19 +218,48 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'])
     def trending(self, request):
         """
-        Get trending stocks.
+        Get trending stocks from configurable list.
+        Symbols can be configured via TRENDING_STOCKS setting or environment variable.
         """
-        # For now, return some popular stocks
-        trending_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM']
-        stocks = Stock.objects.filter(symbol__in=trending_symbols, is_active=True)
+        from django.conf import settings
+        from django.core.cache import cache
+        
+        # Try to get from cache first (cache for 1 hour)
+        cache_key = 'trending_stocks_data'
+        cached_data = cache.get(cache_key)
+        
+        if cached_data is not None:
+            return Response(cached_data)
+        
+        # Get trending symbols from settings (configurable via environment)
+        trending_symbols = getattr(settings, 'TRENDING_STOCKS', [
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM'
+        ])
+        
+        # Filter active stocks and order by symbol for consistency
+        stocks = Stock.objects.filter(
+            symbol__in=trending_symbols, 
+            is_active=True
+        ).order_by('symbol')
+        
         serializer = self.get_serializer(stocks, many=True)
-        return Response(serializer.data)
+        response_data = serializer.data
+        
+        # Cache the result for 1 hour to improve performance
+        cache.set(cache_key, response_data, 3600)
+        
+        return Response(response_data)
     
     @action(detail=False, methods=['get'])
     def indices(self, request):
         """
         Get major market indices.
+        Query parameters:
+        - include_full_data: Set to 'true' to include the full data payload
         """
+        # Check if full data is explicitly requested
+        include_full_data = request.query_params.get('include_full_data', 'false').lower() == 'true'
+        
         indices = [
             {'symbol': '^GSPC', 'name': 'S&P 500'},
             {'symbol': '^DJI', 'name': 'Dow Jones Industrial Average'},
@@ -208,13 +270,48 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
         
         result = []
         for index in indices:
-            price_data = yahoo_finance_service.get_stock_data(index['symbol'], period='1d', sync_db=False)
-            if 'error' not in price_data:
+            try:
+                price_data = yahoo_finance_service.get_stock_data(index['symbol'], period='1d', sync_db=False)
+                
+                if 'error' not in price_data:
+                    # Safely extract essential fields with proper null checks
+                    price = None
+                    change = None
+                    change_percent = None
+                    
+                    prices_list = price_data.get('prices', [])
+                    if prices_list and len(prices_list) > 0 and prices_list[0] is not None:
+                        latest_data = prices_list[0]
+                        price = latest_data.get('close')
+                        change = latest_data.get('change_amount')
+                        change_percent = latest_data.get('change_percent')
+                    
+                    index_summary = {
+                        'symbol': index['symbol'],
+                        'name': index['name'],
+                        'price': price,
+                        'change': change,
+                        'change_percent': change_percent
+                    }
+                    
+                    # Include full data payload if explicitly requested
+                    if include_full_data:
+                        index_summary['data'] = price_data
+                    
+                    result.append(index_summary)
+            except Exception as e:
+                # Log error but continue with other indices
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to fetch data for index {index['symbol']}: {str(e)}")
+                
+                # Add entry with null values to maintain consistency
                 result.append({
                     'symbol': index['symbol'],
                     'name': index['name'],
-                    'price': price_data.get('prices', [None])[0] if price_data.get('prices') else None,
-                    'data': price_data
+                    'price': None,
+                    'change': None,
+                    'change_percent': None
                 })
         
         return Response(result)
@@ -233,8 +330,42 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        quotes = yahoo_finance_service.get_realtime_quotes(symbols)
-        return Response(quotes)
+        # Validate symbols list
+        if not isinstance(symbols, list):
+            return Response(
+                {'error': 'Symbols must be provided as a list'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Limit number of symbols to prevent abuse
+        if len(symbols) > 50:  # Reasonable limit
+            return Response(
+                {'error': 'Maximum 50 symbols allowed per request'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            quotes = yahoo_finance_service.get_realtime_quotes(symbols)
+            
+            # Check if the service returned an error response
+            if isinstance(quotes, dict) and 'error' in quotes:
+                return Response(
+                    {'error': 'Failed to retrieve real-time quotes. Please try again later.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            return Response(quotes)
+            
+        except Exception as e:
+            # Log detailed error for debugging but return generic message
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Real-time quotes retrieval failed for symbols {symbols}: {str(e)}")
+            
+            return Response(
+                {'error': 'Failed to retrieve real-time quotes. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class StockPriceViewSet(viewsets.ReadOnlyModelViewSet):
@@ -380,34 +511,68 @@ class PortfolioViewSet(viewsets.ModelViewSet):
         
         return Response(performance)
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def update_prices(self, request, pk=None):
         """
         Update current prices for all holdings in the portfolio.
         """
-        self.permission_classes = [IsAuthenticated]
-        self.check_permissions(request)
-        
         portfolio = self.get_object()
         holdings = portfolio.holdings.filter(is_active=True)
         
+        if not holdings.exists():
+            return Response({
+                'message': 'No active holdings found in portfolio',
+                'updated_holdings': [],
+                'new_total_value': float(portfolio.current_value)
+            })
+        
+        # Collect all unique stock symbols from holdings
+        stock_symbols = list(holdings.values_list('stock__symbol', flat=True).distinct())
+        
+        # Make a single batch API call to fetch data for all symbols
+        batch_stock_data = yahoo_finance_service.get_multiple_stocks(stock_symbols, period='1d')
+        
         updated_holdings = []
+        holdings_to_update = []
+        failed_updates = []
+        
         for holding in holdings:
-            # Get latest price from Yahoo Finance
-            stock_data = yahoo_finance_service.get_stock_data(
-                holding.stock.symbol, period='1d', sync_db=True
-            )
+            symbol = holding.stock.symbol
+            stock_data = batch_stock_data.get(symbol, {})
             
-            if 'error' not in stock_data:
-                # Update holding with latest price
+            # Update holding if stock data is available and has no error
+            if stock_data and 'error' not in stock_data:
+                # Get the latest price from database after sync
                 latest_price = holding.stock.get_latest_price()
                 if latest_price:
                     holding.current_price = latest_price.close
-                    holding.save()
+                    holdings_to_update.append(holding)
                     updated_holdings.append({
-                        'symbol': holding.stock.symbol,
+                        'symbol': symbol,
                         'updated_price': float(holding.current_price)
                     })
+                else:
+                    failed_updates.append({
+                        'symbol': symbol,
+                        'error': 'No latest price data available after sync'
+                    })
+            else:
+                error_msg = stock_data.get('error', 'Unknown error') if stock_data else 'No data returned'
+                failed_updates.append({
+                    'symbol': symbol,
+                    'error': error_msg
+                })
+        
+        # Bulk update all holdings at once to reduce database writes
+        if holdings_to_update:
+            PortfolioHolding.objects.bulk_update(holdings_to_update, ['current_price'], batch_size=100)
+        
+        # Log failed updates for observability
+        if failed_updates:
+            import logging
+            logger = logging.getLogger(__name__)
+            for failure in failed_updates:
+                logger.warning(f"Failed to update price for {failure['symbol']}: {failure['error']}")
         
         # Update portfolio total value
         portfolio.update_value()
@@ -469,13 +634,57 @@ class PortfolioViewSet(viewsets.ModelViewSet):
         try:
             holding = portfolio.holdings.get(stock__symbol=symbol)
             
-            # Update fields if provided
+            # Update fields if provided with validation
             if 'quantity' in request.data:
-                holding.quantity = request.data['quantity']
+                try:
+                    quantity = float(request.data['quantity'])
+                    if quantity <= 0:
+                        return Response(
+                            {'error': 'Quantity must be a positive number'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    holding.quantity = quantity
+                except (ValueError, TypeError):
+                    return Response(
+                        {'error': 'Quantity must be a valid number'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                    
             if 'average_price' in request.data:
-                holding.average_price = request.data['average_price']
+                try:
+                    average_price = float(request.data['average_price'])
+                    if average_price <= 0:
+                        return Response(
+                            {'error': 'Average price must be a positive number'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    holding.average_price = average_price
+                except (ValueError, TypeError):
+                    return Response(
+                        {'error': 'Average price must be a valid number'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                    
             if 'purchase_date' in request.data:
-                holding.purchase_date = request.data['purchase_date']
+                try:
+                    # Try to parse as ISO date string (YYYY-MM-DD)
+                    purchase_date_str = str(request.data['purchase_date'])
+                    purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
+                    
+                    # Validate date is not in the future
+                    from datetime import date
+                    if purchase_date > date.today():
+                        return Response(
+                            {'error': 'Purchase date cannot be in the future'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    
+                    holding.purchase_date = purchase_date
+                except (ValueError, TypeError):
+                    return Response(
+                        {'error': 'Purchase date must be a valid date in YYYY-MM-DD format'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
             
             holding.save()  # This will trigger recalculation of derived fields
             
@@ -518,19 +727,24 @@ class PortfolioViewSet(viewsets.ModelViewSet):
                 'percentage': percentage
             })
             
-            # Sector allocation
+            # Sector allocation - only aggregate values
             sector = holding.stock.sector or 'Unknown'
             if sector not in allocation['by_sector']:
-                allocation['by_sector'][sector] = {'value': 0, 'percentage': 0}
+                allocation['by_sector'][sector] = {'value': 0}
             allocation['by_sector'][sector]['value'] += float(holding.current_value)
-            allocation['by_sector'][sector]['percentage'] += percentage
             
-            # Industry allocation
+            # Industry allocation - only aggregate values
             industry = holding.stock.industry or 'Unknown'
             if industry not in allocation['by_industry']:
-                allocation['by_industry'][industry] = {'value': 0, 'percentage': 0}
+                allocation['by_industry'][industry] = {'value': 0}
             allocation['by_industry'][industry]['value'] += float(holding.current_value)
-            allocation['by_industry'][industry]['percentage'] += percentage
+        
+        # Calculate percentages after aggregating all values to avoid rounding drift
+        for sector_data in allocation['by_sector'].values():
+            sector_data['percentage'] = float((sector_data['value'] / total_value * 100) if total_value > 0 else 0)
+        
+        for industry_data in allocation['by_industry'].values():
+            industry_data['percentage'] = float((industry_data['value'] / total_value * 100) if total_value > 0 else 0)
         
         # Sort by value
         allocation['by_stock'].sort(key=lambda x: x['value'], reverse=True)

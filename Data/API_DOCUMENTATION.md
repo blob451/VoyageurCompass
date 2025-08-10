@@ -3,9 +3,20 @@
 ## Overview
 The Data API provides comprehensive endpoints for stock market data retrieval, portfolio management, and market analytics powered by Yahoo Finance integration.
 
+## API Host Configuration
+**Important:** Replace `{API_HOST}` in all URLs below with your actual API host:
+- **Development:** `localhost:8000`
+- **Staging:** `staging-api.yourcompany.com`  
+- **Production:** `api.yourcompany.com`
+
+### Example URL Replacements
+- Template: `http://{API_HOST}/api/data/stocks/`
+- Development: `http://localhost:8000/api/data/stocks/`
+- Production: `http://api.yourcompany.com/api/data/stocks/`
+
 ## Base URL
 ```
-http://localhost:8000/api/data/
+http://{API_HOST}/api/data/
 ```
 
 ## Authentication
@@ -304,26 +315,26 @@ http://localhost:8000/api/data/
 ## WebSocket Support (Future)
 Real-time price updates will be available via WebSocket connections at:
 ```
-ws://localhost:8000/ws/stocks/
+ws://{API_HOST}/ws/stocks/
 ```
 
 ## Examples
 
 ### Get Stock with Price History
 ```bash
-curl -X GET "http://localhost:8000/api/data/stocks/1/prices/?days=7"
+curl -X GET "http://{API_HOST}/api/data/stocks/1/prices/?days=7"
 ```
 
 ### Create Portfolio and Add Holdings
 ```bash
 # Create portfolio
-curl -X POST "http://localhost:8000/api/data/portfolios/" \
+curl -X POST "http://{API_HOST}/api/data/portfolios/" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"name": "Tech Portfolio", "description": "Technology stocks"}'
 
 # Add holding
-curl -X POST "http://localhost:8000/api/data/portfolios/1/add_holding/" \
+curl -X POST "http://{API_HOST}/api/data/portfolios/1/add_holding/" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"stock_symbol": "AAPL", "quantity": 10, "average_price": 150.00}'
@@ -331,7 +342,7 @@ curl -X POST "http://localhost:8000/api/data/portfolios/1/add_holding/" \
 
 ### Compare Multiple Stocks
 ```bash
-curl -X POST "http://localhost:8000/api/data/compare/" \
+curl -X POST "http://{API_HOST}/api/data/compare/" \
   -H "Content-Type: application/json" \
   -d '{"symbols": ["AAPL", "MSFT"], "metrics": ["price", "market_cap"]}'
 ```
