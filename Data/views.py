@@ -125,6 +125,116 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
         status_data = yahoo_finance_service.get_market_status()
         serializer = MarketStatusSerializer(status_data)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def historical(self, request, pk=None):
+        """
+        Get historical data for a specific stock.
+        Query params: start_date, end_date (ISO format)
+        """
+        stock = self.get_object()
+        
+        from datetime import datetime
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        if not start_date or not end_date:
+            # Default to last 3 months
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=90)
+        else:
+            start_date = datetime.fromisoformat(start_date)
+            end_date = datetime.fromisoformat(end_date)
+        
+        historical_data = yahoo_finance_service.get_historical_data(
+            stock.symbol, start_date, end_date
+        )
+        
+        return Response(historical_data)
+    
+    @action(detail=True, methods=['get'])
+    def info(self, request, pk=None):
+        """
+        Get detailed company information for a stock.
+        """
+        stock = self.get_object()
+        info = yahoo_finance_service.get_stock_info(stock.symbol)
+        return Response(info)
+    
+    @action(detail=False, methods=['post'])
+    def batch_sync(self, request):
+        """
+        Synchronize multiple stocks at once.
+        Body: { "symbols": ["AAPL", "MSFT", ...], "period": "1mo" }
+        """
+        self.permission_classes = [IsAuthenticated]
+        self.check_permissions(request)
+        
+        symbols = request.data.get('symbols', [])
+        period = request.data.get('period', '1mo')
+        
+        if not symbols:
+            return Response(
+                {'error': 'Symbols list is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        results = yahoo_finance_service.get_multiple_stocks(symbols, period)
+        return Response(results)
+    
+    @action(detail=False, methods=['get'])
+    def trending(self, request):
+        """
+        Get trending stocks.
+        """
+        # For now, return some popular stocks
+        trending_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM']
+        stocks = Stock.objects.filter(symbol__in=trending_symbols, is_active=True)
+        serializer = self.get_serializer(stocks, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def indices(self, request):
+        """
+        Get major market indices.
+        """
+        indices = [
+            {'symbol': '^GSPC', 'name': 'S&P 500'},
+            {'symbol': '^DJI', 'name': 'Dow Jones Industrial Average'},
+            {'symbol': '^IXIC', 'name': 'NASDAQ Composite'},
+            {'symbol': '^VIX', 'name': 'CBOE Volatility Index'},
+            {'symbol': '^TNX', 'name': '10-Year Treasury Yield'}
+        ]
+        
+        result = []
+        for index in indices:
+            price_data = yahoo_finance_service.get_stock_data(index['symbol'], period='1d', sync_db=False)
+            if 'error' not in price_data:
+                result.append({
+                    'symbol': index['symbol'],
+                    'name': index['name'],
+                    'price': price_data.get('prices', [None])[0] if price_data.get('prices') else None,
+                    'data': price_data
+                })
+        
+        return Response(result)
+    
+    @action(detail=False, methods=['post'])
+    def realtime_quotes(self, request):
+        """
+        Get real-time quotes for multiple symbols.
+        Body: { "symbols": ["AAPL", "MSFT", ...] }
+        """
+        symbols = request.data.get('symbols', [])
+        
+        if not symbols:
+            return Response(
+                {'error': 'Symbols list is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        quotes = yahoo_finance_service.get_realtime_quotes(symbols)
+        return Response(quotes)
 
 
 class StockPriceViewSet(viewsets.ReadOnlyModelViewSet):
@@ -238,9 +348,9 @@ class PortfolioViewSet(viewsets.ModelViewSet):
         Get portfolio performance metrics.
         """
         portfolio = self.get_object()
-        holdings = portfolio.holdings.all()
+        holdings = portfolio.holdings.filter(is_active=True)
         
-        total_cost = sum(h.total_cost for h in holdings)
+        total_cost = sum(h.cost_basis for h in holdings)
         total_value = sum(h.current_value for h in holdings)
         total_gain_loss = total_value - total_cost
         
@@ -262,13 +372,170 @@ class PortfolioViewSet(viewsets.ModelViewSet):
                 'symbol': holding.stock.symbol,
                 'name': holding.stock.short_name or holding.stock.long_name,
                 'quantity': float(holding.quantity),
-                'cost': float(holding.total_cost),
+                'cost': float(holding.cost_basis),
                 'value': float(holding.current_value),
-                'gain_loss': float(holding.gain_loss),
-                'gain_loss_percent': float(holding.gain_loss_percent)
+                'gain_loss': float(holding.unrealized_gain_loss),
+                'gain_loss_percent': float(holding.unrealized_gain_loss_percent)
             })
         
         return Response(performance)
+    
+    @action(detail=True, methods=['post'])
+    def update_prices(self, request, pk=None):
+        """
+        Update current prices for all holdings in the portfolio.
+        """
+        self.permission_classes = [IsAuthenticated]
+        self.check_permissions(request)
+        
+        portfolio = self.get_object()
+        holdings = portfolio.holdings.filter(is_active=True)
+        
+        updated_holdings = []
+        for holding in holdings:
+            # Get latest price from Yahoo Finance
+            stock_data = yahoo_finance_service.get_stock_data(
+                holding.stock.symbol, period='1d', sync_db=True
+            )
+            
+            if 'error' not in stock_data:
+                # Update holding with latest price
+                latest_price = holding.stock.get_latest_price()
+                if latest_price:
+                    holding.current_price = latest_price.close
+                    holding.save()
+                    updated_holdings.append({
+                        'symbol': holding.stock.symbol,
+                        'updated_price': float(holding.current_price)
+                    })
+        
+        # Update portfolio total value
+        portfolio.update_value()
+        
+        return Response({
+            'message': 'Portfolio prices updated',
+            'updated_holdings': updated_holdings,
+            'new_total_value': float(portfolio.current_value)
+        })
+    
+    @action(detail=True, methods=['post'])
+    def remove_holding(self, request, pk=None):
+        """
+        Remove a holding from the portfolio.
+        Body: { "symbol": "AAPL" }
+        """
+        portfolio = self.get_object()
+        symbol = request.data.get('symbol', '').upper()
+        
+        if not symbol:
+            return Response(
+                {'error': 'Stock symbol is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            holding = portfolio.holdings.get(stock__symbol=symbol)
+            holding.is_active = False
+            holding.save()
+            
+            # Update portfolio value
+            portfolio.update_value()
+            
+            return Response({
+                'message': f'Holding {symbol} removed from portfolio',
+                'portfolio_value': float(portfolio.current_value)
+            })
+        except PortfolioHolding.DoesNotExist:
+            return Response(
+                {'error': f'Holding {symbol} not found in portfolio'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=True, methods=['post'])
+    def update_holding(self, request, pk=None):
+        """
+        Update a holding in the portfolio.
+        Body: { "symbol": "AAPL", "quantity": 100, "average_price": 150.00 }
+        """
+        portfolio = self.get_object()
+        symbol = request.data.get('symbol', '').upper()
+        
+        if not symbol:
+            return Response(
+                {'error': 'Stock symbol is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            holding = portfolio.holdings.get(stock__symbol=symbol)
+            
+            # Update fields if provided
+            if 'quantity' in request.data:
+                holding.quantity = request.data['quantity']
+            if 'average_price' in request.data:
+                holding.average_price = request.data['average_price']
+            if 'purchase_date' in request.data:
+                holding.purchase_date = request.data['purchase_date']
+            
+            holding.save()  # This will trigger recalculation of derived fields
+            
+            serializer = PortfolioHoldingSerializer(holding)
+            return Response(serializer.data)
+            
+        except PortfolioHolding.DoesNotExist:
+            return Response(
+                {'error': f'Holding {symbol} not found in portfolio'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=True, methods=['get'])
+    def allocation(self, request, pk=None):
+        """
+        Get portfolio allocation breakdown.
+        """
+        portfolio = self.get_object()
+        holdings = portfolio.holdings.filter(is_active=True)
+        
+        total_value = sum(h.current_value for h in holdings)
+        
+        allocation = {
+            'portfolio_id': portfolio.id,
+            'portfolio_name': portfolio.name,
+            'total_value': float(total_value),
+            'by_stock': [],
+            'by_sector': {},
+            'by_industry': {}
+        }
+        
+        for holding in holdings:
+            percentage = float((holding.current_value / total_value * 100) if total_value > 0 else 0)
+            
+            # Stock allocation
+            allocation['by_stock'].append({
+                'symbol': holding.stock.symbol,
+                'name': holding.stock.short_name or holding.stock.long_name,
+                'value': float(holding.current_value),
+                'percentage': percentage
+            })
+            
+            # Sector allocation
+            sector = holding.stock.sector or 'Unknown'
+            if sector not in allocation['by_sector']:
+                allocation['by_sector'][sector] = {'value': 0, 'percentage': 0}
+            allocation['by_sector'][sector]['value'] += float(holding.current_value)
+            allocation['by_sector'][sector]['percentage'] += percentage
+            
+            # Industry allocation
+            industry = holding.stock.industry or 'Unknown'
+            if industry not in allocation['by_industry']:
+                allocation['by_industry'][industry] = {'value': 0, 'percentage': 0}
+            allocation['by_industry'][industry]['value'] += float(holding.current_value)
+            allocation['by_industry'][industry]['percentage'] += percentage
+        
+        # Sort by value
+        allocation['by_stock'].sort(key=lambda x: x['value'], reverse=True)
+        
+        return Response(allocation)
 
 
 class PortfolioHoldingViewSet(viewsets.ModelViewSet):

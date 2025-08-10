@@ -10,7 +10,7 @@ __pycache__/
 prompts/
 .claude/
 CLAUDE.md
-code-review-output.md
+prompt-output.md
 codeReview.md
 
 # Distribution / packaging
