@@ -10,7 +10,8 @@ __pycache__/
 prompts/
 .claude/
 CLAUDE.md
-code-review-output.md
+prompt-output.md
+code-review-output.md  # Backward compatibility for older tools
 codeReview.md
 
 # Distribution / packaging

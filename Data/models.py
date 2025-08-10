@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.utils import timezone
+from django.conf import settings
 from datetime import timedelta
 from decimal import Decimal
 
@@ -109,6 +110,16 @@ class Stock(models.Model):
         """Get price history for the specified number of days."""
         cutoff_date = timezone.now().date() - timedelta(days=days)
         return self.prices.filter(date__gte=cutoff_date).order_by('-date')
+    
+    @property
+    def needs_sync(self):
+        """Check if the stock data needs synchronization."""
+        if not self.last_sync:
+            return True
+        # Use configurable threshold from settings
+        from django.conf import settings
+        threshold = getattr(settings, 'STOCK_DATA_SYNC_THRESHOLD_SECONDS', 3600)
+        return (timezone.now() - self.last_sync).total_seconds() > threshold
 
 
 class StockPrice(models.Model):
@@ -192,9 +203,52 @@ class StockPrice(models.Model):
     @property
     def daily_change_percent(self):
         """Calculate the daily price change percentage using Decimal precision."""
-        if self.open and self.open != 0:
-            return (self.daily_change / self.open) * Decimal('100')
-        return Decimal('0')
+        if self.open and self.open != Decimal('0'):
+            percentage = (self.daily_change / self.open) * Decimal('100')
+            return percentage.quantize(Decimal('0.01'))
+        return Decimal('0').quantize(Decimal('0.01'))
+    
+    @property
+    def daily_range(self):
+        """Get the daily price range."""
+        return f"{self.low} - {self.high}"
+    
+    @property
+    def is_gain(self):
+        """Check if the day was a gain."""
+        return self.close > self.open
+    
+    @property
+    def change_amount(self):
+        """
+        Calculate the daily price change amount.
+        
+        .. deprecated:: 1.0
+           Use :attr:`daily_change` instead. This property will be removed in a future version.
+        """
+        import warnings
+        warnings.warn(
+            "change_amount is deprecated, use daily_change instead",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self.daily_change
+    
+    @property
+    def change_percent(self):
+        """
+        Calculate the daily price change percentage.
+        
+        .. deprecated:: 1.0
+           Use :attr:`daily_change_percent` instead. This property will be removed in a future version.
+        """
+        import warnings
+        warnings.warn(
+            "change_percent is deprecated, use daily_change_percent instead",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self.daily_change_percent
 
 
 class Portfolio(models.Model):
@@ -202,6 +256,12 @@ class Portfolio(models.Model):
     Model to store user portfolio information.
     """
     
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='portfolios',
+        help_text="Portfolio owner"
+    )
     name = models.CharField(
         max_length=100,
         help_text="Portfolio name"

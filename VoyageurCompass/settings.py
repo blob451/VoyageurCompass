@@ -483,6 +483,15 @@ if SENTRY_AVAILABLE and SENTRY_DSN:
 YAHOO_FINANCE_API_TIMEOUT = int(env('YAHOO_FINANCE_API_TIMEOUT', default=30))
 DATA_REFRESH_INTERVAL = int(env('DATA_REFRESH_INTERVAL', default=3600))
 
+# Stock synchronization settings
+STOCK_DATA_SYNC_THRESHOLD_SECONDS = int(env('STOCK_DATA_SYNC_THRESHOLD_SECONDS', default=3600))
+
+# Stock Market Settings
+TRENDING_STOCKS = env.list('TRENDING_STOCKS', default=[
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM',
+    'V', 'JNJ', 'WMT', 'PG', 'UNH', 'DIS', 'HD', 'MA'
+])
+
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5 MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
