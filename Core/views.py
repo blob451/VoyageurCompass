@@ -12,7 +12,6 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth.models import User
-from django.http import JsonResponse
 from django.db import connection
 from drf_spectacular.utils import extend_schema
 
@@ -20,7 +19,6 @@ from Core.serializers import (
     UserSerializer, UserRegistrationSerializer,
     ChangePasswordSerializer, UserProfileSerializer
 )
-from Core.services.auth import auth_service
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -213,10 +211,12 @@ def health_check(request):
 def healthCheck(request):
     """Liveness probe - simple health check"""
     from datetime import datetime, timezone
-    return JsonResponse({
+    return Response({
         'status': 'healthy',
         'timestamp': datetime.now(timezone.utc).isoformat(),
         'requestId': getattr(request, 'correlation_id', None),
+    }, headers={
+        'Cache-Control': 'no-store'
     })
 
 @api_view(['GET'])
@@ -226,27 +226,33 @@ def readinessCheck(request):
     logger = logging.getLogger('VoyageurCompass.health')
     
     try:
-        # Simple DB ping
+        # Ensure connection and simple DB ping
+        connection.ensure_connection()
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
         
         from datetime import datetime, timezone
-        return JsonResponse({
-            'status': 'ready',
-            'database': 'connected',
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-            'requestId': getattr(request, 'correlation_id', None),
-        })
+        return Response({
+                'status': 'ready',
+                'database': 'connected',
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'requestId': getattr(request, 'correlation_id', None),
+            },
+            headers={'Cache-Control': 'no-store'},
+        )
     except Exception as e:
         logger.error('Readiness check failed', exc_info=True)
         from datetime import datetime, timezone
-        return JsonResponse({
-            'status': 'not ready',
-            'database': 'disconnected',
-            'error': 'database connection failure',
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-            'requestId': getattr(request, 'correlation_id', None),
-        }, status=503)
+        return Response({
+                'status': 'not ready',
+                'database': 'disconnected',
+                'error': 'database connection failure',
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'requestId': getattr(request, 'correlation_id', None),
+            },
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            headers={'Cache-Control': 'no-store'},
+        )
 
 
 @extend_schema(

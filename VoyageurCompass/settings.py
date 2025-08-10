@@ -13,10 +13,17 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import environ
 import os
 import sys
+import json
 from pathlib import Path
 from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
-import sentry_sdk
+
+# Guard Sentry import to prevent crashes when package not installed
+try:
+    import sentry_sdk
+    SENTRY_AVAILABLE = True
+except ImportError:
+    SENTRY_AVAILABLE = False
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -141,11 +148,12 @@ DATABASES = {
 # SQLite Guard - Prevent SQLite usage
 def checkDatabaseEngine():
     """Ensure PostgreSQL is used, not SQLite"""
-    if 'sqlite' in DATABASES['default']['ENGINE'].lower():
-        if not ('test' in sys.argv or 'pytest' in sys.modules):
-            raise ImproperlyConfigured(
-                "SQLite is not allowed! Configure PostgreSQL in DATABASES setting."
-            )
+    if ('sqlite' in DATABASES['default']['ENGINE'].lower()
+            and 'test' not in sys.argv
+            and 'pytest' not in sys.modules):
+        raise ImproperlyConfigured(
+            "SQLite is not allowed! Configure PostgreSQL in DATABASES setting."
+        )
 checkDatabaseEngine()
 
 # Override database for testing
@@ -392,11 +400,11 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'json': {
-            'format': '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "environment": "' + APP_ENV + '", "message": "%(message)s"}',
+            'format': '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "environment": ' + json.dumps(APP_ENV) + ', "message": "%(message)s"}',
             'datefmt': '%Y-%m-%dT%H:%M:%S',
         },
         'structured': {
-            'format': 'timestamp=%(asctime)s level=%(levelname)s logger=%(name)s environment=' + APP_ENV + ' message="%(message)s"',
+            'format': 'timestamp=%(asctime)s level=%(levelname)s logger=%(name)s environment=' + json.dumps(APP_ENV) + ' message="%(message)s"',
             'datefmt': '%Y-%m-%dT%H:%M:%S',
         },
     },
@@ -425,16 +433,42 @@ LOGGING = {
     },
 }
 
-# Create logs directory if it doesn't exist
-LOGS_DIR = BASE_DIR / 'logs'
-if not LOGS_DIR.exists():
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+# Logs directory creation removed - no file handlers configured
+# LOGS_DIR = BASE_DIR / 'logs'
+# if not LOGS_DIR.exists():
+#     LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Sentry Error Tracking
 SENTRY_DSN = env('SENTRY_DSN', default=None)
-if SENTRY_DSN:
+if SENTRY_AVAILABLE and SENTRY_DSN:
+    def before_send(event, hint):
+        """Redact sensitive data instead of dropping entire events"""
+        # List of sensitive keys to redact
+        sensitive_keys = ['password', 'token', 'secret', 'api_key', 'private_key', 'ssn']
+        
+        def redact_dict(d):
+            """Recursively redact sensitive keys in dictionary"""
+            if not isinstance(d, dict):
+                return d
+            for key in list(d.keys()):
+                if any(sensitive in str(key).lower() for sensitive in sensitive_keys):
+                    d[key] = '[REDACTED]'
+                elif isinstance(d[key], dict):
+                    redact_dict(d[key])
+                elif isinstance(d[key], list):
+                    for item in d[key]:
+                        if isinstance(item, dict):
+                            redact_dict(item)
+            return d
+        
+        if isinstance(event, dict):
+            event = redact_dict(event.copy())
+        return event
+
     sentry_sdk.init(
         dsn=SENTRY_DSN,
+        before_send=before_send,
+        send_default_pii=False,  # Don't send PII by default
         integrations=[
             sentry_sdk.integrations.django.DjangoIntegration(),
             sentry_sdk.integrations.redis.RedisIntegration(),
@@ -442,7 +476,6 @@ if SENTRY_DSN:
         traces_sample_rate=float(env('SENTRY_TRACES_SAMPLE_RATE', default='0.1')),
         environment=APP_ENV,
         release=env('APP_VERSION', default='unknown'),
-        before_send=lambda event, hint: None if 'password' in str(event).lower() else event,
     )
 
 

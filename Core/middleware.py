@@ -2,6 +2,7 @@ import time
 import uuid
 import logging
 from django.http import HttpResponse
+from django.utils.cache import patch_vary_headers
 from django.utils.deprecation import MiddlewareMixin
 
 class CustomCorsMiddleware:
@@ -18,14 +19,17 @@ class CustomCorsMiddleware:
             resp['Access-Control-Allow-Headers'] = requested or 'Authorization, Content-Type'
             resp['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
             resp['Access-Control-Max-Age'] = '600'
+            # Ensure caches vary correctly for CORS preflight
+            patch_vary_headers(resp, ['Origin', 'Access-Control-Request-Method', 'Access-Control-Request-Headers'])
             return resp
 
         response = self.get_response(request)
 
         # Add CORS headers for non-preflight responses
         response['Access-Control-Allow-Origin'] = '*'
-        response['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
-        response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        # Expose custom headers to clients (Allow-* headers are ignored on actual responses)
+        response['Access-Control-Expose-Headers'] = 'X-Request-Id'
+        response['Vary'] = 'Origin'
         return response
 
 class RequestLoggingMiddleware(MiddlewareMixin):
@@ -34,13 +38,18 @@ class RequestLoggingMiddleware(MiddlewareMixin):
         self.logger = logging.getLogger('VoyageurCompass.requests')
 
     def process_request(self, request):
-        request.correlation_id = str(uuid.uuid4())
+        # Honor incoming request ID for distributed tracing
+        incoming = request.headers.get('X-Request-Id') or request.headers.get('X-Correlation-Id')
+        request.correlation_id = incoming or str(uuid.uuid4())
         request.start_time = time.perf_counter()
         return None
 
     def process_response(self, request, response):
         if hasattr(request, 'start_time'):
             duration = time.perf_counter() - request.start_time
+            # Note: userId logging should be reviewed against privacy policy
+            # Consider: anonymization, retention policies, or conditional logging
+            # based on user consent and regulatory requirements
             user_id = getattr(request.user, 'id', None) if hasattr(request, 'user') else None
             
             self.logger.info(
