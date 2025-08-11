@@ -25,6 +25,293 @@ class DataSourceChoices(models.TextChoices):
     MOCK = 'mock', 'Mock Data'
 
 
+class DataSector(models.Model):
+    """
+    Model to store normalized sector information.
+    """
+    
+    sectorKey = models.CharField(
+        max_length=50, 
+        unique=True,
+        db_index=True,
+        help_text="Normalized sector key (e.g., 'technology', 'healthcare')"
+    )
+    sectorName = models.CharField(
+        max_length=200,
+        help_text="Human-readable sector name"
+    )
+    isActive = models.BooleanField(
+        default=True,
+        help_text="Whether this sector is actively tracked"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_sync = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="Last time sector data was synced"
+    )
+    data_source = models.CharField(
+        max_length=20,
+        choices=DataSourceChoices.choices,
+        default=DataSourceChoices.YAHOO,
+        help_text="Source of the sector data"
+    )
+    
+    class Meta:
+        db_table = 'data_sector'
+        ordering = ['sectorName']
+        verbose_name = 'Data Sector'
+        verbose_name_plural = 'Data Sectors'
+        indexes = [
+            models.Index(fields=['sectorKey']),
+            models.Index(fields=['isActive']),
+        ]
+    
+    def __str__(self):
+        return self.sectorName
+
+
+class DataIndustry(models.Model):
+    """
+    Model to store normalized industry information.
+    """
+    
+    industryKey = models.CharField(
+        max_length=100, 
+        unique=True,
+        db_index=True,
+        help_text="Normalized industry key"
+    )
+    industryName = models.CharField(
+        max_length=200,
+        help_text="Human-readable industry name"
+    )
+    sector = models.ForeignKey(
+        DataSector,
+        on_delete=models.CASCADE,
+        related_name='industries',
+        help_text="Parent sector"
+    )
+    isActive = models.BooleanField(
+        default=True,
+        help_text="Whether this industry is actively tracked"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_sync = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="Last time industry data was synced"
+    )
+    data_source = models.CharField(
+        max_length=20,
+        choices=DataSourceChoices.choices,
+        default=DataSourceChoices.YAHOO,
+        help_text="Source of the industry data"
+    )
+    
+    class Meta:
+        db_table = 'data_industry'
+        ordering = ['industryName']
+        verbose_name = 'Data Industry'
+        verbose_name_plural = 'Data Industries'
+        indexes = [
+            models.Index(fields=['industryKey']),
+            models.Index(fields=['sector']),
+            models.Index(fields=['isActive']),
+        ]
+    
+    def __str__(self):
+        return f"{self.industryName} ({self.sector.sectorName})"
+
+
+class DataSectorPrice(models.Model):
+    """
+    Model to store sector composite price data.
+    """
+    
+    sector = models.ForeignKey(
+        DataSector,
+        on_delete=models.CASCADE,
+        related_name='prices',
+        help_text="Related sector"
+    )
+    date = models.DateField(
+        db_index=True,
+        help_text="Trading date"
+    )
+    close_index = models.DecimalField(
+        max_digits=20, 
+        decimal_places=6,
+        validators=[MinValueValidator(0)],
+        help_text="Sector composite close index"
+    )
+    fiftyTwoWeekChange = models.DecimalField(
+        max_digits=10, 
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="52-week change percentage"
+    )
+    fiftyDayAverage = models.DecimalField(
+        max_digits=20, 
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="50-day moving average"
+    )
+    twoHundredDayAverage = models.DecimalField(
+        max_digits=20, 
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="200-day moving average"
+    )
+    averageVolume = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="Average daily volume"
+    )
+    averageVolume3months = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="3-month average daily volume"
+    )
+    volume_agg = models.BigIntegerField(
+        default=0,
+        help_text="Aggregated volume for sector constituents"
+    )
+    constituents_count = models.IntegerField(
+        help_text="Number of stocks included in composite"
+    )
+    method = models.CharField(
+        max_length=20,
+        default='cap_weighted',
+        choices=[
+            ('cap_weighted', 'Cap Weighted'),
+            ('equal_weighted', 'Equal Weighted'),
+        ],
+        help_text="Composite calculation method"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    data_source = models.CharField(
+        max_length=20,
+        choices=DataSourceChoices.choices,
+        default=DataSourceChoices.YAHOO,
+        help_text="Source of the composite data"
+    )
+    
+    class Meta:
+        db_table = 'data_sectorprice'
+        ordering = ['-date']
+        verbose_name = 'Data Sector Price'
+        verbose_name_plural = 'Data Sector Prices'
+        unique_together = [['sector', 'date']]
+        indexes = [
+            models.Index(fields=['date']),
+            models.Index(fields=['sector', 'date']),
+            models.Index(fields=['sector', '-date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.sector.sectorName} - {self.date}: {self.close_index}"
+
+
+class DataIndustryPrice(models.Model):
+    """
+    Model to store industry composite price data.
+    """
+    
+    industry = models.ForeignKey(
+        DataIndustry,
+        on_delete=models.CASCADE,
+        related_name='prices',
+        help_text="Related industry"
+    )
+    date = models.DateField(
+        db_index=True,
+        help_text="Trading date"
+    )
+    close_index = models.DecimalField(
+        max_digits=20, 
+        decimal_places=6,
+        validators=[MinValueValidator(0)],
+        help_text="Industry composite close index"
+    )
+    fiftyTwoWeekChange = models.DecimalField(
+        max_digits=10, 
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="52-week change percentage"
+    )
+    fiftyDayAverage = models.DecimalField(
+        max_digits=20, 
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="50-day moving average"
+    )
+    twoHundredDayAverage = models.DecimalField(
+        max_digits=20, 
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="200-day moving average"
+    )
+    averageVolume = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="Average daily volume"
+    )
+    averageVolume3months = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="3-month average daily volume"
+    )
+    volume_agg = models.BigIntegerField(
+        default=0,
+        help_text="Aggregated volume for industry constituents"
+    )
+    constituents_count = models.IntegerField(
+        help_text="Number of stocks included in composite"
+    )
+    method = models.CharField(
+        max_length=20,
+        default='cap_weighted',
+        choices=[
+            ('cap_weighted', 'Cap Weighted'),
+            ('equal_weighted', 'Equal Weighted'),
+        ],
+        help_text="Composite calculation method"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    data_source = models.CharField(
+        max_length=20,
+        choices=DataSourceChoices.choices,
+        default=DataSourceChoices.YAHOO,
+        help_text="Source of the composite data"
+    )
+    
+    class Meta:
+        db_table = 'data_industryprice'
+        ordering = ['-date']
+        verbose_name = 'Data Industry Price'
+        verbose_name_plural = 'Data Industry Prices'
+        unique_together = [['industry', 'date']]
+        indexes = [
+            models.Index(fields=['date']),
+            models.Index(fields=['industry', 'date']),
+            models.Index(fields=['industry', '-date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.industry.industryName} - {self.date}: {self.close_index}"
+
+
 class Stock(models.Model):
     """
     Model to store stock metadata and company information.
@@ -90,6 +377,139 @@ class Stock(models.Model):
         default=0,
         help_text="Market capitalization"
     )
+    # Required Stocks category fields
+    currentPrice = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Current trading price"
+    )
+    previousClose = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Previous day's closing price"
+    )
+    dayLow = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Day's low price"
+    )
+    dayHigh = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Day's high price"
+    )
+    regularMarketPrice = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Regular market price"
+    )
+    regularMarketOpen = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Regular market open price"
+    )
+    regularMarketDayLow = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Regular market day low"
+    )
+    regularMarketDayHigh = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Regular market day high"
+    )
+    regularMarketPreviousClose = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Regular market previous close"
+    )
+    fiftyTwoWeekLow = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="52-week low price"
+    )
+    fiftyTwoWeekHigh = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="52-week high price"
+    )
+    fiftyTwoWeekChange = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="52-week change percentage"
+    )
+    fiftyDayAverage = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="50-day moving average"
+    )
+    twoHundredDayAverage = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="200-day moving average"
+    )
+    beta = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text="Beta coefficient"
+    )
+    impliedVolatility = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text="Implied volatility"
+    )
+    regularMarketVolume = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="Regular market volume"
+    )
+    averageVolume = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="Average daily volume"
+    )
+    averageVolume10days = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="10-day average volume"
+    )
+    averageVolume3months = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="3-month average volume"
+    )
     shares_outstanding = models.BigIntegerField(
         default=0,
         help_text="Number of shares outstanding"
@@ -115,6 +535,24 @@ class Stock(models.Model):
         help_text="Last time sector/industry data was updated"
     )
     
+    # Foreign key relationships to normalized classification tables
+    sector_id = models.ForeignKey(
+        DataSector,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='stocks',
+        help_text="Related normalized sector"
+    )
+    industry_id = models.ForeignKey(
+        DataIndustry,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='stocks',
+        help_text="Related normalized industry"
+    )
+    
     # Data source tracking
     data_source = models.CharField(
         max_length=10,
@@ -137,6 +575,9 @@ class Stock(models.Model):
             models.Index(fields=['is_active', 'symbol']),
             models.Index(fields=['data_source', 'symbol']),
             models.Index(fields=['sectorUpdatedAt']),
+            models.Index(fields=['sector_id']),
+            models.Index(fields=['industry_id']),
+            models.Index(fields=['sector_id', 'industry_id']),
         ]
     
     def __str__(self):
@@ -312,95 +753,6 @@ class StockPrice(models.Model):
         )
         return self.daily_change_percent
 
-
-class PriceBar(models.Model):
-    """
-    Model for OHLCV time-series data with interval support.
-    """
-    
-    INTERVAL_CHOICES = [
-        ('1m', '1 Minute'),
-        ('5m', '5 Minutes'),
-        ('15m', '15 Minutes'),
-        ('30m', '30 Minutes'),
-        ('1h', '1 Hour'),
-        ('1d', '1 Day'),
-        ('1wk', '1 Week'),
-        ('1mo', '1 Month'),
-    ]
-    
-    stock = models.ForeignKey(
-        Stock,
-        on_delete=models.CASCADE,
-        related_name='priceBars',
-        help_text="Related stock"
-    )
-    date = models.DateTimeField(
-        db_index=True,
-        help_text="Bar timestamp"
-    )
-    interval = models.CharField(
-        max_length=5,
-        choices=INTERVAL_CHOICES,
-        default='1d',
-        help_text="Time interval"
-    )
-    
-    # OHLCV data
-    open = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        validators=[MinValueValidator(0)],
-        help_text="Opening price for the time period"
-    )
-    high = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        validators=[MinValueValidator(0)],
-        help_text="Highest price during the time period"
-    )
-    low = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        validators=[MinValueValidator(0)],
-        help_text="Lowest price during the time period"
-    )
-    close = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        validators=[MinValueValidator(0)],
-        help_text="Closing price for the time period"
-    )
-    volume = models.BigIntegerField(
-        default=0, 
-        validators=[MinValueValidator(0)],
-        help_text="Trading volume during the time period"
-    )
-    
-    # Data source tracking
-    data_source = models.CharField(
-        max_length=10,
-        choices=DataSourceChoices.choices,
-        default=DataSourceChoices.YAHOO,
-        help_text="Source of the price bar data"
-    )
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    # Custom managers  
-    objects = models.Manager()
-    real_data = RealDataManager()
-    
-    class Meta:
-        ordering = ['-date']
-        unique_together = [['stock', 'date', 'interval']]
-        indexes = [
-            models.Index(fields=['stock', 'interval', '-date']),
-            models.Index(fields=['data_source', 'stock', '-date']),
-        ]
-    
-    def __str__(self):
-        return f"{self.stock.symbol} - {self.date} ({self.interval}): ${self.close}"
 
 
 class Portfolio(models.Model):
