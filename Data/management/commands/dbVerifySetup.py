@@ -5,7 +5,7 @@ Validates schema integrity and data separation.
 
 from django.core.management.base import BaseCommand
 from django.db import connection
-from Data.models import Stock, StockPrice, PriceBar, Portfolio, PortfolioHolding
+from Data.models import Stock, StockPrice, PriceBar, Portfolio, PortfolioHolding, DataSourceChoices
 
 
 class Command(BaseCommand):
@@ -36,8 +36,9 @@ class Command(BaseCommand):
         
         # Check critical fields exist using Django's introspection API
         with connection.cursor() as cursor:
-            # Get table description for Data_stock table
-            table_description = connection.introspection.get_table_description(cursor, 'Data_stock')
+            # Get table description for Stock table using model metadata
+            stock_table_name = Stock._meta.db_table
+            table_description = connection.introspection.get_table_description(cursor, stock_table_name)
             column_names = [col.name for col in table_description]
             
             if 'data_source' in column_names:
@@ -50,51 +51,77 @@ class Command(BaseCommand):
         self.stdout.write('[INFO] Checking data separation...')
         
         # Check Stock data sources
-        yahooCount = Stock.objects.filter(data_source='yahoo').count()
-        mockCount = Stock.objects.filter(data_source='mock').count()
+        yahooCount = Stock.objects.filter(data_source=DataSourceChoices.YAHOO).count()
+        mockCount = Stock.objects.filter(data_source=DataSourceChoices.MOCK).count()
         self.stdout.write(f'  [DATA] Stocks - Yahoo: {yahooCount}, Mock: {mockCount}')
         
         # Check StockPrice data sources
-        yahooPrice = StockPrice.objects.filter(data_source='yahoo').count()
-        mockPrice = StockPrice.objects.filter(data_source='mock').count()
+        yahooPrice = StockPrice.objects.filter(data_source=DataSourceChoices.YAHOO).count()
+        mockPrice = StockPrice.objects.filter(data_source=DataSourceChoices.MOCK).count()
         self.stdout.write(f'  [DATA] Prices - Yahoo: {yahooPrice}, Mock: {mockPrice}')
         
         # Check PriceBar data sources
-        yahooBars = PriceBar.objects.filter(data_source='yahoo').count()
-        mockBars = PriceBar.objects.filter(data_source='mock').count()
+        yahooBars = PriceBar.objects.filter(data_source=DataSourceChoices.YAHOO).count()
+        mockBars = PriceBar.objects.filter(data_source=DataSourceChoices.MOCK).count()
         self.stdout.write(f'  [DATA] PriceBars - Yahoo: {yahooBars}, Mock: {mockBars}')
     
     def checkIndexes(self):
-        """Verify critical indexes exist."""
+        """Verify critical indexes exist using column-based verification."""
         self.stdout.write('[INFO] Checking indexes...')
         
+        # Expected indexes with their columns for verification
+        expected_indexes = [
+            (Stock, ['data_source'], 'Stock dataSource index'),
+            (StockPrice, ['data_source'], 'StockPrice dataSource index'),
+            (PriceBar, ['stock_id', 'interval'], 'PriceBar stock/interval index'),
+            (PriceBar, ['data_source'], 'PriceBar dataSource index')
+        ]
+        
         with connection.cursor() as cursor:
-            # Check for time-series indexes using Django's introspection API
-            table_names = ['Data_stock', 'Data_stockprice', 'Data_pricebar']
-            all_indexes = []
-            
-            for table_name in table_names:
+            for model, expected_columns, description in expected_indexes:
+                table_name = model._meta.db_table
+                
                 try:
-                    # Get indexes for each table
+                    # Get indexes for the table
                     table_indexes = connection.introspection.get_indexes(cursor, table_name)
-                    # Extract index names (keys from the dictionary)
-                    all_indexes.extend(table_indexes.keys())
+                    
+                    # Check if expected columns are indexed
+                    index_found = self._check_columns_indexed(table_indexes, expected_columns)
+                    
+                    if index_found:
+                        self.stdout.write(f'  [OK] {description}: columns {expected_columns} are indexed')
+                    else:
+                        self.stdout.write(f'  [WARN] Missing {description}: columns {expected_columns} not indexed')
+                        
                 except Exception as e:
-                    self.stdout.write(f'  [WARN] Could not get indexes for {table_name}: {str(e)}')
+                    self.stdout.write(f'  [WARN] Could not verify indexes for {table_name}: {str(e)}')
+    
+    def _check_columns_indexed(self, table_indexes, expected_columns):
+        """
+        Check if expected columns are covered by any index.
+        
+        Args:
+            table_indexes: Dictionary of indexes from introspection
+            expected_columns: List of column names to check
             
-            # Expected index prefixes for robust verification
-            expected_index_prefixes = [
-                ('Data_stock_dataSou', 'Stock dataSource index'),
-                ('Data_stockp_dataSou', 'StockPrice dataSource index'), 
-                ('Data_priceb_stock_i', 'PriceBar stock/interval index'),
-                ('Data_priceb_dataSou', 'PriceBar dataSource index')
-            ]
-            
-            for prefix, description in expected_index_prefixes:
-                found_indexes = [idx for idx in all_indexes if idx.startswith(prefix)]
-                if found_indexes:
-                    # Show the actual index name found
-                    actual_name = found_indexes[0]  # Take first match
-                    self.stdout.write(f'  [OK] {description}: {actual_name}')
-                else:
-                    self.stdout.write(f'  [WARN] Missing {description} (expected prefix: {prefix})')
+        Returns:
+            bool: True if columns are indexed, False otherwise
+        """
+        # Convert expected columns to set for easier comparison
+        expected_set = set(expected_columns)
+        
+        # Check each index to see if it covers our expected columns
+        for index_name, index_info in table_indexes.items():
+            # Get columns in this index
+            if 'columns' in index_info:
+                index_columns = set(index_info['columns'])
+            elif 'column_names' in index_info:
+                index_columns = set(index_info['column_names'])
+            else:
+                # Skip this index if we can't determine its columns
+                continue            
+            # Check if this index covers all expected columns
+            if expected_set.issubset(index_columns):
+                return True
+        
+        return False

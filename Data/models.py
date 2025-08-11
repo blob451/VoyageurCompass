@@ -3,13 +3,24 @@ from django.core.validators import MinValueValidator
 from django.utils import timezone
 from django.conf import settings
 from datetime import timedelta
+from datetime import datetime
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
 
 from .managers import StockManager, RealDataManager
 
 
 class DataSourceChoices(models.TextChoices):
-    """Data source choices for tracking data origin."""
+    """
+    Data source choices for tracking data origin.
+    
+    Usage:
+        from Data.models import DataSourceChoices
+        
+        # In queries
+        Stock.objects.filter(data_source=DataSourceChoices.YAHOO)
+        Stock.objects.exclude(data_source=DataSourceChoices.MOCK)
+    """
     YAHOO = 'yahoo', 'Yahoo Finance'
     MOCK = 'mock', 'Mock Data'
 
@@ -97,6 +108,13 @@ class Stock(models.Model):
         help_text="Last time data was synced from Yahoo Finance"
     )
     
+    # Sector/Industry data tracking
+    sectorUpdatedAt = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="Last time sector/industry data was updated"
+    )
+    
     # Data source tracking
     data_source = models.CharField(
         max_length=10,
@@ -118,6 +136,7 @@ class Stock(models.Model):
             models.Index(fields=['sector', 'industry']),
             models.Index(fields=['is_active', 'symbol']),
             models.Index(fields=['data_source', 'symbol']),
+            models.Index(fields=['sectorUpdatedAt']),
         ]
     
     def __str__(self):
@@ -141,6 +160,15 @@ class Stock(models.Model):
         from django.conf import settings
         threshold = getattr(settings, 'STOCK_DATA_SYNC_THRESHOLD_SECONDS', 3600)
         return (timezone.now() - self.last_sync).total_seconds() > threshold
+
+    @property
+    def sectorNeedsUpdate(self):
+        """Check if sector/industry data needs update (older than 3 years)."""
+        if not self.sectorUpdatedAt:
+            return True
+        # 3 years threshold using precise date arithmetic
+        threshold_date = timezone.now() - relativedelta(years=3)
+        return self.sectorUpdatedAt < threshold_date
 
 
 class StockPrice(models.Model):

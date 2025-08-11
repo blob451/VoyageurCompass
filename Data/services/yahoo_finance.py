@@ -18,18 +18,8 @@ from decimal import Decimal
 # Configure yfinance with proper headers to handle consent pages
 # SSL verification remains enabled for security
 import requests
-
-# Configure session with proper headers for Yahoo Finance
-session = requests.Session()
-session.headers.update({
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Accept-Encoding': 'gzip, deflate',
-    'DNT': '1',
-    'Connection': 'keep-alive',
-    'Upgrade-Insecure-Requests': '1'
-})
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Note: requests.Session doesn't support a default `timeout` attribute.
 # Keep a module-level default to pass explicitly to HTTP calls.
@@ -61,7 +51,69 @@ class YahooFinanceService:
         self.maxRetries = 5
         self.baseDelay = 2
         self.maxBackoff = 60
+        
+        # Create instance-specific session for thread safety
+        self._create_session()
+        
         logger.info("Yahoo Finance Service initialized with yfinance integration")
+    
+    def _create_session(self):
+        """Create a resilient requests session with retries, pooling, and modern headers."""
+        self.session = requests.Session()
+        
+        # Enhanced headers with modern encoding and refined accept headers
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,image/webp,*/*;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9,*;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',  # Added brotli support
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'no-cache'
+        })
+        
+        # Configure retry strategy with exponential backoff
+        retry_strategy = Retry(
+            total=3,  # Total number of retries
+            backoff_factor=1.0,  # Backoff factor (1 second, then 2, then 4)
+            status_forcelist=[429, 500, 502, 503, 504],  # Retry on these HTTP status codes
+            allowed_methods=["HEAD", "GET", "OPTIONS"],  # Only retry safe methods
+            raise_on_status=False  # Don't raise exception on final failure
+        )
+        
+        # Create HTTP adapter with retry strategy and connection pooling
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=10,  # Number of connection pools to cache
+            pool_maxsize=20,     # Maximum connections in each pool
+            pool_block=False     # Don't block if pool is full
+        )
+        
+        # Mount adapters for both HTTP and HTTPS
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+    
+    def close(self):
+        """Close the requests session and cleanup resources."""
+        if hasattr(self, 'session') and self.session:
+            self.session.close()
+            self.session = None
+    
+    def _ensure_session(self):
+        """Ensure session exists, recreating if necessary."""
+        if not hasattr(self, 'session') or self.session is None:
+            self._create_session()
+    
+    def __enter__(self):
+        """Enter the context manager, returning the service instance."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit the context manager, ensuring session cleanup."""
+        self.close()
+        # Don't suppress exceptions
+        return False
     
     # =====================================================================
     # Input validation methods (camelCase)
@@ -685,16 +737,33 @@ class YahooFinanceService:
             # Validate period and interval parameters before calling yf.download
             self._validate_period_interval(period, interval)
             
-            # Try using yf.download with default session handling
-            history = yf.download(
-                ticker, 
-                period=period, 
-                interval=interval, 
-                auto_adjust=False,  # Preserve unadjusted close prices for consistency
-                prepost=False,
-                threads=False,
-                progress=False
-            )
+            # Try using yf.download with custom session for better connection handling
+            try:
+                # Ensure session is available
+                self._ensure_session()
+                # Try with session parameter (newer yfinance versions)
+                history = yf.download(
+                    ticker, 
+                    period=period, 
+                    interval=interval, 
+                    auto_adjust=False,  # Preserve unadjusted close prices for consistency
+                    prepost=False,
+                    threads=False,
+                    progress=False,
+                    session=self.session  # Use our custom session with headers
+                )
+            except (TypeError, AttributeError):
+                # Fallback for older yfinance versions that don't support session parameter
+                logger.debug(f"yfinance session parameter not supported, using default session for {ticker}")
+                history = yf.download(
+                    ticker, 
+                    period=period, 
+                    interval=interval, 
+                    auto_adjust=False,
+                    prepost=False,
+                    threads=False,
+                    progress=False
+                )
             
             if history.empty:
                 logger.warning(f"No data returned for {ticker}")
@@ -911,6 +980,231 @@ class YahooFinanceService:
             
         return created_count, total_skipped
 
+    # =====================================================================
+    # Sector/Industry Data Fetching Methods
+    # =====================================================================
+    
+    def fetchSectorIndustryBatch(self, symbols: List[str]) -> Dict[str, Dict]:
+        """
+        Fetch sector/industry data for multiple symbols with rate limit handling.
+        
+        Args:
+            symbols: List of stock ticker symbols
+            
+        Returns:
+            Dictionary with symbol as key and sector/industry data as value
+        """
+        try:
+            # Validate symbols
+            validatedSymbols = self.validateSymbolList(symbols)
+            logger.info(f"Fetching sector/industry for {len(validatedSymbols)} symbols")
+            
+            # Check for recent data and filter what needs fetching
+            symbolsToFetch = self.getStaleAndMissingSymbols(validatedSymbols)
+            
+            if not symbolsToFetch:
+                logger.info("All symbols have recent sector/industry data, skipping fetch")
+                return {}
+            
+            logger.info(f"Fetching sector/industry for {len(symbolsToFetch)} symbols: {symbolsToFetch}")
+            
+            results = {}
+            
+            for i, symbol in enumerate(symbolsToFetch):
+                logger.info(f"Fetching {symbol} sector/industry ({i+1}/{len(symbolsToFetch)})")
+                
+                # Add delay between symbols to avoid rate limiting
+                if i > 0:
+                    time.sleep(random.uniform(1, 2))
+                
+                try:
+                    data = self._retryWithBackoff(self.fetchSectorIndustrySingle, symbol)
+                    if data and 'error' not in data:
+                        results[symbol] = data
+                        logger.info(f"Successfully fetched sector/industry for {symbol}")
+                    else:
+                        logger.warning(f"No sector/industry data for {symbol}")
+                        results[symbol] = {'error': 'No data available'}
+                        
+                except Exception as e:
+                    logger.error(f"Failed to fetch sector/industry for {symbol}: {str(e)}")
+                    results[symbol] = {'error': str(e)}
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error in fetchSectorIndustryBatch: {str(e)}")
+            return {}
+    
+    def fetchSectorIndustrySingle(self, symbol: str) -> Dict:
+        """
+        Fetch sector/industry data for a single symbol.
+        
+        Args:
+            symbol: Stock ticker symbol
+            
+        Returns:
+            Dictionary containing sector/industry data
+        """
+        try:
+            # Validate symbol
+            symbol = self.validateSymbol(symbol)
+            
+            logger.info(f"Fetching sector/industry data for {symbol}")
+            
+            # Create yfinance Ticker object with custom session
+            try:
+                # Ensure session is available
+                self._ensure_session()
+                # Try with session parameter (newer yfinance versions)
+                ticker = yf.Ticker(symbol, session=self.session)
+            except (TypeError, AttributeError):
+                # Fallback for older yfinance versions that don't support session parameter
+                logger.debug(f"yfinance Ticker session parameter not supported, using default session for {symbol}")
+                ticker = yf.Ticker(symbol)
+            
+            # Get company info which contains sector/industry
+            info = ticker.info
+            
+            if not info or len(info) < 2:  # Minimal check for valid response
+                logger.warning(f"No info data returned for {symbol}")
+                return {'error': 'No company information available'}
+            
+            # Extract sector and industry
+            sector = info.get('sector', '').strip()
+            industry = info.get('industry', '').strip()
+            
+            if not sector and not industry:
+                logger.warning(f"No sector/industry data found for {symbol}")
+                return {'error': 'No sector/industry data available'}
+            
+            result = {
+                'symbol': symbol.upper(),
+                'sector': sector or '',
+                'industry': industry or '',
+                'updatedAt': timezone.now()
+            }
+            
+            logger.info(f"Retrieved sector/industry for {symbol}: {sector} / {industry}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error fetching sector/industry for {symbol}: {str(e)}")
+            return {'error': str(e)}
+    
+    def getStaleAndMissingSymbols(self, symbols: List[str]) -> List[str]:
+        """
+        Identify symbols that need sector/industry data fetching.
+        
+        Args:
+            symbols: List of symbols to check
+            
+        Returns:
+            List of symbols that need fetching (stale + missing)
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # 3 years threshold
+        threshold_date = timezone.now() - timedelta(days=3*365)
+        
+        # Query existing stocks
+        existing_stocks = Stock.objects.filter(symbol__in=symbols)
+        
+        staleSymbols = []
+        recentSymbols = []
+        
+        existing_symbols_set = set()
+        
+        for stock in existing_stocks:
+            existing_symbols_set.add(stock.symbol)
+            
+            if not stock.sectorUpdatedAt or stock.sectorUpdatedAt < threshold_date:
+                staleSymbols.append(stock.symbol)
+            else:
+                recentSymbols.append(stock.symbol)
+        
+        # Find missing symbols
+        missingSymbols = [s for s in symbols if s not in existing_symbols_set]
+        
+        logger.info(f"Symbol analysis: {len(recentSymbols)} recent, {len(staleSymbols)} stale, {len(missingSymbols)} missing")
+        
+        return staleSymbols + missingSymbols
+    
+    def upsertCompanyProfiles(self, profiles: Dict[str, Dict]) -> Tuple[int, int, int]:
+        """
+        Upsert sector/industry data into Stock model.
+        
+        Args:
+            profiles: Dictionary with symbol as key and profile data as value
+            
+        Returns:
+            Tuple of (created_count, updated_count, skipped_count)
+        """
+        if not profiles:
+            return 0, 0, 0
+        
+        created_count = 0
+        updated_count = 0
+        skipped_count = 0
+        
+        for symbol, profile_data in profiles.items():
+            if 'error' in profile_data:
+                skipped_count += 1
+                continue
+                
+            try:
+                stock, created = Stock.objects.get_or_create(
+                    symbol=symbol,
+                    defaults={
+                        'short_name': symbol,
+                        'sector': profile_data.get('sector', ''),
+                        'industry': profile_data.get('industry', ''),
+                        'sectorUpdatedAt': profile_data.get('updatedAt'),
+                        'data_source': 'yahoo'
+                    }
+                )
+                
+                if created:
+                    created_count += 1
+                    logger.info(f"Created new stock record for {symbol}")
+                else:
+                    # Update existing record
+                    stock.sector = profile_data.get('sector', '')
+                    stock.industry = profile_data.get('industry', '')
+                    stock.sectorUpdatedAt = profile_data.get('updatedAt')
+                    stock.save(update_fields=['sector', 'industry', 'sectorUpdatedAt'])
+                    updated_count += 1
+                    logger.info(f"Updated sector/industry for {symbol}")
+                    
+            except Exception as e:
+                logger.error(f"Error upserting profile for {symbol}: {str(e)}")
+                skipped_count += 1
+        
+        logger.info(f"Upsert complete: {created_count} created, {updated_count} updated, {skipped_count} skipped")
+        return created_count, updated_count, skipped_count
+
 
 # Singleton instance
 yahoo_finance_service = YahooFinanceService()
+
+
+def create_yahoo_finance_service():
+    """
+    Create a new YahooFinanceService instance for use with context managers.
+    
+    Use this when you want guaranteed resource cleanup:
+    
+    Example usage in a management command:
+    
+        from Data.services.yahoo_finance import create_yahoo_finance_service
+        
+        def handle(self, *args, **options):
+            with create_yahoo_finance_service() as service:
+                data = service.fetchSingleHistorical('AAPL', '1mo', '1d')
+                created, skipped = service.saveBars(data)
+                # Session is automatically closed after this block
+    
+    For general use throughout the application, prefer the singleton yahoo_finance_service.
+    """
+    return YahooFinanceService()
