@@ -16,6 +16,8 @@ import { apiSlice } from '../features/api/apiSlice'
 vi.mock('recharts', () => ({
   LineChart: ({ children }) => <div data-testid="line-chart">{children}</div>,
   Line: () => <div data-testid="line" />,
+  AreaChart: ({ children }) => <div data-testid="area-chart">{children}</div>,
+  Area: () => <div data-testid="area" />,
   XAxis: () => <div data-testid="x-axis" />,
   YAxis: () => <div data-testid="y-axis" />,
   CartesianGrid: () => <div data-testid="cartesian-grid" />,
@@ -156,8 +158,8 @@ describe('DashboardPage', () => {
       </TestWrapper>
     )
 
-    // Should show dashboard title
-    expect(screen.getByText(/dashboard/i)).toBeInTheDocument()
+    // Should show welcome message
+    expect(screen.getByText(/welcome back/i)).toBeInTheDocument()
     
     // Should show welcome message with username
     expect(screen.getByText(/welcome/i)).toBeInTheDocument()
@@ -443,7 +445,7 @@ describe('DashboardPage', () => {
 
     // Should render without errors on mobile
     await waitFor(() => {
-      expect(screen.getByText(/dashboard/i)).toBeInTheDocument()
+      expect(screen.getByText(/welcome back/i)).toBeInTheDocument()
     })
   })
 
