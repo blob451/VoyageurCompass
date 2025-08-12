@@ -559,6 +559,7 @@ def health_comprehensive(request):
     
     # System info
     try:
+        import psutil
         memory = psutil.virtual_memory()
         cpu_percent = psutil.cpu_percent()
         
