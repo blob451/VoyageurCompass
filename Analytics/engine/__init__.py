@@ -1,0 +1,1 @@
+# Technical Analysis Engine for VoyageurCompass

@@ -5,7 +5,7 @@ Validates schema integrity and data separation.
 
 from django.core.management.base import BaseCommand
 from django.db import connection
-from Data.models import Stock, StockPrice, PriceBar, Portfolio, PortfolioHolding, DataSourceChoices
+from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding, DataSourceChoices
 
 
 class Command(BaseCommand):
@@ -29,7 +29,7 @@ class Command(BaseCommand):
         self.stdout.write('[INFO] Checking schema...')
         
         # Check model tables exist
-        models = [Stock, StockPrice, PriceBar, Portfolio, PortfolioHolding]
+        models = [Stock, StockPrice, Portfolio, PortfolioHolding]
         for model in models:
             count = model.objects.count()
             self.stdout.write(f'  [OK] {model._meta.db_table}: {count} records')
@@ -60,10 +60,6 @@ class Command(BaseCommand):
         mockPrice = StockPrice.objects.filter(data_source=DataSourceChoices.MOCK).count()
         self.stdout.write(f'  [DATA] Prices - Yahoo: {yahooPrice}, Mock: {mockPrice}')
         
-        # Check PriceBar data sources
-        yahooBars = PriceBar.objects.filter(data_source=DataSourceChoices.YAHOO).count()
-        mockBars = PriceBar.objects.filter(data_source=DataSourceChoices.MOCK).count()
-        self.stdout.write(f'  [DATA] PriceBars - Yahoo: {yahooBars}, Mock: {mockBars}')
     
     def checkIndexes(self):
         """Verify critical indexes exist using column-based verification."""
@@ -72,9 +68,7 @@ class Command(BaseCommand):
         # Expected indexes with their columns for verification
         expected_indexes = [
             (Stock, ['data_source'], 'Stock dataSource index'),
-            (StockPrice, ['data_source'], 'StockPrice dataSource index'),
-            (PriceBar, ['stock_id', 'interval'], 'PriceBar stock/interval index'),
-            (PriceBar, ['data_source'], 'PriceBar dataSource index')
+            (StockPrice, ['data_source'], 'StockPrice dataSource index')
         ]
         
         with connection.cursor() as cursor:

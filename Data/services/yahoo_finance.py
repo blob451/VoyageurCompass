@@ -9,11 +9,15 @@ import re
 import time
 import random
 import os
-import yfinance as yf
-import pandas as pd
+import hashlib
+import threading
+from typing import Dict, List, Optional, Tuple
+import yfinance as yfimport pandas as pd
 from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Configure yfinance with proper headers to handle consent pages
 # SSL verification remains enabled for security
@@ -28,9 +32,69 @@ DEFAULT_TIMEOUT = 30
 from Data.services.provider import data_provider
 from Data.services.synchronizer import data_synchronizer
 from django.db import models, transaction
-from Data.models import Stock, StockPrice, PriceBar
+from django.utils import timezone
+from Data.models import Stock, StockPrice, DataSector, DataIndustry, DataSectorPrice, DataIndustryPrice
 
 logger = logging.getLogger(__name__)
+
+
+class CompositeCache:
+    """
+    Phase 4: Smart Caching for composite generation optimization.
+    Caches frequently accessed stock price data and composite calculations.
+    """
+    
+    def __init__(self):
+        self.price_data_cache = {}
+        self.composite_cache = {}
+        self.stock_date_index = {}
+    
+    def get_cache_key(self, stocks, start_date, end_date):
+        """Generate a cache key for stock price data."""
+        if hasattr(stocks, '__iter__') and not isinstance(stocks, str):
+            stock_ids = sorted([stock.id for stock in stocks])
+        else:
+            stock_ids = [stocks.id] if hasattr(stocks, 'id') else [stocks]
+        
+        key_string = f"{stock_ids}_{start_date}_{end_date}"
+        return hashlib.md5(key_string.encode()).hexdigest()[:12]
+    
+    def get_composite_cache_key(self, entity, date):
+        """Generate a cache key for composite calculations."""
+        entity_type = entity.__class__.__name__
+        entity_id = entity.id if hasattr(entity, 'id') else str(entity)
+        return f"{entity_type}_{entity_id}_{date}"
+    
+    def index_prices_by_stock_and_date(self, all_prices):
+        """
+        Phase 4: Index price data for fast lookup.
+        Creates a nested dictionary: {stock: {date: price_record}}
+        """
+        if hasattr(self, '_indexed_prices') and self._indexed_prices:
+            return self._indexed_prices
+        
+        prices_by_stock_date = defaultdict(dict)
+        for price in all_prices:
+            prices_by_stock_date[price.stock][price.date] = price
+        
+        self._indexed_prices = dict(prices_by_stock_date)
+        return self._indexed_prices
+    
+    def get_cached_composite(self, cache_key):
+        """Get cached composite data."""
+        return self.composite_cache.get(cache_key)
+    
+    def cache_composite(self, cache_key, composite_data):
+        """Cache composite calculation results."""
+        self.composite_cache[cache_key] = composite_data
+    
+    def clear_cache(self):
+        """Clear all cached data."""
+        self.price_data_cache.clear()
+        self.composite_cache.clear()
+        self.stock_date_index.clear()
+        if hasattr(self, '_indexed_prices'):
+            del self._indexed_prices
 
 
 class YahooFinanceService:
@@ -737,33 +801,17 @@ class YahooFinanceService:
             # Validate period and interval parameters before calling yf.download
             self._validate_period_interval(period, interval)
             
-            # Try using yf.download with custom session for better connection handling
-            try:
-                # Ensure session is available
-                self._ensure_session()
-                # Try with session parameter (newer yfinance versions)
-                history = yf.download(
-                    ticker, 
-                    period=period, 
-                    interval=interval, 
-                    auto_adjust=False,  # Preserve unadjusted close prices for consistency
-                    prepost=False,
-                    threads=False,
-                    progress=False,
-                    session=self.session  # Use our custom session with headers
-                )
-            except (TypeError, AttributeError):
-                # Fallback for older yfinance versions that don't support session parameter
-                logger.debug(f"yfinance session parameter not supported, using default session for {ticker}")
-                history = yf.download(
-                    ticker, 
-                    period=period, 
-                    interval=interval, 
-                    auto_adjust=False,
-                    prepost=False,
-                    threads=False,
-                    progress=False
-                )
+            # Use yf.download without custom session to avoid curl_cffi conflicts
+            # Let yfinance handle its own session management
+            history = yf.download(
+                ticker, 
+                period=period, 
+                interval=interval, 
+                auto_adjust=False,  # Preserve unadjusted close prices for consistency
+                prepost=False,
+                threads=False,
+                progress=False
+            )
             
             if history.empty:
                 logger.warning(f"No data returned for {ticker}")
@@ -815,7 +863,7 @@ class YahooFinanceService:
                     if hasattr(date, 'tzinfo') and date.tzinfo is not None:
                         date_utc = date.tz_convert('UTC')
                     else:
-                        date_utc = date.replace(tzinfo=timezone.utc)
+                        date_utc = date.replace(tzinfo=dt_timezone.utc)
                     
                     bars.append({
                         'symbol': ticker.upper(),
@@ -841,144 +889,6 @@ class YahooFinanceService:
         """Normalize bar data for database insertion."""
         # Already normalized in _fetchSingleTicker
         return bars
-    
-    def saveBars(self, bars: List[Dict]) -> Tuple[int, int]:
-        """
-        Save bars to database using bulk operations.
-        Returns (created_count, skipped_count).
-        """
-        from Data.models import Stock, PriceBar
-        
-        if not bars:
-            return 0, 0
-        
-        # Ensure stocks exist using bulk operations for efficiency
-        symbols = list(set(bar['symbol'] for bar in bars))
-        
-        # Query existing stocks in one database call
-        existing_stocks = Stock.objects.filter(symbol__in=symbols)
-        existing_symbols = set(stock.symbol for stock in existing_stocks)
-        
-        # Identify missing symbols and bulk create them
-        missing_symbols = set(symbols) - existing_symbols
-        if missing_symbols:
-            stocks_to_create = [
-                Stock(symbol=symbol, short_name=symbol, data_source='yahoo')
-                for symbol in missing_symbols
-            ]
-            
-            try:
-                # Attempt bulk create without ignoring conflicts first
-                created_stocks = Stock.objects.bulk_create(stocks_to_create, ignore_conflicts=False)
-                logger.info(f"Successfully created {len(created_stocks)} new Stock records: {list(missing_symbols)}")
-            except Exception as e:
-                # Handle conflicts explicitly with detailed logging
-                logger.warning(f"Conflicts detected during Stock creation for symbols {list(missing_symbols)}: {str(e)}")
-                
-                # Retry with ignore_conflicts to handle race conditions
-                try:
-                    created_stocks = Stock.objects.bulk_create(stocks_to_create, ignore_conflicts=True)
-                    actual_created = len(created_stocks)
-                    skipped = len(stocks_to_create) - actual_created
-                    
-                    if skipped > 0:
-                        logger.info(f"Stock creation: {actual_created} created, {skipped} skipped due to conflicts")
-                        # Log which specific symbols may have been skipped
-                        if actual_created == 0:
-                            logger.debug(f"All Stock symbols already existed: {list(missing_symbols)}")
-                    else:
-                        logger.info(f"Successfully created {actual_created} Stock records after retry")
-                        
-                except Exception as retry_error:
-                    logger.error(f"Failed to create Stock records even with ignore_conflicts: {str(retry_error)}")
-                    raise
-        
-        # Create a stock lookup dictionary for efficient access
-        all_stocks = Stock.objects.filter(symbol__in=symbols)
-        stock_lookup = {stock.symbol: stock for stock in all_stocks}
-        
-        # Bulk create with conflict handling
-        price_bars = []
-        skipped_bars = 0
-        missing_stocks = {}  # Track missing stocks with sample dates for diagnosis
-        
-        for bar in bars:
-            # Safely check if stock exists in lookup to avoid KeyError
-            stock = stock_lookup.get(bar['symbol'])
-            if stock is None:
-                # Aggregate missing stock info instead of logging per bar
-                symbol = bar['symbol']
-                if symbol not in missing_stocks:
-                    missing_stocks[symbol] = []
-                # Store sample dates for diagnosis (limit to 3 samples per symbol)
-                if len(missing_stocks[symbol]) < 3:
-                    missing_stocks[symbol].append(bar.get('date', 'unknown date'))
-                skipped_bars += 1
-                continue
-                
-            price_bars.append(PriceBar(
-                stock=stock,
-                date=bar['date'],
-                interval=bar['interval'],
-                open=bar['open'],
-                high=bar['high'],
-                low=bar['low'],
-                close=bar['close'],
-                volume=bar['volume'],
-                data_source=bar['data_source']
-            ))
-        
-        try:
-            # Use ignore_conflicts from the start to handle duplicates gracefully
-            with transaction.atomic():
-                created = PriceBar.objects.bulk_create(
-                    price_bars,
-                    ignore_conflicts=True,
-                    batch_size=500
-                )
-                
-            created_count = len(created)
-            skipped_count = len(price_bars) - created_count
-            
-            if skipped_count > 0:
-                logger.info(f"PriceBar creation: {created_count} created, {skipped_count} skipped due to duplicates")
-            else:
-                logger.info(f"Successfully created all {created_count} PriceBar records")
-                
-        except Exception as e:
-            logger.error(f"Failed to create PriceBar records: {str(e)}")
-            raise
-            
-        # Include skipped bars due to missing stocks in the final count
-        total_skipped = skipped_count + skipped_bars
-        
-        # Log aggregated missing stock information to avoid log noise
-        if missing_stocks:
-            missing_count = len(missing_stocks)
-            sample_symbols = list(missing_stocks.keys())[:5]  # Show up to 5 symbols
-            sample_info = []
-            
-            for symbol in sample_symbols:
-                dates = missing_stocks[symbol]
-                date_str = ', '.join(str(d) for d in dates)
-                if len(missing_stocks[symbol]) == 3:
-                    date_str += "..."  # Indicate more dates exist
-                sample_info.append(f"{symbol} (dates: {date_str})")
-            
-            logger.warning(f"Skipped {skipped_bars} bars due to {missing_count} missing stocks. "
-                          f"This may indicate race conditions or symbol normalization issues. "
-                          f"Sample symbols: {'; '.join(sample_info)}")
-            
-            if missing_count > 5:
-                remaining = missing_count - 5
-                logger.debug(f"Additional {remaining} missing symbols not shown in sample")
-        
-        if skipped_bars > 0:
-            logger.info(f"Final result: {created_count} bars saved, {skipped_count} duplicates skipped, {skipped_bars} skipped due to missing stocks")
-        else:
-            logger.info(f"Final result: {created_count} bars saved, {skipped_count} duplicates skipped")
-            
-        return created_count, total_skipped
 
     # =====================================================================
     # Sector/Industry Data Fetching Methods
@@ -987,12 +897,13 @@ class YahooFinanceService:
     def fetchSectorIndustryBatch(self, symbols: List[str]) -> Dict[str, Dict]:
         """
         Fetch sector/industry data for multiple symbols with rate limit handling.
+        Enhanced for technical analysis with normalized classification data.
         
         Args:
             symbols: List of stock ticker symbols
             
         Returns:
-            Dictionary with symbol as key and sector/industry data as value
+            Dictionary with symbol as key and normalized classification data as value
         """
         try:
             # Validate symbols
@@ -1020,7 +931,16 @@ class YahooFinanceService:
                 try:
                     data = self._retryWithBackoff(self.fetchSectorIndustrySingle, symbol)
                     if data and 'error' not in data:
-                        results[symbol] = data
+                        # Enhance with normalized keys for classification upsert
+                        enhanced_data = {
+                            'symbol': data['symbol'],
+                            'sectorKey': self._normalizeSectorKey(data.get('sector', '')),
+                            'sectorName': data.get('sector', ''),
+                            'industryKey': self._normalizeIndustryKey(data.get('industry', '')),
+                            'industryName': data.get('industry', ''),
+                            'updatedAt': data.get('updatedAt')
+                        }
+                        results[symbol] = enhanced_data
                         logger.info(f"Successfully fetched sector/industry for {symbol}")
                     else:
                         logger.warning(f"No sector/industry data for {symbol}")
@@ -1039,12 +959,13 @@ class YahooFinanceService:
     def fetchSectorIndustrySingle(self, symbol: str) -> Dict:
         """
         Fetch sector/industry data for a single symbol.
+        Enhanced for technical analysis with normalized classification data.
         
         Args:
             symbol: Stock ticker symbol
             
         Returns:
-            Dictionary containing sector/industry data
+            Dictionary containing sector/industry data with normalized keys
         """
         try:
             # Validate symbol
@@ -1052,16 +973,9 @@ class YahooFinanceService:
             
             logger.info(f"Fetching sector/industry data for {symbol}")
             
-            # Create yfinance Ticker object with custom session
-            try:
-                # Ensure session is available
-                self._ensure_session()
-                # Try with session parameter (newer yfinance versions)
-                ticker = yf.Ticker(symbol, session=self.session)
-            except (TypeError, AttributeError):
-                # Fallback for older yfinance versions that don't support session parameter
-                logger.debug(f"yfinance Ticker session parameter not supported, using default session for {symbol}")
-                ticker = yf.Ticker(symbol)
+            # Create yfinance Ticker object without custom session to avoid curl_cffi conflicts
+            # Let yfinance handle its own session management
+            ticker = yf.Ticker(symbol)
             
             # Get company info which contains sector/industry
             info = ticker.info
@@ -1082,6 +996,10 @@ class YahooFinanceService:
                 'symbol': symbol.upper(),
                 'sector': sector or '',
                 'industry': industry or '',
+                'sectorKey': self._normalizeSectorKey(sector),
+                'sectorName': sector,
+                'industryKey': self._normalizeIndustryKey(industry),
+                'industryName': industry,
                 'updatedAt': timezone.now()
             }
             
@@ -1102,7 +1020,6 @@ class YahooFinanceService:
         Returns:
             List of symbols that need fetching (stale + missing)
         """
-        from django.utils import timezone
         from datetime import timedelta
         
         # 3 years threshold
@@ -1184,6 +1101,1234 @@ class YahooFinanceService:
         logger.info(f"Upsert complete: {created_count} created, {updated_count} updated, {skipped_count} skipped")
         return created_count, updated_count, skipped_count
 
+    # =====================================================================
+    # Technical Analysis Enhancement Methods
+    # =====================================================================
+    
+    def upsertClassification(self, rows: List[Dict]) -> Tuple[int, int, int]:
+        """
+        Create/update DataSector and DataIndustry records and establish FK relationships.
+        
+        Args:
+            rows: List of classification dictionaries with keys:
+                  symbol, sectorKey, sectorName, industryKey, industryName, updatedAt
+                  
+        Returns:
+            Tuple of (created_count, updated_count, skipped_count)
+        """
+        if not rows:
+            return 0, 0, 0
+            
+        created_count = 0
+        updated_count = 0
+        skipped_count = 0
+        
+        with transaction.atomic():
+            for row in rows:
+                try:
+                    symbol = row.get('symbol', '').upper()
+                    sector_key = self._normalizeSectorKey(row.get('sectorKey', ''))
+                    sector_name = row.get('sectorName', '').strip()
+                    industry_key = self._normalizeIndustryKey(row.get('industryKey', ''))
+                    industry_name = row.get('industryName', '').strip()
+                    updated_at = row.get('updatedAt')
+                    
+                    if not symbol or not sector_key or not industry_key:
+                        skipped_count += 1
+                        continue
+                    
+                    # Create or get sector
+                    sector, sector_created = DataSector.objects.get_or_create(
+                        sectorKey=sector_key,
+                        defaults={
+                            'sectorName': sector_name,
+                            'last_sync': updated_at,
+                            'data_source': 'yahoo'
+                        }
+                    )
+                    
+                    if not sector_created and sector.sectorName != sector_name:
+                        sector.sectorName = sector_name
+                        sector.last_sync = updated_at
+                        sector.save(update_fields=['sectorName', 'last_sync'])
+                    
+                    # Create or get industry
+                    industry, industry_created = DataIndustry.objects.get_or_create(
+                        industryKey=industry_key,
+                        defaults={
+                            'industryName': industry_name,
+                            'sector': sector,
+                            'last_sync': updated_at,
+                            'data_source': 'yahoo'
+                        }
+                    )
+                    
+                    if not industry_created and (industry.industryName != industry_name or industry.sector != sector):
+                        industry.industryName = industry_name
+                        industry.sector = sector
+                        industry.last_sync = updated_at
+                        industry.save(update_fields=['industryName', 'sector', 'last_sync'])
+                    
+                    # Update Stock model with FK relationships
+                    try:
+                        stock = Stock.objects.get(symbol=symbol)
+                        if stock.sector_id != sector or stock.industry_id != industry:
+                            stock.sector_id = sector
+                            stock.industry_id = industry
+                            stock.sectorUpdatedAt = updated_at
+                            stock.save(update_fields=['sector_id', 'industry_id', 'sectorUpdatedAt'])
+                            updated_count += 1
+                    except Stock.DoesNotExist:
+                        # Create stock if it doesn't exist
+                        Stock.objects.create(
+                            symbol=symbol,
+                            short_name=symbol,
+                            sector_id=sector,
+                            industry_id=industry,
+                            sectorUpdatedAt=updated_at,
+                            data_source='yahoo'
+                        )
+                        created_count += 1
+                        
+                except Exception as e:
+                    logger.error(f"Error upserting classification for {row.get('symbol', 'unknown')}: {str(e)}")
+                    skipped_count += 1
+        
+        logger.info(f"Classification upsert complete: {created_count} created, {updated_count} updated, {skipped_count} skipped")
+        return created_count, updated_count, skipped_count
+    
+    def _normalizeSectorKey(self, sector: str) -> str:
+        """Normalize sector name to consistent key format."""
+        if not sector:
+            return ''
+        # Replace non-alphanumeric with underscores, then collapse multiple underscores
+        normalized = re.sub(r'[^a-zA-Z0-9]', '_', sector.lower().strip())
+        # Collapse multiple underscores into single underscore
+        normalized = re.sub(r'_+', '_', normalized)
+        return normalized.strip('_')
+    
+    def _normalizeIndustryKey(self, industry: str) -> str:
+        """Normalize industry name to consistent key format."""
+        if not industry:
+            return ''
+        # Replace non-alphanumeric with underscores, then collapse multiple underscores
+        normalized = re.sub(r'[^a-zA-Z0-9]', '_', industry.lower().strip())
+        # Collapse multiple underscores into single underscore
+        normalized = re.sub(r'_+', '_', normalized)
+        return normalized.strip('_')
+    
+    def fetchStockEodHistory(self, symbol: str, startDate: datetime, endDate: datetime) -> List[Dict]:
+        """
+        Fetch EOD stock price history for the specified date range.
+        
+        Args:
+            symbol: Stock ticker symbol
+            startDate: Start date for historical data
+            endDate: End date for historical data
+            
+        Returns:
+            List of EOD price dictionaries
+        """
+        try:
+            # Validate inputs
+            symbol = self.validateSymbol(symbol)
+            self.validateDateRange(startDate, endDate)
+            
+            logger.info(f"Fetching EOD history for {symbol} from {startDate.date()} to {endDate.date()}")
+            
+            # Use existing historical data method but force EOD interval
+            historical_data = self.get_historical_data(symbol, startDate, endDate)
+            
+            if 'error' in historical_data:
+                return []
+                
+            # Convert to the expected format with adjusted_close
+            eod_data = []
+            for item in historical_data.get('data', []):
+                eod_data.append({
+                    'symbol': symbol.upper(),
+                    'date': datetime.fromisoformat(item['date']).date(),
+                    'open': Decimal(str(item['open'])),
+                    'high': Decimal(str(item['high'])), 
+                    'low': Decimal(str(item['low'])),
+                    'close': Decimal(str(item['close'])),
+                    'adjusted_close': Decimal(str(item.get('adjusted_close', item['close']))),
+                    'volume': item['volume'],
+                    'data_source': 'yahoo'
+                })
+            
+            logger.info(f"Retrieved {len(eod_data)} EOD records for {symbol}")
+            
+            # Limit to maximum expected trading days to prevent excessive data
+            calendar_days = (endDate - startDate).days
+            max_expected_trading_days = int(calendar_days * 0.690420)
+            min_threshold = int(max_expected_trading_days * 0.95)
+            
+            if len(eod_data) > max_expected_trading_days * 1.05:
+                trim_to = int(max_expected_trading_days * 1.05)
+                logger.warning(f"Trimming {len(eod_data)} records to {trim_to} expected trading days")
+                eod_data = eod_data[-trim_to:]  # Keep most recent data
+                logger.info(f"Trimmed to {len(eod_data)} EOD records for {symbol}")
+            elif len(eod_data) < min_threshold:
+                logger.warning(f"Data count {len(eod_data)} is below minimum threshold of {min_threshold} trading days")
+            
+            return eod_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching EOD history for {symbol}: {str(e)}")
+            return []
+    
+    def composeSectorIndustryEod(self, date_range: Tuple[datetime, datetime]) -> Dict[str, int]:
+        """
+        OPTIMIZED: Combined Phases 1, 2, 4 implementation.
+        Calculate and persist sector/industry EOD composites for the given date range.
+        
+        Optimizations:
+        - Phase 2: Unified data fetching (single query for all stocks)
+        - Phase 1: Bulk database operations (bulk_create/bulk_update)
+        - Phase 4: Smart caching for repeated calculations
+        
+        Args:
+            date_range: Tuple of (start_date, end_date)
+            
+        Returns:
+            Dictionary with counts of created sector and industry price records
+        """
+        start_date, end_date = date_range
+        
+        try:
+            logger.info(f"Computing sector/industry composites from {start_date.date()} to {end_date.date()}")
+            
+            # Phase 4: Initialize cache
+            cache = CompositeCache()
+            
+            # Phase 2: Get all active sectors and industries with associated stocks
+            sectors = DataSector.objects.filter(
+                isActive=True,
+                stocks__isnull=False
+            ).distinct()
+            
+            industries = DataIndustry.objects.filter(
+                isActive=True,
+                stocks__isnull=False
+            ).distinct()
+            
+            # Phase 2: Collect all stocks across sectors and industries (unified approach)
+            all_stocks_set = set()
+            sector_stock_mapping = {}
+            industry_stock_mapping = {}
+            
+            logger.info(f"Mapping stocks for {len(sectors)} sectors and {len(industries)} industries")
+            
+            for sector in sectors:
+                sector_stocks = list(Stock.objects.filter(
+                    sector_id=sector, 
+                    is_active=True,
+                    prices__date__gte=start_date.date(),
+                    prices__date__lte=end_date.date()
+                ).distinct())
+                
+                if sector_stocks:
+                    sector_stock_mapping[sector.id] = sector_stocks
+                    all_stocks_set.update(sector_stocks)
+            
+            for industry in industries:
+                industry_stocks = list(Stock.objects.filter(
+                    industry_id=industry, 
+                    is_active=True,
+                    prices__date__gte=start_date.date(),
+                    prices__date__lte=end_date.date()
+                ).distinct())
+                
+                if industry_stocks:
+                    industry_stock_mapping[industry.id] = industry_stocks
+                    all_stocks_set.update(industry_stocks)
+            
+            # Phase 2: Single unified data fetch for all stocks (major optimization)
+            logger.info(f"Fetching unified price data for {len(all_stocks_set)} unique stocks")
+            all_prices = StockPrice.objects.filter(
+                stock__in=all_stocks_set,
+                date__gte=start_date.date(),
+                date__lte=end_date.date()
+            ).select_related('stock').order_by('date', 'stock')
+            
+            # Phase 4: Cache the unified data for fast lookup
+            prices_by_stock_date = cache.index_prices_by_stock_and_date(all_prices)
+            price_dates = sorted(set(price.date for price in all_prices))
+            logger.info(f"Indexed {len(all_prices)} price records across {len(price_dates)} dates")
+            
+            sector_prices_created = 0
+            industry_prices_created = 0
+            
+            # PHASE 3: Parallel Processing with ThreadPoolExecutor
+            # Determine optimal worker count (conservative approach)
+            total_entities = len([s for s in sectors if s.id in sector_stock_mapping]) + \
+                           len([i for i in industries if i.id in industry_stock_mapping])
+            
+            max_workers = min(4, max(1, total_entities // 2))  # Conservative threading
+            logger.info(f"Using parallel processing with {max_workers} workers for {total_entities} entities")
+            
+            # Process sectors in parallel
+            if sector_stock_mapping:
+                sector_tasks = []
+                for sector in sectors:
+                    if sector.id in sector_stock_mapping:
+                        sector_tasks.append({
+                            'entity': sector,
+                            'stocks': sector_stock_mapping[sector.id]
+                        })
+                
+                if sector_tasks:
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        # Submit all sector tasks
+                        future_to_entity = {
+                            executor.submit(
+                                self._processEntityParallel,
+                                task_data,
+                                'sector',
+                                prices_by_stock_date,
+                                price_dates,
+                                cache
+                            ): task_data['entity'].id for task_data in sector_tasks
+                        }
+                        
+                        # Collect results as they complete
+                        for future in as_completed(future_to_entity):
+                            entity_name, created = future.result()
+                            sector_prices_created += created
+                            logger.debug(f"Sector task completed: {entity_name} -> {created} records")
+            
+            # Process industries in parallel
+            if industry_stock_mapping:
+                industry_tasks = []
+                for industry in industries:
+                    if industry.id in industry_stock_mapping:
+                        industry_tasks.append({
+                            'entity': industry,
+                            'stocks': industry_stock_mapping[industry.id]
+                        })
+                
+                if industry_tasks:
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        # Submit all industry tasks
+                        future_to_entity = {
+                            executor.submit(
+                                self._processEntityParallel,
+                                task_data,
+                                'industry',
+                                prices_by_stock_date,
+                                price_dates,
+                                cache
+                            ): task_data['entity'].id for task_data in industry_tasks
+                        }
+                        
+                        # Collect results as they complete
+                        for future in as_completed(future_to_entity):
+                            entity_name, created = future.result()
+                            industry_prices_created += created
+                            logger.debug(f"Industry task completed: {entity_name} -> {created} records")
+            
+            # Phase 4: Clean up cache
+            cache.clear_cache()
+            
+            logger.info(f"Composite creation complete: {sector_prices_created} sector prices, {industry_prices_created} industry prices")
+            
+            return {
+                'sector_prices_created': sector_prices_created,
+                'industry_prices_created': industry_prices_created
+            }
+            
+        except Exception as e:
+            logger.error(f"Error creating sector/industry composites: {str(e)}")
+            return {'sector_prices_created': 0, 'industry_prices_created': 0}
+    
+    def _createCompositesUnifiedBulk(self, entity, entity_type: str, stocks: List, 
+                                   prices_by_stock_date: Dict, price_dates: List, 
+                                   cache: CompositeCache) -> int:
+        """
+        COMBINED PHASES 1, 2, 4: Create composite records with unified data and bulk operations.
+        
+        Args:
+            entity: DataSector or DataIndustry instance
+            entity_type: 'sector' or 'industry'
+            stocks: List of Stock instances for this entity
+            prices_by_stock_date: Pre-fetched price data {stock: {date: price}}
+            price_dates: List of dates to process
+            cache: CompositeCache instance for optimization
+            
+        Returns:
+            Number of composite records created/updated
+        """
+        try:
+            # Phase 2: Extract relevant data from unified dataset
+            entity_prices_by_date = {}
+            for date in price_dates:
+                daily_prices = []
+                for stock in stocks:
+                    if stock in prices_by_stock_date and date in prices_by_stock_date[stock]:
+                        daily_prices.append(prices_by_stock_date[stock][date])
+                
+                if daily_prices:
+                    entity_prices_by_date[date] = daily_prices
+            
+            if not entity_prices_by_date:
+                return 0
+            
+            # Phase 1: Bulk existence check
+            model_class = DataSectorPrice if entity_type == 'sector' else DataIndustryPrice
+            entity_field = 'sector' if entity_type == 'sector' else 'industry'
+            
+            # Phase 1: Get existing records for this entity
+            existing_records_qs = model_class.objects.filter(
+                **{entity_field: entity},
+                date__in=list(entity_prices_by_date.keys())
+            )
+            existing_records = {record.date: record for record in existing_records_qs}
+            
+            # Phase 1 + 4: Calculate composites with caching and prepare bulk operations
+            new_records = []
+            update_records = []
+            
+            for date in sorted(entity_prices_by_date.keys()):
+                daily_prices = entity_prices_by_date[date]
+                
+                # Phase 4: Check cache first
+                cache_key = cache.get_composite_cache_key(entity, date)
+                composite_data = cache.get_cached_composite(cache_key)
+                
+                if not composite_data:
+                    # Calculate and cache
+                    composite_data = self._calculateComposite(daily_prices)
+                    if composite_data:
+                        cache.cache_composite(cache_key, composite_data)
+                
+                if not composite_data:
+                    continue
+                
+                # Phase 1: Bulk record preparation
+                if date in existing_records:
+                    # Update existing record if needed
+                    record = existing_records[date]
+                    if record.constituents_count != composite_data['constituents_count']:
+                        for key, value in composite_data.items():
+                            setattr(record, key, value)
+                        update_records.append(record)
+                else:
+                    # Prepare new record
+                    record_data = {entity_field: entity, 'date': date}
+                    record_data.update(composite_data)
+                    new_records.append(model_class(**record_data))
+            
+            # Phase 1: Bulk database operations
+            created_count = 0
+            
+            if new_records:
+                try:
+                    model_class.objects.bulk_create(new_records, batch_size=100, ignore_conflicts=True)
+                    created_count += len(new_records)
+                    logger.debug(f"Bulk created {len(new_records)} {entity_type} composite records")
+                except Exception as e:
+                    logger.warning(f"Bulk create failed, falling back to individual creates: {str(e)}")
+                    # Fallback to individual creates
+                    for record in new_records:
+                        try:
+                            record.save()
+                            created_count += 1
+                        except Exception:
+                            pass  # Skip conflicts
+            
+            if update_records:
+                try:
+                    updated_fields = ['close_index', 'constituents_count']
+                    model_class.objects.bulk_update(update_records, updated_fields, batch_size=100)
+                    created_count += len(update_records)
+                    logger.debug(f"Bulk updated {len(update_records)} {entity_type} composite records")
+                except Exception as e:
+                    logger.warning(f"Bulk update failed, falling back to individual updates: {str(e)}")
+                    # Fallback to individual updates
+                    for record in update_records:
+                        try:
+                            record.save()
+                            created_count += 1
+                        except Exception:
+                            pass  # Skip errors
+            
+            return created_count
+            
+        except Exception as e:
+            logger.error(f"Error creating {entity_type} composites for {entity}: {str(e)}")
+            return 0
+
+    def _processEntityParallel(self, entity_data: Dict, entity_type: str, 
+                             prices_by_stock_date: Dict, price_dates: List, 
+                             cache: CompositeCache) -> Tuple[str, int]:
+        """
+        PHASE 3: Thread-safe parallel processing for a single entity.
+        
+        Args:
+            entity_data: Dict with 'entity' and 'stocks' keys
+            entity_type: 'sector' or 'industry'
+            prices_by_stock_date: Pre-fetched price data
+            price_dates: List of dates to process
+            cache: CompositeCache instance
+            
+        Returns:
+            Tuple of (entity_name, created_count) for result aggregation
+        """
+        from django.db import connection
+        
+        entity_name = "unknown"
+        try:
+            entity = entity_data['entity']
+            stocks = entity_data['stocks']
+            entity_name = f"{entity_type}:{entity.id}"
+            
+            # Ensure fresh database connection for this thread
+            connection.ensure_connection()
+            
+            created = self._createCompositesUnifiedBulk(
+                entity=entity,
+                entity_type=entity_type,
+                stocks=stocks,
+                prices_by_stock_date=prices_by_stock_date,
+                price_dates=price_dates,
+                cache=cache
+            )
+            
+            logger.debug(f"Parallel {entity_type} processing complete: {entity_name} -> {created} records")
+            return (entity_name, created)
+            
+        except Exception as e:
+            logger.error(f"Error in parallel {entity_type} processing for {entity_name}: {str(e)}")
+            # Return 0 but don't fail the entire process
+            return (entity_name, 0)
+        finally:
+            # Close connection for this thread to prevent connection leaks
+            try:
+                connection.close()
+            except Exception:
+                pass  # Ignore connection close errors
+
+    def _createSectorComposites(self, sector: 'DataSector', start_date: datetime, end_date: datetime) -> int:
+        """Create composite price records for a sector."""
+        try:
+            # Get all stocks in this sector with price data
+            stocks = Stock.objects.filter(
+                sector_id=sector,
+                is_active=True,
+                prices__date__gte=start_date.date(),
+                prices__date__lte=end_date.date()
+            ).distinct()
+            
+            if not stocks.exists():
+                return 0
+            
+            # Get unique dates from stock prices in the date range
+            price_dates = StockPrice.objects.filter(
+                stock__in=stocks,
+                date__gte=start_date.date(),
+                date__lte=end_date.date()
+            ).values_list('date', flat=True).distinct().order_by('date')
+            
+            prices_created = 0
+            
+            # Bulk fetch all price data for all dates at once (optimization fix)
+            all_prices = StockPrice.objects.filter(
+                stock__in=stocks,
+                date__in=price_dates
+            ).select_related('stock').order_by('date', 'stock')
+            
+            # Group prices by date
+            prices_by_date = {}
+            for price in all_prices:
+                if price.date not in prices_by_date:
+                    prices_by_date[price.date] = []
+                prices_by_date[price.date].append(price)
+            
+            for date in price_dates:
+                daily_prices = prices_by_date.get(date, [])
+                
+                if not daily_prices:
+                    continue
+                    
+                # Calculate composite
+                composite_data = self._calculateComposite(daily_prices)
+                
+                if composite_data:
+                    # Create or update sector price record
+                    sector_price, created = DataSectorPrice.objects.get_or_create(
+                        sector=sector,
+                        date=date,
+                        defaults=composite_data
+                    )
+                    
+                    if created:
+                        prices_created += 1
+                    elif sector_price.constituents_count != composite_data['constituents_count']:
+                        # Update if constituent count changed
+                        for key, value in composite_data.items():
+                            setattr(sector_price, key, value)
+                        sector_price.save()
+            
+            return prices_created
+            
+        except Exception as e:
+            logger.error(f"Error creating sector composites for {sector.sectorName}: {str(e)}")
+            return 0
+    
+    def _createIndustryComposites(self, industry: 'DataIndustry', start_date: datetime, end_date: datetime) -> int:
+        """Create composite price records for an industry."""
+        try:
+            # Get all stocks in this industry with price data
+            stocks = Stock.objects.filter(
+                industry_id=industry,
+                is_active=True,
+                prices__date__gte=start_date.date(),
+                prices__date__lte=end_date.date()
+            ).distinct()
+            
+            if not stocks.exists():
+                return 0
+            
+            # Get unique dates from stock prices in the date range
+            price_dates = StockPrice.objects.filter(
+                stock__in=stocks,
+                date__gte=start_date.date(),
+                date__lte=end_date.date()
+            ).values_list('date', flat=True).distinct().order_by('date')
+            
+            prices_created = 0
+            
+            # Bulk fetch all price data for all dates at once (optimization fix)
+            all_prices = StockPrice.objects.filter(
+                stock__in=stocks,
+                date__in=price_dates
+            ).select_related('stock').order_by('date', 'stock')
+            
+            # Group prices by date
+            prices_by_date = {}
+            for price in all_prices:
+                if price.date not in prices_by_date:
+                    prices_by_date[price.date] = []
+                prices_by_date[price.date].append(price)
+            
+            for date in price_dates:
+                daily_prices = prices_by_date.get(date, [])
+                
+                if not daily_prices:
+                    continue
+                    
+                # Calculate composite
+                composite_data = self._calculateComposite(daily_prices)
+                
+                if composite_data:
+                    # Create or update industry price record
+                    industry_price, created = DataIndustryPrice.objects.get_or_create(
+                        industry=industry,
+                        date=date,
+                        defaults=composite_data
+                    )
+                    
+                    if created:
+                        prices_created += 1
+                    elif industry_price.constituents_count != composite_data['constituents_count']:
+                        # Update if constituent count changed
+                        for key, value in composite_data.items():
+                            setattr(industry_price, key, value)
+                        industry_price.save()
+            
+            return prices_created
+            
+        except Exception as e:
+            logger.error(f"Error creating industry composites for {industry.industryName}: {str(e)}")
+            return 0
+    
+    def _calculateComposite(self, daily_prices) -> Optional[Dict]:
+        """Calculate cap-weighted composite for a set of daily prices."""
+        try:
+            total_weighted_price = Decimal('0')
+            total_market_cap = Decimal('0')
+            total_volume = 0
+            constituent_count = 0
+            
+            # Try cap-weighted first
+            for price in daily_prices:
+                market_cap = price.stock.market_cap
+                adjusted_close = price.adjusted_close or price.close
+                
+                if market_cap and market_cap > 0:
+                    weight = Decimal(str(market_cap))
+                    total_weighted_price += adjusted_close * weight
+                    total_market_cap += weight
+                    total_volume += price.volume
+                    constituent_count += 1
+            
+            # If we have cap-weighted data
+            if total_market_cap > 0:
+                close_index = total_weighted_price / total_market_cap
+                method = 'cap_weighted'
+            else:
+                # Fallback to equal-weighted
+                total_price = Decimal('0')
+                constituent_count = 0
+                
+                for price in daily_prices:
+                    adjusted_close = price.adjusted_close or price.close
+                    total_price += adjusted_close
+                    total_volume += price.volume
+                    constituent_count += 1
+                
+                if constituent_count > 0:
+                    close_index = total_price / Decimal(str(constituent_count))
+                    method = 'equal_weighted'
+                else:
+                    return None
+            
+            return {
+                'close_index': close_index,
+                'volume_agg': total_volume,
+                'constituents_count': constituent_count,
+                'method': method,
+                'data_source': 'yahoo'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error calculating composite: {str(e)}")
+            return None
+
+    # =====================================================================
+    # Required Service Functions for AAPL 3Y Import
+    # =====================================================================
+    
+    def fetchQuoteSingle(self, symbol: str) -> Dict:
+        """
+        Fetch quote data for a single symbol with all required Stocks fields.
+        
+        Args:
+            symbol: Stock ticker symbol
+            
+        Returns:
+            Dictionary containing all required Stocks category fields
+        """
+        try:
+            symbol = self.validateSymbol(symbol)
+            logger.info(f"Fetching quote for {symbol}")
+            
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            
+            if not info or len(info) < 2:
+                return {'error': 'No quote data available'}
+            
+            # Extract all required Stocks fields
+            result = {
+                'symbol': symbol.upper(),
+                'currentPrice': info.get('currentPrice'),
+                'previousClose': info.get('previousClose'),
+                'open': info.get('open'),
+                'dayLow': info.get('dayLow'),
+                'dayHigh': info.get('dayHigh'),
+                'regularMarketPrice': info.get('regularMarketPrice'),
+                'regularMarketOpen': info.get('regularMarketOpen'),
+                'regularMarketDayLow': info.get('regularMarketDayLow'),
+                'regularMarketDayHigh': info.get('regularMarketDayHigh'),
+                'regularMarketPreviousClose': info.get('regularMarketPreviousClose'),
+                'fiftyTwoWeekLow': info.get('fiftyTwoWeekLow'),
+                'fiftyTwoWeekHigh': info.get('fiftyTwoWeekHigh'),
+                'fiftyTwoWeekChange': info.get('52WeekChange'),
+                'fiftyDayAverage': info.get('fiftyDayAverage'),
+                'twoHundredDayAverage': info.get('twoHundredDayAverage'),
+                'beta': info.get('beta'),
+                'impliedVolatility': info.get('impliedVolatility'),
+                'volume': info.get('volume'),
+                'regularMarketVolume': info.get('regularMarketVolume'),
+                'averageVolume': info.get('averageVolume'),
+                'averageVolume10days': info.get('averageVolume10days'),
+                'averageVolume3months': info.get('averageVolume3months'),
+                'updatedAt': timezone.now()
+            }
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error fetching quote for {symbol}: {str(e)}")
+            return {'error': str(e)}
+    
+    def fetchHistory(self, symbol: str, startDate: datetime, endDate: datetime, interval: str = '1d') -> List[Dict]:
+        """
+        Fetch historical data with history.AdjClose and history.Volume fields.
+        
+        Args:
+            symbol: Stock ticker symbol
+            startDate: Start date
+            endDate: End date  
+            interval: Data interval
+            
+        Returns:
+            List of dictionaries with adjClose and volume fields
+        """
+        try:
+            symbol = self.validateSymbol(symbol)
+            self.validateDateRange(startDate, endDate)
+            interval = self.validateInterval(interval)
+            
+            logger.info(f"Fetching history for {symbol} from {startDate.date()} to {endDate.date()}")
+            
+            ticker = yf.Ticker(symbol)
+            history = ticker.history(
+                start=startDate,
+                end=endDate,
+                interval=interval
+            )
+            
+            if history.empty:
+                return []
+            
+            result = []
+            for date, row in history.iterrows():
+                try:
+                    if pd.isna(row['Close']):
+                        continue
+                        
+                    # Handle timezone
+                    if hasattr(date, 'tzinfo') and date.tzinfo is not None:
+                        date_utc = date.tz_convert('UTC')
+                    else:
+                        date_utc = date.replace(tzinfo=dt_timezone.utc)
+                    
+                    result.append({
+                        'symbol': symbol.upper(),
+                        'date': date_utc,
+                        'adjClose': Decimal(str(round(float(row['Close']), 2))),
+                        'volume': int(row['Volume']) if pd.notna(row['Volume']) else 0,
+                        'interval': interval,
+                        'data_source': 'yahoo'
+                    })
+                except Exception as e:
+                    logger.warning(f"Skipping row for {symbol}: {str(e)}")
+                    continue
+                    
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error fetching history for {symbol}: {str(e)}")
+            return []
+    
+    def fetchIndustrySectorSingle(self, symbol: str) -> Dict:
+        """
+        Fetch industry and sector data with recency timestamp.
+        
+        Args:
+            symbol: Stock ticker symbol
+            
+        Returns:
+            Dictionary with sector, industry, and updatedAt fields
+        """
+        return self.fetchSectorIndustrySingle(symbol)
+    
+    def upsertStocksMetrics(self, row: Dict) -> bool:
+        """
+        Upsert Stocks fields into Stock model.
+        
+        Args:
+            row: Dictionary with Stocks category field data
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            symbol = row.get('symbol', '').upper()
+            if not symbol:
+                return False
+            
+            # Convert decimal fields safely
+            decimal_fields = [
+                'currentPrice', 'previousClose', 'dayLow', 'dayHigh',
+                'regularMarketPrice', 'regularMarketOpen', 'regularMarketDayLow',
+                'regularMarketDayHigh', 'regularMarketPreviousClose', 'fiftyTwoWeekLow',
+                'fiftyTwoWeekHigh', 'fiftyTwoWeekChange', 'fiftyDayAverage',
+                'twoHundredDayAverage', 'beta', 'impliedVolatility'
+            ]
+            
+            integer_fields = [
+                'volume', 'regularMarketVolume', 'averageVolume',
+                'averageVolume10days', 'averageVolume3months'
+            ]
+            
+            update_data = {'last_sync': row.get('updatedAt', timezone.now())}
+            
+            for field in decimal_fields:
+                value = row.get(field)
+                if value is not None:
+                    try:
+                        update_data[field] = Decimal(str(value))
+                    except (ValueError, TypeError):
+                        pass
+            
+            for field in integer_fields:
+                value = row.get(field)
+                if value is not None:
+                    try:
+                        update_data[field] = int(value)
+                    except (ValueError, TypeError):
+                        pass
+            
+            stock, created = Stock.objects.get_or_create(
+                symbol=symbol,
+                defaults=update_data
+            )
+            
+            if not created:
+                for field, value in update_data.items():
+                    setattr(stock, field, value)
+                stock.save()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error upserting stocks metrics: {str(e)}")
+            return False
+    
+    def upsertIndustrySector(self, row: Dict) -> bool:
+        """
+        Upsert Industry & Sector non-time-series fields.
+        
+        Args:
+            row: Dictionary with sector/industry data
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Use existing upsertCompanyProfiles method
+            symbol = row.get('symbol', '').upper()
+            if not symbol:
+                return False
+                
+            result = self.upsertCompanyProfiles({symbol: row})
+            return sum(result) > 0  # created + updated > 0
+            
+        except Exception as e:
+            logger.error(f"Error upserting industry/sector: {str(e)}")
+            return False
+    
+    def ensure_postgresql_engine(self):
+        """
+        Ensure PostgreSQL database engine is being used.
+        Raises exception if SQLite is detected per requirements.
+        
+        Raises:
+            RuntimeError: If SQLite engine is detected
+        """
+        from django.db import connection
+        
+        engine = connection.vendor
+        
+        if engine == 'sqlite':
+            raise RuntimeError(
+                "SQLite database detected. This analytics system requires PostgreSQL. "
+                "Please configure PostgreSQL database in settings."
+            )
+        elif engine != 'postgresql':
+            logger.warning(f"Unexpected database engine '{engine}'. Expected 'postgresql'.")
+        
+        logger.info(f"Database engine verified: {engine}")
+    
+    def backfill_eod_gaps(
+        self,
+        symbol: str,
+        required_years: int = 2,
+        max_attempts: int = 3
+    ) -> Dict[str, Any]:
+        """
+        Backfill missing EOD data for stock, sector, and industry with retry logic.
+        
+        Args:
+            symbol: Stock ticker symbol
+            required_years: Years of history required
+            max_attempts: Maximum retry attempts for each data type
+            
+        Returns:
+            Dict with backfill results:
+            {
+                'success': bool,
+                'stock_backfilled': int,
+                'sector_backfilled': int, 
+                'industry_backfilled': int,
+                'attempts_used': int,
+                'errors': List[str]
+            }
+        """
+        from Data.repo.price_reader import PriceReader
+        
+        result = {
+            'success': False,
+            'stock_backfilled': 0,
+            'sector_backfilled': 0,
+            'industry_backfilled': 0,
+            'attempts_used': 0,
+            'errors': []
+        }
+        
+        try:
+            # Ensure PostgreSQL engine
+            self.ensure_postgresql_engine()
+            
+            price_reader = PriceReader()
+            
+            # Calculate date range with trading day limit
+            # Target precise trading day count with minimal excess data
+            end_date = timezone.now()
+            
+            # Calculate calendar days needed for target trading days
+            # Use conservative multiplier to avoid fetching excess data
+            target_trading_days = required_years * 252  # Standard trading days per year
+            calendar_days_needed = int(target_trading_days / 0.690420)  # Inverse of trading day ratio
+            start_date = end_date - timezone.timedelta(days=calendar_days_needed)
+            
+            for attempt in range(1, max_attempts + 1):
+                result['attempts_used'] = attempt
+                logger.info(f"Backfill attempt {attempt}/{max_attempts} for {symbol}")
+                
+                try:
+                    # Check current coverage
+                    coverage = price_reader.check_data_coverage(symbol, required_years)
+                    
+                    # Backfill stock data if needed
+                    if not coverage['stock']['has_data'] or coverage['stock']['gap_count'] > 50:
+                        logger.info(f"Backfilling stock data for {symbol}")
+                        stock_data = self.fetchStockEodHistory(symbol, start_date, end_date)
+                        if stock_data:
+                            # Convert to StockPrice format and upsert
+                            stock_rows = []
+                            for item in stock_data:
+                                stock_rows.append({
+                                    'symbol': symbol,
+                                    'date': item['date'],
+                                    'open': item['open'],
+                                    'high': item['high'],
+                                    'low': item['low'],
+                                    'close': item['close'],
+                                    'adjusted_close': item['adjusted_close'],
+                                    'volume': item['volume'],
+                                    'data_source': 'yahoo'
+                                })
+                            
+                            backfilled = self._upsert_stock_prices(stock_rows)
+                            result['stock_backfilled'] += backfilled
+                            logger.info(f"Backfilled {backfilled} stock price records")
+                    
+                    # Create sector/industry classifications if stock was backfilled successfully
+                    if result['stock_backfilled'] > 0:
+                        try:
+                            from Data.models import Stock
+                            stock_record = Stock.objects.get(symbol=symbol)
+                            
+                            # Create classification record if sector/industry strings exist but FK relationships don't
+                            if (stock_record.sector and stock_record.industry and 
+                                not stock_record.sector_id and not stock_record.industry_id):
+                                
+                                # Normalize keys for classification
+                                sector_key = self._normalizeSectorKey(stock_record.sector)
+                                industry_key = self._normalizeIndustryKey(f"{stock_record.industry}_{stock_record.sector}")
+                                
+                                classification_row = {
+                                    'symbol': symbol,
+                                    'sectorKey': sector_key,
+                                    'sectorName': stock_record.sector,
+                                    'industryKey': industry_key,
+                                    'industryName': stock_record.industry,
+                                    'updatedAt': timezone.now()
+                                }
+                                
+                                logger.info(f"Creating sector/industry classification for {symbol}")
+                                self.upsertClassification([classification_row])
+                                
+                        except Exception as e:
+                            logger.error(f"Error creating classification for {symbol}: {str(e)}")
+                    
+                    # Get sector/industry keys (should now exist after classification)
+                    sector_key, industry_key = price_reader.get_stock_sector_industry_keys(symbol)
+                    
+                    # Backfill sector composite if needed and available
+                    if sector_key and not coverage['sector']['has_data']:
+                        logger.info(f"Backfilling sector composite for {sector_key}")
+                        sector_result = self.composeSectorIndustryEod((start_date, end_date))
+                        result['sector_backfilled'] += sector_result.get('sector_prices_created', 0)
+                    
+                    # Backfill industry composite if needed and available  
+                    if industry_key and not coverage['industry']['has_data']:
+                        logger.info(f"Backfilling industry composite for {industry_key}")
+                        industry_result = self.composeSectorIndustryEod((start_date, end_date))
+                        result['industry_backfilled'] += industry_result.get('industry_prices_created', 0)
+                    
+                    # Check if gaps are adequately filled
+                    final_coverage = price_reader.check_data_coverage(symbol, required_years)
+                    
+                    stock_adequate = (final_coverage['stock']['has_data'] and 
+                                    final_coverage['stock']['gap_count'] <= 50)
+                    
+                    sector_adequate = (not sector_key or 
+                                     (final_coverage['sector']['has_data'] and 
+                                      final_coverage['sector']['gap_count'] <= 50))
+                    
+                    industry_adequate = (not industry_key or 
+                                       (final_coverage['industry']['has_data'] and 
+                                        final_coverage['industry']['gap_count'] <= 50))
+                    
+                    if stock_adequate and sector_adequate and industry_adequate:
+                        result['success'] = True
+                        logger.info(f"Backfill complete for {symbol} after {attempt} attempts")
+                        break
+                    else:
+                        logger.info(f"Gaps still exist after attempt {attempt}, retrying...")
+                        
+                except Exception as e:
+                    error_msg = f"Attempt {attempt} failed: {str(e)}"
+                    result['errors'].append(error_msg)
+                    logger.error(error_msg)
+                    
+                    # Add exponential backoff with jitter
+                    if attempt < max_attempts:
+                        delay = (2 ** attempt) + random.uniform(0, 1)
+                        logger.info(f"Waiting {delay:.2f}s before retry...")
+                        time.sleep(delay)
+            
+            if not result['success']:
+                error_msg = f"Failed to adequately backfill {symbol} after {max_attempts} attempts"
+                result['errors'].append(error_msg)
+                logger.error(error_msg)
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Critical error in backfill_eod_gaps: {str(e)}"
+            result['errors'].append(error_msg)
+            logger.error(error_msg)
+            return result
+    
+    def _upsert_stock_prices(self, stock_rows: List[Dict]) -> int:
+        """Helper method to upsert stock price records."""
+        try:
+            if not stock_rows:
+                return 0
+                
+            upserted_count = 0
+            
+            with transaction.atomic():
+                for row in stock_rows:
+                    try:
+                        stock = Stock.objects.get(symbol=row['symbol'].upper())
+                        
+                        price, created = StockPrice.objects.get_or_create(
+                            stock=stock,
+                            date=row['date'],
+                            defaults={
+                                'open': row['open'],
+                                'high': row['high'],
+                                'low': row['low'],
+                                'close': row['close'],
+                                'adjusted_close': row['adjusted_close'],
+                                'volume': row['volume'],
+                                'data_source': row['data_source']
+                            }
+                        )
+                        
+                        if not created:
+                            # Update existing record if data is different
+                            price.open = row['open']
+                            price.high = row['high']
+                            price.low = row['low']
+                            price.close = row['close']
+                            price.adjusted_close = row['adjusted_close']
+                            price.volume = row['volume']
+                            price.data_source = row['data_source']
+                            price.save()
+                        
+                        upserted_count += 1
+                        
+                    except Stock.DoesNotExist:
+                        logger.warning(f"Stock {row['symbol']} not found for price upsert")
+                        continue
+                        
+            return upserted_count
+            
+        except Exception as e:
+            logger.error(f"Error upserting stock prices: {str(e)}")
+            return 0
+
+    def upsertHistoryBars(self, rows: List[Dict]) -> int:
+        """
+        Upsert history.AdjClose and history.Volume time-series data.
+        
+        Args:
+            rows: List of history dictionaries
+            
+        Returns:
+            Number of rows upserted
+        """
+        try:
+            if not rows:
+                return 0
+            
+            upserted_count = 0
+            
+            with transaction.atomic():
+                for row in rows:
+                    symbol = row.get('symbol', '').upper()
+                    date = row.get('date')
+                    
+                    if not symbol or not date:
+                        continue
+                    
+                    try:
+                        stock = Stock.objects.get(symbol=symbol)
+                        
+                        # Convert datetime to date if needed
+                        if isinstance(date, datetime):
+                            date = date.date()
+                        
+                        price_data = {
+                            'adjusted_close': row.get('adjClose'),
+                            'volume': row.get('volume', 0),
+                            'data_source': row.get('data_source', 'yahoo')
+                        }
+                        
+                        # Use existing close for required fields if not provided
+                        if 'adjClose' in row:
+                            adj_close = row['adjClose']
+                            price_data.update({
+                                'open': adj_close,
+                                'high': adj_close,
+                                'low': adj_close,
+                                'close': adj_close
+                            })
+                        
+                        price, created = StockPrice.objects.get_or_create(
+                            stock=stock,
+                            date=date,
+                            defaults=price_data
+                        )
+                        
+                        if not created:
+                            # Update existing record
+                            for field, value in price_data.items():
+                                if value is not None:
+                                    setattr(price, field, value)
+                            price.save()
+                        
+                        upserted_count += 1
+                        
+                    except Stock.DoesNotExist:
+                        logger.warning(f"Stock {symbol} not found for history upsert")
+                        continue
+            
+            return upserted_count
+            
+        except Exception as e:
+            logger.error(f"Error upserting history bars: {str(e)}")
+            return 0
+
 
 # Singleton instance
 yahoo_finance_service = YahooFinanceService()
@@ -1202,7 +2347,7 @@ def create_yahoo_finance_service():
         def handle(self, *args, **options):
             with create_yahoo_finance_service() as service:
                 data = service.fetchSingleHistorical('AAPL', '1mo', '1d')
-                created, skipped = service.saveBars(data)
+                # Process data as needed
                 # Session is automatically closed after this block
     
     For general use throughout the application, prefer the singleton yahoo_finance_service.
