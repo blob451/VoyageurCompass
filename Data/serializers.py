@@ -108,6 +108,7 @@ class PortfolioHoldingSerializer(serializers.ModelSerializer):
             "current_value",
             "unrealized_gain_loss",
             "unrealized_gain_loss_percent",
+            "is_active",
             "created_at",
             "updated_at",
         ]

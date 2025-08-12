@@ -38,7 +38,7 @@ urlpatterns = [
     path("user/change-password/", ChangePasswordView.as_view(), name="change_password"),
     path("user/stats/", user_stats, name="user_stats"),
     # System - health check endpoints
-    # Root-level health checks available at /healthz and /readyz
+    # Root-level health checks available at /healthz and /readyz  
     path("health/", health_check, name="health_check"),
     path("health/comprehensive/", health_comprehensive, name="health-comprehensive"),
     path("health/database/", health_database, name="health-database"),

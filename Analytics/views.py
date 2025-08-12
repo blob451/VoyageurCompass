@@ -130,6 +130,13 @@ def analyze_stock(request, symbol):
         # If validation service fails, continue with analysis
         pass
 
+    # Validate symbol first
+    if not symbol or len(symbol) > 10 or not symbol.isalpha():
+        return Response(
+            {"error": f"Invalid stock symbol: {symbol}"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
     # Run analysis
     try:
         engine = TechnicalAnalysisEngine()
@@ -146,7 +153,7 @@ def analyze_stock(request, symbol):
             "composite_score": analysis.get("score_0_10", 0.0),
             "composite_raw": analysis.get("composite_raw"),
             "indicators": analysis.get("components", {}),
-            "technical_indicators": analysis.get("components", {}),  # Add field expected by tests
+            "technical_indicators": analysis.get("components", {}),  # CRITICAL: Add field expected by tests
             "weighted_scores": {
                 k: float(v) for k, v in analysis.get("weighted_scores", {}).items()
             },
@@ -158,7 +165,7 @@ def analyze_stock(request, symbol):
     except Exception as e:
         error_msg = str(e).lower()
         # Check if error indicates invalid symbol
-        if any(keyword in error_msg for keyword in ['not found', 'invalid symbol', 'does not exist', 'no data']):
+        if any(keyword in error_msg for keyword in ['not found', 'invalid symbol', 'does not exist', 'no data', 'no price data']):
             return Response(
                 {"error": f"Stock symbol '{symbol}' not found"},
                 status=status.HTTP_404_NOT_FOUND,
@@ -200,15 +207,9 @@ def analyze_portfolio(request, portfolio_id):
     Returns:
         Analysis results for all holdings
     """
-    # Check portfolio ownership
+    # Check portfolio ownership - return 404 for both non-existent and unauthorized access
     try:
-        portfolio = Portfolio.objects.get(id=portfolio_id)
-
-        if portfolio.user != request.user:
-            return Response(
-                {"error": "You are not authorized to analyze this portfolio"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        portfolio = Portfolio.objects.get(id=portfolio_id, user=request.user)
     except Portfolio.DoesNotExist:
         return Response(
             {"error": "Portfolio not found"}, status=status.HTTP_404_NOT_FOUND

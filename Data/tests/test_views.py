@@ -471,7 +471,11 @@ class MarketViewsTestCase(APITestCase):
         """Test bulk price update endpoint."""
         mock_get_stock_data.return_value = {"symbol": "TEST0", "prices": [105.00]}
 
-        self.client.force_authenticate(user=self.user)
+        # Use admin user since bulk_price_update requires admin permissions
+        admin_user = User.objects.create_superuser(
+            username="admin", password="adminpass123", email="admin@test.com"
+        )
+        self.client.force_authenticate(user=admin_user)
         url = reverse("data:bulk-price-update")
         response = self.client.post(url)
 
