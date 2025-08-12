@@ -5,7 +5,7 @@ const baseQuery = fetchBaseQuery({
   baseUrl: 'http://localhost:8000/api/v1',
   credentials: 'include',
   prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.token;
+    const token = getState().auth.tokens?.access;
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
@@ -37,7 +37,8 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
 export const apiSlice = createApi({
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['User', 'Stock', 'Portfolio'],
+  tagTypes: ['Stock', 'Portfolio', 'Holding', 'User', 'Market', 'Analytics'],
+  keepUnusedDataFor: 60, // Cache for 60 seconds
   endpoints: (builder) => ({
     login: builder.mutation({
       query: (credentials) => ({

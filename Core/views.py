@@ -97,6 +97,9 @@ class RegisterView(generics.CreateAPIView):
         return Response(
             {
                 "user": UserSerializer(user).data,
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                # Keep nested structure for frontend compatibility
                 "tokens": {
                     "refresh": str(refresh),
                     "access": str(refresh.access_token),
