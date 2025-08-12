@@ -1,0 +1,1003 @@
+"""
+Technical Analysis Engine for VoyageurCompass
+Implements 12 technical indicators with exact specifications from requirements.
+All indicators normalized to [0,1] bullishness scale with defined weights.
+
+cSpell:ignore Bollinger bollinger pricevs bbpos bbwidth volsurge candlerev srcontext Doji doji
+"""
+
+import logging
+from datetime import datetime, date, timedelta
+from decimal import Decimal
+from typing import Dict, List, Optional, Any, Tuple, NamedTuple
+import math
+import statistics
+
+from django.utils import timezone
+
+from Data.repo.price_reader import PriceReader, PriceData, SectorPriceData, IndustryPriceData
+from Data.repo.analytics_writer import AnalyticsWriter
+
+logger = logging.getLogger(__name__)
+
+
+class IndicatorResult(NamedTuple):
+    """Structure for individual indicator results."""
+    raw: Any
+    score: float
+    weight: float
+    weighted_score: float
+
+
+class TechnicalAnalysisEngine:
+    """
+    Technical Analysis Engine implementing 12 indicators with exact normalization.
+    
+    Indicators with weights:
+    - SMA 50/200 Crossover: 0.15
+    - Price vs 50d: 0.10  
+    - RSI(14): 0.10
+    - MACD(12,26,9) histogram: 0.10
+    - Bollinger %B (20,2): 0.10
+    - Bollinger Bandwidth: 0.05
+    - Volume Surge: 0.10
+    - OBV 20-day trend: 0.05
+    - Relative Strength 1Y: 0.05
+    - Relative Strength 2Y: 0.05
+    - Candlestick Reversal: 0.08
+    - Support/Resistance: 0.07
+    Total: 1.00
+    """
+    
+    # Indicator weights as specified
+    WEIGHTS = {
+        'sma50vs200': 0.15,
+        'pricevs50': 0.10,
+        'rsi14': 0.10,
+        'macd12269': 0.10,
+        'bbpos20': 0.10,
+        'bbwidth20': 0.05,
+        'volsurge': 0.10,
+        'obv20': 0.05,
+        'rel1y': 0.05,
+        'rel2y': 0.05,
+        'candlerev': 0.08,
+        'srcontext': 0.07
+    }
+    
+    def __init__(self):
+        """Initialize the TA engine."""
+        self.price_reader = PriceReader()
+        self.analytics_writer = AnalyticsWriter()
+    
+    def analyze_stock(
+        self,
+        symbol: str,
+        analysis_date: Optional[datetime] = None,
+        horizon: str = 'blend'
+    ) -> Dict[str, Any]:
+        """
+        Perform complete technical analysis for a stock.
+        
+        Args:
+            symbol: Stock ticker symbol
+            analysis_date: Date to analyze (defaults to latest trading day)
+            horizon: Analysis horizon (short/medium/long/blend)
+            
+        Returns:
+            Dict containing all analysis results and composite score
+        """
+        try:
+            logger.info(f"Starting technical analysis for {symbol}")
+            
+            if analysis_date is None:
+                analysis_date = timezone.now()
+            
+            # Get required data (3 years for comprehensive analysis)
+            stock_prices = self._get_stock_data(symbol, analysis_date)
+            sector_prices, industry_prices = self._get_sector_industry_data(symbol, analysis_date)
+            
+            if not stock_prices:
+                raise ValueError(f"No price data available for {symbol}")
+            
+            # Calculate all 12 indicators
+            indicators = {}
+            
+            indicators['sma50vs200'] = self._calculate_sma_crossover(stock_prices)
+            indicators['pricevs50'] = self._calculate_price_vs_50d(stock_prices)
+            indicators['rsi14'] = self._calculate_rsi14(stock_prices)
+            indicators['macd12269'] = self._calculate_macd_histogram(stock_prices)
+            indicators['bbpos20'] = self._calculate_bollinger_position(stock_prices)
+            indicators['bbwidth20'] = self._calculate_bollinger_bandwidth(stock_prices)
+            indicators['volsurge'] = self._calculate_volume_surge(stock_prices)
+            indicators['obv20'] = self._calculate_obv_trend(stock_prices)
+            indicators['rel1y'] = self._calculate_relative_strength_1y(stock_prices, sector_prices, industry_prices)
+            indicators['rel2y'] = self._calculate_relative_strength_2y(stock_prices, sector_prices, industry_prices)
+            indicators['candlerev'] = self._calculate_candlestick_reversal(stock_prices)
+            indicators['srcontext'] = self._calculate_support_resistance(stock_prices)
+            
+            # Calculate weighted scores and composite
+            weighted_scores = {}
+            components = {}
+            composite_raw = Decimal('0')
+            
+            for indicator_name, result in indicators.items():
+                if result is None:
+                    # Use default score of 0.5 for missing indicators
+                    score = 0.5
+                    raw_value = None
+                else:
+                    score = result.score
+                    raw_value = result.raw
+                
+                weight = self.WEIGHTS[indicator_name]
+                weighted_score = Decimal(str(score)) * Decimal(str(weight))
+                
+                weighted_scores[f'w_{indicator_name}'] = weighted_score
+                components[indicator_name] = {
+                    'raw': raw_value,
+                    'score': score
+                }
+                composite_raw += weighted_score
+            
+            # Final composite score (0-10, rounded)
+            score_0_10 = round(float(composite_raw) * 10)
+            
+            # Store results in database
+            analytics_result = self.analytics_writer.upsert_analytics_result(
+                symbol=symbol,
+                as_of=analysis_date,
+                weighted_scores=weighted_scores,
+                components=components,
+                composite_raw=composite_raw,
+                score_0_10=score_0_10,
+                horizon=horizon
+            )
+            
+            result = {
+                'symbol': symbol,
+                'analysis_date': analysis_date,
+                'horizon': horizon,
+                'indicators': indicators,
+                'weighted_scores': weighted_scores,
+                'components': components,
+                'composite_raw': float(composite_raw),
+                'score_0_10': score_0_10,
+                'analytics_result_id': analytics_result.id
+            }
+            
+            logger.info(f"Analysis complete for {symbol}: {score_0_10}/10")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error analyzing {symbol}: {str(e)}")
+            raise
+    
+    def _get_stock_data(self, symbol: str, analysis_date: datetime) -> List[PriceData]:
+        """Get 3 years of stock price data ending at analysis date."""
+        try:
+            start_date = (analysis_date - timedelta(days=3*365+30)).date()
+            end_date = analysis_date.date()
+            
+            return self.price_reader.get_stock_prices(symbol, start_date, end_date)
+        except Exception as e:
+            logger.error(f"Error getting stock data for {symbol}: {str(e)}")
+            return []
+    
+    def _get_sector_industry_data(self, symbol: str, analysis_date: datetime) -> Tuple[List[SectorPriceData], List[IndustryPriceData]]:
+        """Get sector and industry composite data."""
+        try:
+            sector_key, industry_key = self.price_reader.get_stock_sector_industry_keys(symbol)
+            start_date = (analysis_date - timedelta(days=3*365+30)).date()
+            end_date = analysis_date.date()
+            
+            sector_prices = []
+            industry_prices = []
+            
+            if sector_key:
+                sector_prices = self.price_reader.get_sector_prices(sector_key, start_date, end_date)
+            
+            if industry_key:
+                industry_prices = self.price_reader.get_industry_prices(industry_key, start_date, end_date)
+            
+            return sector_prices, industry_prices
+            
+        except Exception as e:
+            logger.warning(f"Error getting sector/industry data for {symbol}: {str(e)}")
+            return [], []
+    
+    def _calculate_sma_crossover(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
+        """
+        SMA 50/200 Crossover: Score=1 if 50>200; 0 if 50<200. Weight 0.15.
+        """
+        try:
+            if len(prices) < 200:
+                return None
+                
+            # Calculate SMAs using adjusted_close
+            closes = [float(p.adjusted_close or p.close) for p in prices[-200:]]
+            
+            sma50 = statistics.mean(closes[-50:])
+            sma200 = statistics.mean(closes[-200:])
+            
+            score = 1.0 if sma50 > sma200 else 0.0
+            
+            return IndicatorResult(
+                raw={'sma50': sma50, 'sma200': sma200},
+                score=score,
+                weight=self.WEIGHTS['sma50vs200'],
+                weighted_score=score * self.WEIGHTS['sma50vs200']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating SMA crossover: {str(e)}")
+            return None
+    
+    def _calculate_price_vs_50d(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
+        """
+        Price vs 50d: pct=(close/SMA50-1); map −10%→0, 0→0.5, +10%→1 (clamp). Weight 0.10.
+        """
+        try:
+            if len(prices) < 50:
+                return None
+                
+            closes = [float(p.adjusted_close or p.close) for p in prices[-50:]]
+            current_price = closes[-1]
+            sma50 = statistics.mean(closes)
+            
+            pct_diff = (current_price / sma50) - 1.0
+            
+            # Linear mapping: -10% → 0, 0% → 0.5, +10% → 1
+            if pct_diff <= -0.10:
+                score = 0.0
+            elif pct_diff >= 0.10:
+                score = 1.0
+            else:
+                # Linear interpolation
+                score = 0.5 + (pct_diff / 0.20)
+            
+            return IndicatorResult(
+                raw={'price': current_price, 'sma50': sma50, 'pct_diff': pct_diff},
+                score=score,
+                weight=self.WEIGHTS['pricevs50'],
+                weighted_score=score * self.WEIGHTS['pricevs50']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating price vs 50d: {str(e)}")
+            return None
+    
+    def _calculate_rsi14(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
+        """
+        RSI(14): standard formula over adjusted close; Score=RSI/100 (cap 0..1). Weight 0.10.
+        """
+        try:
+            if len(prices) < 15:
+                return None
+                
+            closes = [float(p.adjusted_close or p.close) for p in prices[-15:]]
+            
+            # Calculate price changes
+            gains = []
+            losses = []
+            
+            for i in range(1, len(closes)):
+                change = closes[i] - closes[i-1]
+                if change > 0:
+                    gains.append(change)
+                    losses.append(0)
+                else:
+                    gains.append(0)
+                    losses.append(abs(change))
+            
+            if not gains and not losses:
+                return None
+                
+            avg_gain = statistics.mean(gains)
+            avg_loss = statistics.mean(losses)
+            
+            if avg_loss == 0:
+                rsi = 100.0
+            else:
+                rs = avg_gain / avg_loss
+                rsi = 100 - (100 / (1 + rs))
+            
+            score = min(1.0, max(0.0, rsi / 100.0))
+            
+            return IndicatorResult(
+                raw={'rsi': rsi},
+                score=score,
+                weight=self.WEIGHTS['rsi14'],
+                weighted_score=score * self.WEIGHTS['rsi14']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating RSI14: {str(e)}")
+            return None
+    
+    def _calculate_macd_histogram(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
+        """
+        MACD(12,26,9) histogram: Score=0.5+0.5*(hist/(1% of price)); clamp 0..1. Weight 0.10.
+        """
+        try:
+            if len(prices) < 35:  # Need at least 26 + 9 days
+                return None
+                
+            closes = [float(p.adjusted_close or p.close) for p in prices[-35:]]
+            current_price = closes[-1]
+            
+            # Calculate EMAs
+            def ema(data, period):
+                multiplier = 2 / (period + 1)
+                ema_values = [data[0]]
+                for i in range(1, len(data)):
+                    ema_val = (data[i] * multiplier) + (ema_values[-1] * (1 - multiplier))
+                    ema_values.append(ema_val)
+                return ema_values
+            
+            ema12 = ema(closes, 12)
+            ema26 = ema(closes, 26)
+            
+            # MACD line
+            macd_line = [ema12[i] - ema26[i] for i in range(len(ema12))]
+            
+            # Signal line (9-day EMA of MACD)
+            if len(macd_line) >= 9:
+                signal_line = ema(macd_line[-9:], 9)
+                histogram = macd_line[-1] - signal_line[-1]
+            else:
+                histogram = 0
+            
+            # Normalize: 0.5 + 0.5 * (hist / 1% of price)
+            one_percent = current_price * 0.01
+            if one_percent > 0:
+                normalized = histogram / one_percent
+                score = 0.5 + 0.5 * normalized
+                score = min(1.0, max(0.0, score))
+            else:
+                score = 0.5
+            
+            return IndicatorResult(
+                raw={'histogram': histogram, 'macd': macd_line[-1], 'signal': signal_line[-1] if len(macd_line) >= 9 else 0},
+                score=score,
+                weight=self.WEIGHTS['macd12269'],
+                weighted_score=score * self.WEIGHTS['macd12269']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating MACD histogram: {str(e)}")
+            return None
+    
+    def _calculate_bollinger_position(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
+        """
+        Bollinger %B (20,2): %B=(close−lower)/(upper−lower); Score=1−%B; clamp 0..1. Weight 0.10.
+        """
+        try:
+            if len(prices) < 20:
+                return None
+                
+            closes = [float(p.adjusted_close or p.close) for p in prices[-20:]]
+            current_price = closes[-1]
+            
+            mean_price = statistics.mean(closes)
+            std_dev = statistics.stdev(closes)
+            
+            upper_band = mean_price + (2 * std_dev)
+            lower_band = mean_price - (2 * std_dev)
+            
+            if upper_band == lower_band:
+                percent_b = 0.5
+            else:
+                percent_b = (current_price - lower_band) / (upper_band - lower_band)
+            
+            score = 1 - percent_b
+            score = min(1.0, max(0.0, score))
+            
+            return IndicatorResult(
+                raw={'percent_b': percent_b, 'upper': upper_band, 'lower': lower_band, 'middle': mean_price},
+                score=score,
+                weight=self.WEIGHTS['bbpos20'],
+                weighted_score=score * self.WEIGHTS['bbpos20']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating Bollinger %B: {str(e)}")
+            return None
+    
+    def _calculate_bollinger_bandwidth(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
+        """
+        Bollinger Bandwidth (bbWidth20): width=(upper−lower)/mid; map ≤5%→0.6, 12.5%→0.5, ≥20%→0.4 linear. Weight 0.05.
+        """
+        try:
+            if len(prices) < 20:
+                return None
+                
+            closes = [float(p.adjusted_close or p.close) for p in prices[-20:]]
+            
+            mean_price = statistics.mean(closes)
+            std_dev = statistics.stdev(closes)
+            
+            upper_band = mean_price + (2 * std_dev)
+            lower_band = mean_price - (2 * std_dev)
+            
+            if mean_price == 0:
+                bandwidth_pct = 0
+            else:
+                bandwidth = upper_band - lower_band
+                bandwidth_pct = bandwidth / mean_price
+            
+            # Linear mapping: ≤5% → 0.6, 12.5% → 0.5, ≥20% → 0.4
+            if bandwidth_pct <= 0.05:
+                score = 0.6
+            elif bandwidth_pct >= 0.20:
+                score = 0.4
+            else:
+                # Linear interpolation between control points
+                if bandwidth_pct <= 0.125:
+                    # Between 5% and 12.5%: 0.6 to 0.5
+                    ratio = (bandwidth_pct - 0.05) / (0.125 - 0.05)
+                    score = 0.6 - (ratio * 0.1)
+                else:
+                    # Between 12.5% and 20%: 0.5 to 0.4
+                    ratio = (bandwidth_pct - 0.125) / (0.20 - 0.125)
+                    score = 0.5 - (ratio * 0.1)
+            
+            return IndicatorResult(
+                raw={'bandwidth_pct': bandwidth_pct, 'bandwidth': upper_band - lower_band},
+                score=score,
+                weight=self.WEIGHTS['bbwidth20'],
+                weighted_score=score * self.WEIGHTS['bbwidth20']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating Bollinger Bandwidth: {str(e)}")
+            return None
+    
+    def _calculate_volume_surge(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
+        """
+        Volume Surge: compare today volume to 10-day mean; complex mapping based on price direction. Weight 0.10.
+        """
+        try:
+            if len(prices) < 11:
+                return None
+                
+            current_volume = prices[-1].volume
+            recent_volumes = [p.volume for p in prices[-11:-1]]  # Last 10 days excluding today
+            avg_volume = statistics.mean(recent_volumes)
+            
+            if avg_volume == 0:
+                volume_ratio = 1.0
+            else:
+                volume_ratio = current_volume / avg_volume
+            
+            # Price direction for today
+            current_price = prices[-1]
+            price_up = (current_price.close > current_price.open)
+            
+            # Mapping based on direction and volume ratio
+            if price_up:
+                if volume_ratio >= 1.5:
+                    score = 1.0
+                elif volume_ratio >= 1.0:
+                    score = 0.8
+                else:
+                    score = 0.6
+            else:  # price down
+                if volume_ratio >= 1.5:
+                    score = 0.0
+                elif volume_ratio >= 1.0:
+                    score = 0.3
+                else:
+                    score = 0.4
+            
+            return IndicatorResult(
+                raw={'volume_ratio': volume_ratio, 'price_up': price_up},
+                score=score,
+                weight=self.WEIGHTS['volsurge'],
+                weighted_score=score * self.WEIGHTS['volsurge']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating Volume Surge: {str(e)}")
+            return None
+    
+    def _calculate_obv_trend(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
+        """
+        OBV 20-day trend: OBV_delta=(OBV_t−OBV_t−20)/sum(volume_20); Score=(OBV_delta+1)/2. Weight 0.05.
+        """
+        try:
+            if len(prices) < 21:
+                return None
+                
+            # Calculate OBV
+            obv_values = [0]
+            for i in range(1, len(prices)):
+                prev_close = float(prices[i-1].close)
+                curr_close = float(prices[i].close)
+                volume = prices[i].volume
+                
+                if curr_close > prev_close:
+                    obv_values.append(obv_values[-1] + volume)
+                elif curr_close < prev_close:
+                    obv_values.append(obv_values[-1] - volume)
+                else:
+                    obv_values.append(obv_values[-1])
+            
+            # Get current and 20-day ago OBV
+            obv_current = obv_values[-1]
+            obv_20_ago = obv_values[-21]
+            
+            # Volume sum for last 20 days
+            volume_sum = sum(p.volume for p in prices[-20:])
+            
+            if volume_sum == 0:
+                obv_delta = 0
+            else:
+                obv_delta = (obv_current - obv_20_ago) / volume_sum
+            
+            score = (obv_delta + 1) / 2
+            score = min(1.0, max(0.0, score))
+            
+            return IndicatorResult(
+                raw={'obv_delta': obv_delta, 'obv_current': obv_current, 'obv_20_ago': obv_20_ago},
+                score=score,
+                weight=self.WEIGHTS['obv20'],
+                weighted_score=score * self.WEIGHTS['obv20']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating OBV trend: {str(e)}")
+            return None
+    
+    def _calculate_relative_strength_1y(self, stock_prices: List[PriceData], sector_prices: List[SectorPriceData], industry_prices: List[IndustryPriceData]) -> Optional[IndicatorResult]:
+        """
+        Rel Strength 1Y: stock_1Y minus avg(sector_1Y, industry_1Y); map −20pp→0, 0→0.5, +20pp→1. Weight 0.05.
+        """
+        try:
+            if len(stock_prices) < 252:  # ~1 year trading days
+                return None
+                
+            # Stock 1Y return
+            stock_current = float(stock_prices[-1].adjusted_close or stock_prices[-1].close)
+            stock_1y_ago = float(stock_prices[-252].adjusted_close or stock_prices[-252].close)
+            stock_1y_return = (stock_current / stock_1y_ago - 1) * 100
+            
+            # Sector and industry returns
+            benchmark_returns = []
+            
+            if sector_prices and len(sector_prices) >= 252:
+                sector_current = float(sector_prices[-1].close_index)
+                sector_1y_ago = float(sector_prices[-252].close_index)
+                sector_1y_return = (sector_current / sector_1y_ago - 1) * 100
+                benchmark_returns.append(sector_1y_return)
+            
+            if industry_prices and len(industry_prices) >= 252:
+                industry_current = float(industry_prices[-1].close_index)
+                industry_1y_ago = float(industry_prices[-252].close_index)
+                industry_1y_return = (industry_current / industry_1y_ago - 1) * 100
+                benchmark_returns.append(industry_1y_return)
+            
+            if not benchmark_returns:
+                return None
+                
+            avg_benchmark = statistics.mean(benchmark_returns)
+            relative_strength = stock_1y_return - avg_benchmark
+            
+            # Map -20pp → 0, 0 → 0.5, +20pp → 1
+            if relative_strength <= -20:
+                score = 0.0
+            elif relative_strength >= 20:
+                score = 1.0
+            else:
+                score = 0.5 + (relative_strength / 40)
+            
+            return IndicatorResult(
+                raw={'relative_strength': relative_strength, 'stock_return': stock_1y_return, 'benchmark_return': avg_benchmark},
+                score=score,
+                weight=self.WEIGHTS['rel1y'],
+                weighted_score=score * self.WEIGHTS['rel1y']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating 1Y relative strength: {str(e)}")
+            return None
+    
+    def _calculate_relative_strength_2y(self, stock_prices: List[PriceData], sector_prices: List[SectorPriceData], industry_prices: List[IndustryPriceData]) -> Optional[IndicatorResult]:
+        """
+        Rel Strength 2Y: stock_2Y minus avg(sector_2Y, industry_2Y); map −100pp→0, 0→0.5, +100pp→1. Weight 0.05.
+        """
+        try:
+            # Require at least 99% of expected 2-year data (~500 trading days minimum)
+            min_required_days = int(504 * 0.99)  # ~499 days
+            if len(stock_prices) < min_required_days:
+                return None
+                
+            # Use available data length for baseline calculation
+            baseline_index = min(504, len(stock_prices)) - 1
+            
+            # Stock 2Y return
+            stock_current = float(stock_prices[-1].adjusted_close or stock_prices[-1].close)
+            stock_2y_ago = float(stock_prices[-baseline_index - 1].adjusted_close or stock_prices[-baseline_index - 1].close)
+            stock_2y_return = (stock_current / stock_2y_ago - 1) * 100
+            
+            # Sector and industry returns
+            benchmark_returns = []
+            
+            if sector_prices and len(sector_prices) >= min_required_days:
+                sector_baseline_index = min(504, len(sector_prices)) - 1
+                sector_current = float(sector_prices[-1].close_index)
+                sector_2y_ago = float(sector_prices[-sector_baseline_index - 1].close_index)
+                sector_2y_return = (sector_current / sector_2y_ago - 1) * 100
+                benchmark_returns.append(sector_2y_return)
+            
+            if industry_prices and len(industry_prices) >= min_required_days:
+                industry_baseline_index = min(504, len(industry_prices)) - 1
+                industry_current = float(industry_prices[-1].close_index)
+                industry_2y_ago = float(industry_prices[-industry_baseline_index - 1].close_index)
+                industry_2y_return = (industry_current / industry_2y_ago - 1) * 100
+                benchmark_returns.append(industry_2y_return)
+            
+            if not benchmark_returns:
+                return None
+                
+            avg_benchmark = statistics.mean(benchmark_returns)
+            relative_strength = stock_2y_return - avg_benchmark
+            
+            # Map -100pp → 0, 0 → 0.5, +100pp → 1
+            if relative_strength <= -100:
+                score = 0.0
+            elif relative_strength >= 100:
+                score = 1.0
+            else:
+                score = 0.5 + (relative_strength / 200)
+            
+            return IndicatorResult(
+                raw={'relative_strength': relative_strength, 'stock_return': stock_2y_return, 'benchmark_return': avg_benchmark},
+                score=score,
+                weight=self.WEIGHTS['rel2y'],
+                weighted_score=score * self.WEIGHTS['rel2y']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating 2Y relative strength: {str(e)}")
+            return None
+    
+    def _calculate_candlestick_reversal(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
+        """
+        Candlestick Reversal: detect patterns in last 3-5 days; bullish→1, bearish→0, none→0.5. Weight 0.08.
+        """
+        try:
+            if len(prices) < 5:
+                return None
+                
+            recent_prices = prices[-5:]
+            pattern = self._detect_candlestick_patterns(recent_prices)
+            
+            if pattern['type'] == 'bullish':
+                score = 1.0
+            elif pattern['type'] == 'bearish':
+                score = 0.0
+            elif pattern['type'] == 'neutral':
+                score = 0.5  # Doji indicates indecision, neutral signal
+            else:
+                score = 0.5
+            
+            return IndicatorResult(
+                raw=pattern,
+                score=score,
+                weight=self.WEIGHTS['candlerev'],
+                weighted_score=score * self.WEIGHTS['candlerev']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating candlestick reversal: {str(e)}")
+            return None
+    
+    def _detect_candlestick_patterns(self, prices: List[PriceData]) -> Dict[str, Any]:
+        """Detect candlestick reversal patterns with expanded pattern library."""
+        try:
+            if not prices:
+                return {'type': 'none', 'pattern': 'insufficient_data'}
+            
+            # Check for patterns in all recent candles, prioritizing multi-candle patterns
+            
+            # Three candle patterns first (most significant)
+            if len(prices) >= 3:
+                three_candle_result = self._check_three_candle_patterns(prices)
+                if three_candle_result['type'] != 'none':
+                    return three_candle_result
+            
+            # Two candle patterns second
+            if len(prices) >= 2:
+                two_candle_result = self._check_two_candle_patterns(prices)
+                if two_candle_result['type'] != 'none':
+                    return two_candle_result
+            
+            # Single candle patterns last - check all recent candles
+            for i in range(len(prices)):  # Check all candles for single patterns
+                candle = prices[-(i+1)]  # Start from most recent
+                single_result = self._check_single_candle_patterns(candle)
+                if single_result['type'] != 'none':
+                    return single_result
+            
+            return {'type': 'none', 'pattern': 'no_pattern'}
+            
+        except Exception as e:
+            logger.warning(f"Error detecting candlestick patterns: {str(e)}")
+            return {'type': 'none', 'pattern': 'error'}
+    
+    def _check_single_candle_patterns(self, price: PriceData) -> Dict[str, Any]:
+        """Check single candle patterns."""
+        try:
+            # Get candle data
+            last_open = float(price.open)
+            last_high = float(price.high)
+            last_low = float(price.low)
+            last_close = float(price.close)
+            
+            # Calculate body and shadow sizes
+            body_size = abs(last_close - last_open)
+            total_range = last_high - last_low
+            upper_shadow = last_high - max(last_open, last_close)
+            lower_shadow = min(last_open, last_close) - last_low
+            
+            # Avoid division by zero
+            if total_range == 0:
+                return {'type': 'none', 'pattern': 'no_range'}
+            
+            # Single candle patterns with relaxed thresholds
+            
+            # Doji - body is very small relative to range (indecision)
+            if body_size <= total_range * 0.1 and total_range > 0:
+                return {'type': 'neutral', 'pattern': 'doji'}
+            
+            # Hammer pattern (bullish) - relaxed threshold
+            if (lower_shadow >= 1.5 * body_size and 
+                upper_shadow <= body_size * 0.7 and 
+                body_size > total_range * 0.05):
+                return {'type': 'bullish', 'pattern': 'hammer'}
+            
+            # Inverted Hammer (bullish) - long upper shadow at bottom of downtrend
+            if (upper_shadow >= 1.5 * body_size and 
+                lower_shadow <= body_size * 0.7 and 
+                body_size > total_range * 0.05):
+                return {'type': 'bullish', 'pattern': 'inverted_hammer'}
+            
+            # Shooting Star pattern (bearish) - relaxed threshold
+            if (upper_shadow >= 1.5 * body_size and 
+                lower_shadow <= body_size * 0.7 and 
+                body_size > total_range * 0.05):
+                return {'type': 'bearish', 'pattern': 'shooting_star'}
+            
+            # Hanging Man (bearish) - same as hammer but in uptrend context
+            if (lower_shadow >= 1.5 * body_size and 
+                upper_shadow <= body_size * 0.7 and 
+                body_size > total_range * 0.05):
+                return {'type': 'bearish', 'pattern': 'hanging_man'}
+            
+            return {'type': 'none', 'pattern': 'no_pattern'}
+            
+        except Exception as e:
+            logger.warning(f"Error detecting single candle patterns: {str(e)}")
+            return {'type': 'none', 'pattern': 'error'}
+    
+    def _check_two_candle_patterns(self, prices: List[PriceData]) -> Dict[str, Any]:
+        """Check two candle patterns."""
+        try:
+            if len(prices) < 2:
+                return {'type': 'none', 'pattern': 'insufficient_data'}
+            
+            prev = prices[-2]
+            last = prices[-1]
+            
+            prev_open = float(prev.open)
+            prev_close = float(prev.close)
+            prev_high = float(prev.high)
+            prev_low = float(prev.low)
+            prev_body_size = abs(prev_close - prev_open)
+            
+            last_open = float(last.open)
+            last_close = float(last.close)
+            body_size = abs(last_close - last_open)
+            
+            # Bullish Engulfing - relaxed requirements
+            if (prev_close < prev_open and  # Previous was bearish
+                last_close > last_open and   # Current is bullish
+                last_close > prev_open and   # Current close above prev open
+                last_open < prev_close and   # Current open below prev close
+                body_size >= prev_body_size * 0.8):  # Current body at least 80% of prev
+                return {'type': 'bullish', 'pattern': 'bullish_engulfing'}
+            
+            # Bearish Engulfing - relaxed requirements
+            if (prev_close > prev_open and  # Previous was bullish
+                last_close < last_open and   # Current is bearish
+                last_close < prev_open and   # Current close below prev open
+                last_open > prev_close and   # Current open above prev close
+                body_size >= prev_body_size * 0.8):  # Current body at least 80% of prev
+                return {'type': 'bearish', 'pattern': 'bearish_engulfing'}
+            
+            # Piercing Pattern (bullish)
+            if (prev_close < prev_open and  # Previous bearish
+                last_close > last_open and   # Current bullish
+                last_open < prev_low and     # Gap down open
+                last_close > (prev_open + prev_close) / 2 and  # Close above midpoint
+                last_close < prev_open):     # But below prev open
+                return {'type': 'bullish', 'pattern': 'piercing'}
+            
+            # Dark Cloud Cover (bearish)
+            if (prev_close > prev_open and  # Previous bullish
+                last_close < last_open and   # Current bearish
+                last_open > prev_high and    # Gap up open
+                last_close < (prev_open + prev_close) / 2 and  # Close below midpoint
+                last_close > prev_open):     # But above prev open
+                return {'type': 'bearish', 'pattern': 'dark_cloud'}
+            
+            return {'type': 'none', 'pattern': 'no_pattern'}
+            
+        except Exception as e:
+            logger.warning(f"Error detecting two candle patterns: {str(e)}")
+            return {'type': 'none', 'pattern': 'error'}
+    
+    def _check_three_candle_patterns(self, prices: List[PriceData]) -> Dict[str, Any]:
+        """Check three candle patterns."""
+        try:
+            if len(prices) < 3:
+                return {'type': 'none', 'pattern': 'insufficient_data'}
+            
+            first = prices[-3]
+            middle = prices[-2]
+            last = prices[-1]
+            
+            first_open = float(first.open)
+            first_close = float(first.close)
+            first_high = float(first.high)
+            first_low = float(first.low)
+            
+            middle_open = float(middle.open)
+            middle_close = float(middle.close)
+            middle_high = float(middle.high)
+            middle_low = float(middle.low)
+            
+            last_open = float(last.open)
+            last_close = float(last.close)
+            
+            middle_body = abs(middle_close - middle_open)
+            middle_range = middle_high - middle_low
+            
+            # Morning Star (bullish)
+            if (first_close < first_open and    # First bearish
+                last_close > last_open and       # Third bullish
+                middle_body < middle_range * 0.3 and  # Middle is small body (star)
+                middle_high < first_close and    # Gap down from first
+                last_open > middle_high and      # Gap up to third
+                last_close > (first_open + first_close) / 2):  # Close above first midpoint
+                return {'type': 'bullish', 'pattern': 'morning_star'}
+            
+            # Evening Star (bearish)
+            if (first_close > first_open and    # First bullish
+                last_close < last_open and       # Third bearish
+                middle_body < middle_range * 0.3 and  # Middle is small body (star)
+                middle_low > first_close and     # Gap up from first
+                last_open < middle_low and       # Gap down to third
+                last_close < (first_open + first_close) / 2):  # Close below first midpoint
+                return {'type': 'bearish', 'pattern': 'evening_star'}
+            
+            return {'type': 'none', 'pattern': 'no_pattern'}
+            
+        except Exception as e:
+            logger.warning(f"Error detecting three candle patterns: {str(e)}")
+            return {'type': 'none', 'pattern': 'error'}
+    
+    def _calculate_support_resistance(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
+        """
+        Support/Resistance: break above resistance→1; near resistance (≤2%)→0.3; near support (≤2%)→0.7; break below→0; else 0.5. Weight 0.07.
+        """
+        try:
+            if len(prices) < 50:
+                return None
+                
+            current_price = float(prices[-1].close)
+            
+            # Find support and resistance levels using pivot points
+            highs = [float(p.high) for p in prices[-50:]]
+            lows = [float(p.low) for p in prices[-50:]]
+            
+            resistance_levels = self._find_resistance_levels(highs)
+            support_levels = self._find_support_levels(lows)
+            
+            # Find nearest levels
+            nearest_resistance = None
+            nearest_support = None
+            
+            for level in resistance_levels:
+                if level > current_price:
+                    if nearest_resistance is None or level < nearest_resistance:
+                        nearest_resistance = level
+            
+            for level in support_levels:
+                if level < current_price:
+                    if nearest_support is None or level > nearest_support:
+                        nearest_support = level
+            
+            # Determine score based on position relative to levels
+            score = 0.5  # Default
+            context = 'neutral'
+            
+            # Check for breaks above resistance
+            if nearest_resistance and current_price > nearest_resistance:
+                # Already broke above resistance
+                score = 1.0
+                context = 'break_above_resistance'
+            # Check if near resistance (within 2%)
+            elif nearest_resistance and abs(current_price - nearest_resistance) / nearest_resistance <= 0.02:
+                if current_price < nearest_resistance:
+                    score = 0.3
+                    context = 'near_resistance'
+            # Check for breaks below support
+            elif nearest_support and current_price < nearest_support:
+                # Already broke below support
+                score = 0.0
+                context = 'break_below_support'
+            # Check if near support (within 2%)
+            elif nearest_support and abs(current_price - nearest_support) / nearest_support <= 0.02:
+                if current_price > nearest_support:
+                    score = 0.7
+                    context = 'near_support'
+            
+            return IndicatorResult(
+                raw={
+                    'current_price': current_price,
+                    'nearest_resistance': nearest_resistance,
+                    'nearest_support': nearest_support,
+                    'context': context
+                },
+                score=score,
+                weight=self.WEIGHTS['srcontext'],
+                weighted_score=score * self.WEIGHTS['srcontext']
+            )
+            
+        except Exception as e:
+            logger.warning(f"Error calculating support/resistance: {str(e)}")
+            return None
+    
+    def _find_resistance_levels(self, highs: List[float]) -> List[float]:
+        """Find resistance levels from high prices."""
+        if len(highs) < 10:
+            return []
+            
+        # Simple approach: find local maxima
+        levels = []
+        for i in range(2, len(highs) - 2):
+            if (highs[i] > highs[i-1] and highs[i] > highs[i-2] and
+                highs[i] > highs[i+1] and highs[i] > highs[i+2]):
+                levels.append(highs[i])
+        
+        # Remove levels too close to each other (within 1%)
+        levels.sort()
+        filtered_levels = []
+        for level in levels:
+            if not filtered_levels or abs(level - filtered_levels[-1]) / filtered_levels[-1] > 0.01:
+                filtered_levels.append(level)
+        
+        return filtered_levels[-3:]  # Return top 3 levels
+    
+    def _find_support_levels(self, lows: List[float]) -> List[float]:
+        """Find support levels from low prices."""
+        if len(lows) < 10:
+            return []
+            
+        # Simple approach: find local minima
+        levels = []
+        for i in range(2, len(lows) - 2):
+            if (lows[i] < lows[i-1] and lows[i] < lows[i-2] and
+                lows[i] < lows[i+1] and lows[i] < lows[i+2]):
+                levels.append(lows[i])
+        
+        # Remove levels too close to each other (within 1%)
+        levels.sort(reverse=True)
+        filtered_levels = []
+        for level in levels:
+            if not filtered_levels or abs(level - filtered_levels[-1]) / filtered_levels[-1] > 0.01:
+                filtered_levels.append(level)
+        
+        return filtered_levels[-3:]  # Return bottom 3 levels

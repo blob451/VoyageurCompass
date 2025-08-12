@@ -9,11 +9,15 @@ import re
 import time
 import random
 import os
+import hashlib
+import threading
 import yfinance as yf
 import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Configure yfinance with proper headers to handle consent pages
 # SSL verification remains enabled for security
@@ -32,6 +36,65 @@ from django.utils import timezone
 from Data.models import Stock, StockPrice, DataSector, DataIndustry, DataSectorPrice, DataIndustryPrice
 
 logger = logging.getLogger(__name__)
+
+
+class CompositeCache:
+    """
+    Phase 4: Smart Caching for composite generation optimization.
+    Caches frequently accessed stock price data and composite calculations.
+    """
+    
+    def __init__(self):
+        self.price_data_cache = {}
+        self.composite_cache = {}
+        self.stock_date_index = {}
+    
+    def get_cache_key(self, stocks, start_date, end_date):
+        """Generate a cache key for stock price data."""
+        if hasattr(stocks, '__iter__') and not isinstance(stocks, str):
+            stock_ids = sorted([stock.id for stock in stocks])
+        else:
+            stock_ids = [stocks.id] if hasattr(stocks, 'id') else [stocks]
+        
+        key_string = f"{stock_ids}_{start_date}_{end_date}"
+        return hashlib.md5(key_string.encode()).hexdigest()[:12]
+    
+    def get_composite_cache_key(self, entity, date):
+        """Generate a cache key for composite calculations."""
+        entity_type = entity.__class__.__name__
+        entity_id = entity.id if hasattr(entity, 'id') else str(entity)
+        return f"{entity_type}_{entity_id}_{date}"
+    
+    def index_prices_by_stock_and_date(self, all_prices):
+        """
+        Phase 4: Index price data for fast lookup.
+        Creates a nested dictionary: {stock: {date: price_record}}
+        """
+        if hasattr(self, '_indexed_prices') and self._indexed_prices:
+            return self._indexed_prices
+        
+        prices_by_stock_date = defaultdict(dict)
+        for price in all_prices:
+            prices_by_stock_date[price.stock][price.date] = price
+        
+        self._indexed_prices = dict(prices_by_stock_date)
+        return self._indexed_prices
+    
+    def get_cached_composite(self, cache_key):
+        """Get cached composite data."""
+        return self.composite_cache.get(cache_key)
+    
+    def cache_composite(self, cache_key, composite_data):
+        """Cache composite calculation results."""
+        self.composite_cache[cache_key] = composite_data
+    
+    def clear_cache(self):
+        """Clear all cached data."""
+        self.price_data_cache.clear()
+        self.composite_cache.clear()
+        self.stock_date_index.clear()
+        if hasattr(self, '_indexed_prices'):
+            del self._indexed_prices
 
 
 class YahooFinanceService:
@@ -1195,6 +1258,20 @@ class YahooFinanceService:
                 })
             
             logger.info(f"Retrieved {len(eod_data)} EOD records for {symbol}")
+            
+            # Limit to maximum expected trading days to prevent excessive data
+            calendar_days = (endDate - startDate).days
+            max_expected_trading_days = int(calendar_days * 0.690420)
+            min_threshold = int(max_expected_trading_days * 0.95)
+            
+            if len(eod_data) > max_expected_trading_days * 1.05:
+                trim_to = int(max_expected_trading_days * 1.05)
+                logger.warning(f"Trimming {len(eod_data)} records to {trim_to} expected trading days")
+                eod_data = eod_data[-trim_to:]  # Keep most recent data
+                logger.info(f"Trimmed to {len(eod_data)} EOD records for {symbol}")
+            elif len(eod_data) < min_threshold:
+                logger.warning(f"Data count {len(eod_data)} is below minimum threshold of {min_threshold} trading days")
+            
             return eod_data
             
         except Exception as e:
@@ -1203,7 +1280,13 @@ class YahooFinanceService:
     
     def composeSectorIndustryEod(self, date_range: Tuple[datetime, datetime]) -> Dict[str, int]:
         """
+        OPTIMIZED: Combined Phases 1, 2, 4 implementation.
         Calculate and persist sector/industry EOD composites for the given date range.
+        
+        Optimizations:
+        - Phase 2: Unified data fetching (single query for all stocks)
+        - Phase 1: Bulk database operations (bulk_create/bulk_update)
+        - Phase 4: Smart caching for repeated calculations
         
         Args:
             date_range: Tuple of (start_date, end_date)
@@ -1216,7 +1299,10 @@ class YahooFinanceService:
         try:
             logger.info(f"Computing sector/industry composites from {start_date.date()} to {end_date.date()}")
             
-            # Get all active sectors and industries with associated stocks
+            # Phase 4: Initialize cache
+            cache = CompositeCache()
+            
+            # Phase 2: Get all active sectors and industries with associated stocks
             sectors = DataSector.objects.filter(
                 isActive=True,
                 stocks__isnull=False
@@ -1227,18 +1313,123 @@ class YahooFinanceService:
                 stocks__isnull=False
             ).distinct()
             
+            # Phase 2: Collect all stocks across sectors and industries (unified approach)
+            all_stocks_set = set()
+            sector_stock_mapping = {}
+            industry_stock_mapping = {}
+            
+            logger.info(f"Mapping stocks for {len(sectors)} sectors and {len(industries)} industries")
+            
+            for sector in sectors:
+                sector_stocks = list(Stock.objects.filter(
+                    sector_id=sector, 
+                    is_active=True,
+                    prices__date__gte=start_date.date(),
+                    prices__date__lte=end_date.date()
+                ).distinct())
+                
+                if sector_stocks:
+                    sector_stock_mapping[sector.id] = sector_stocks
+                    all_stocks_set.update(sector_stocks)
+            
+            for industry in industries:
+                industry_stocks = list(Stock.objects.filter(
+                    industry_id=industry, 
+                    is_active=True,
+                    prices__date__gte=start_date.date(),
+                    prices__date__lte=end_date.date()
+                ).distinct())
+                
+                if industry_stocks:
+                    industry_stock_mapping[industry.id] = industry_stocks
+                    all_stocks_set.update(industry_stocks)
+            
+            # Phase 2: Single unified data fetch for all stocks (major optimization)
+            logger.info(f"Fetching unified price data for {len(all_stocks_set)} unique stocks")
+            all_prices = StockPrice.objects.filter(
+                stock__in=all_stocks_set,
+                date__gte=start_date.date(),
+                date__lte=end_date.date()
+            ).select_related('stock').order_by('date', 'stock')
+            
+            # Phase 4: Cache the unified data for fast lookup
+            prices_by_stock_date = cache.index_prices_by_stock_and_date(all_prices)
+            price_dates = sorted(set(price.date for price in all_prices))
+            logger.info(f"Indexed {len(all_prices)} price records across {len(price_dates)} dates")
+            
             sector_prices_created = 0
             industry_prices_created = 0
             
-            # Process sectors
-            for sector in sectors:
-                prices_created = self._createSectorComposites(sector, start_date, end_date)
-                sector_prices_created += prices_created
+            # PHASE 3: Parallel Processing with ThreadPoolExecutor
+            # Determine optimal worker count (conservative approach)
+            total_entities = len([s for s in sectors if s.id in sector_stock_mapping]) + \
+                           len([i for i in industries if i.id in industry_stock_mapping])
+            
+            max_workers = min(4, max(1, total_entities // 2))  # Conservative threading
+            logger.info(f"Using parallel processing with {max_workers} workers for {total_entities} entities")
+            
+            # Process sectors in parallel
+            if sector_stock_mapping:
+                sector_tasks = []
+                for sector in sectors:
+                    if sector.id in sector_stock_mapping:
+                        sector_tasks.append({
+                            'entity': sector,
+                            'stocks': sector_stock_mapping[sector.id]
+                        })
                 
-            # Process industries
-            for industry in industries:
-                prices_created = self._createIndustryComposites(industry, start_date, end_date)
-                industry_prices_created += prices_created
+                if sector_tasks:
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        # Submit all sector tasks
+                        future_to_entity = {
+                            executor.submit(
+                                self._processEntityParallel,
+                                task_data,
+                                'sector',
+                                prices_by_stock_date,
+                                price_dates,
+                                cache
+                            ): task_data['entity'].id for task_data in sector_tasks
+                        }
+                        
+                        # Collect results as they complete
+                        for future in as_completed(future_to_entity):
+                            entity_name, created = future.result()
+                            sector_prices_created += created
+                            logger.debug(f"Sector task completed: {entity_name} -> {created} records")
+            
+            # Process industries in parallel
+            if industry_stock_mapping:
+                industry_tasks = []
+                for industry in industries:
+                    if industry.id in industry_stock_mapping:
+                        industry_tasks.append({
+                            'entity': industry,
+                            'stocks': industry_stock_mapping[industry.id]
+                        })
+                
+                if industry_tasks:
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        # Submit all industry tasks
+                        future_to_entity = {
+                            executor.submit(
+                                self._processEntityParallel,
+                                task_data,
+                                'industry',
+                                prices_by_stock_date,
+                                price_dates,
+                                cache
+                            ): task_data['entity'].id for task_data in industry_tasks
+                        }
+                        
+                        # Collect results as they complete
+                        for future in as_completed(future_to_entity):
+                            entity_name, created = future.result()
+                            industry_prices_created += created
+                            logger.debug(f"Industry task completed: {entity_name} -> {created} records")
+            
+            # Phase 4: Clean up cache
+            cache.clear_cache()
             
             logger.info(f"Composite creation complete: {sector_prices_created} sector prices, {industry_prices_created} industry prices")
             
@@ -1251,6 +1442,173 @@ class YahooFinanceService:
             logger.error(f"Error creating sector/industry composites: {str(e)}")
             return {'sector_prices_created': 0, 'industry_prices_created': 0}
     
+    def _createCompositesUnifiedBulk(self, entity, entity_type: str, stocks: List, 
+                                   prices_by_stock_date: Dict, price_dates: List, 
+                                   cache: CompositeCache) -> int:
+        """
+        COMBINED PHASES 1, 2, 4: Create composite records with unified data and bulk operations.
+        
+        Args:
+            entity: DataSector or DataIndustry instance
+            entity_type: 'sector' or 'industry'
+            stocks: List of Stock instances for this entity
+            prices_by_stock_date: Pre-fetched price data {stock: {date: price}}
+            price_dates: List of dates to process
+            cache: CompositeCache instance for optimization
+            
+        Returns:
+            Number of composite records created/updated
+        """
+        try:
+            # Phase 2: Extract relevant data from unified dataset
+            entity_prices_by_date = {}
+            for date in price_dates:
+                daily_prices = []
+                for stock in stocks:
+                    if stock in prices_by_stock_date and date in prices_by_stock_date[stock]:
+                        daily_prices.append(prices_by_stock_date[stock][date])
+                
+                if daily_prices:
+                    entity_prices_by_date[date] = daily_prices
+            
+            if not entity_prices_by_date:
+                return 0
+            
+            # Phase 1: Bulk existence check
+            model_class = DataSectorPrice if entity_type == 'sector' else DataIndustryPrice
+            entity_field = 'sector' if entity_type == 'sector' else 'industry'
+            
+            # Phase 1: Get existing records for this entity
+            existing_records_qs = model_class.objects.filter(
+                **{entity_field: entity},
+                date__in=list(entity_prices_by_date.keys())
+            )
+            existing_records = {record.date: record for record in existing_records_qs}
+            
+            # Phase 1 + 4: Calculate composites with caching and prepare bulk operations
+            new_records = []
+            update_records = []
+            
+            for date in sorted(entity_prices_by_date.keys()):
+                daily_prices = entity_prices_by_date[date]
+                
+                # Phase 4: Check cache first
+                cache_key = cache.get_composite_cache_key(entity, date)
+                composite_data = cache.get_cached_composite(cache_key)
+                
+                if not composite_data:
+                    # Calculate and cache
+                    composite_data = self._calculateComposite(daily_prices)
+                    if composite_data:
+                        cache.cache_composite(cache_key, composite_data)
+                
+                if not composite_data:
+                    continue
+                
+                # Phase 1: Bulk record preparation
+                if date in existing_records:
+                    # Update existing record if needed
+                    record = existing_records[date]
+                    if record.constituents_count != composite_data['constituents_count']:
+                        for key, value in composite_data.items():
+                            setattr(record, key, value)
+                        update_records.append(record)
+                else:
+                    # Prepare new record
+                    record_data = {entity_field: entity, 'date': date}
+                    record_data.update(composite_data)
+                    new_records.append(model_class(**record_data))
+            
+            # Phase 1: Bulk database operations
+            created_count = 0
+            
+            if new_records:
+                try:
+                    model_class.objects.bulk_create(new_records, batch_size=100, ignore_conflicts=True)
+                    created_count += len(new_records)
+                    logger.debug(f"Bulk created {len(new_records)} {entity_type} composite records")
+                except Exception as e:
+                    logger.warning(f"Bulk create failed, falling back to individual creates: {str(e)}")
+                    # Fallback to individual creates
+                    for record in new_records:
+                        try:
+                            record.save()
+                            created_count += 1
+                        except Exception:
+                            pass  # Skip conflicts
+            
+            if update_records:
+                try:
+                    updated_fields = ['close_index', 'constituents_count']
+                    model_class.objects.bulk_update(update_records, updated_fields, batch_size=100)
+                    created_count += len(update_records)
+                    logger.debug(f"Bulk updated {len(update_records)} {entity_type} composite records")
+                except Exception as e:
+                    logger.warning(f"Bulk update failed, falling back to individual updates: {str(e)}")
+                    # Fallback to individual updates
+                    for record in update_records:
+                        try:
+                            record.save()
+                            created_count += 1
+                        except Exception:
+                            pass  # Skip errors
+            
+            return created_count
+            
+        except Exception as e:
+            logger.error(f"Error creating {entity_type} composites for {entity}: {str(e)}")
+            return 0
+
+    def _processEntityParallel(self, entity_data: Dict, entity_type: str, 
+                             prices_by_stock_date: Dict, price_dates: List, 
+                             cache: CompositeCache) -> Tuple[str, int]:
+        """
+        PHASE 3: Thread-safe parallel processing for a single entity.
+        
+        Args:
+            entity_data: Dict with 'entity' and 'stocks' keys
+            entity_type: 'sector' or 'industry'
+            prices_by_stock_date: Pre-fetched price data
+            price_dates: List of dates to process
+            cache: CompositeCache instance
+            
+        Returns:
+            Tuple of (entity_name, created_count) for result aggregation
+        """
+        from django.db import connection
+        
+        entity_name = "unknown"
+        try:
+            entity = entity_data['entity']
+            stocks = entity_data['stocks']
+            entity_name = f"{entity_type}:{entity.id}"
+            
+            # Ensure fresh database connection for this thread
+            connection.ensure_connection()
+            
+            created = self._createCompositesUnifiedBulk(
+                entity=entity,
+                entity_type=entity_type,
+                stocks=stocks,
+                prices_by_stock_date=prices_by_stock_date,
+                price_dates=price_dates,
+                cache=cache
+            )
+            
+            logger.debug(f"Parallel {entity_type} processing complete: {entity_name} -> {created} records")
+            return (entity_name, created)
+            
+        except Exception as e:
+            logger.error(f"Error in parallel {entity_type} processing for {entity_name}: {str(e)}")
+            # Return 0 but don't fail the entire process
+            return (entity_name, 0)
+        finally:
+            # Close connection for this thread to prevent connection leaks
+            try:
+                connection.close()
+            except Exception:
+                pass  # Ignore connection close errors
+
     def _createSectorComposites(self, sector: 'DataSector', start_date: datetime, end_date: datetime) -> int:
         """Create composite price records for a sector."""
         try:
@@ -1274,14 +1632,23 @@ class YahooFinanceService:
             
             prices_created = 0
             
+            # Bulk fetch all price data for all dates at once (optimization fix)
+            all_prices = StockPrice.objects.filter(
+                stock__in=stocks,
+                date__in=price_dates
+            ).select_related('stock').order_by('date', 'stock')
+            
+            # Group prices by date
+            prices_by_date = {}
+            for price in all_prices:
+                if price.date not in prices_by_date:
+                    prices_by_date[price.date] = []
+                prices_by_date[price.date].append(price)
+            
             for date in price_dates:
-                # Get prices for all stocks in sector for this date
-                daily_prices = StockPrice.objects.filter(
-                    stock__in=stocks,
-                    date=date
-                ).select_related('stock')
+                daily_prices = prices_by_date.get(date, [])
                 
-                if not daily_prices.exists():
+                if not daily_prices:
                     continue
                     
                 # Calculate composite
@@ -1332,14 +1699,23 @@ class YahooFinanceService:
             
             prices_created = 0
             
+            # Bulk fetch all price data for all dates at once (optimization fix)
+            all_prices = StockPrice.objects.filter(
+                stock__in=stocks,
+                date__in=price_dates
+            ).select_related('stock').order_by('date', 'stock')
+            
+            # Group prices by date
+            prices_by_date = {}
+            for price in all_prices:
+                if price.date not in prices_by_date:
+                    prices_by_date[price.date] = []
+                prices_by_date[price.date].append(price)
+            
             for date in price_dates:
-                # Get prices for all stocks in industry for this date
-                daily_prices = StockPrice.objects.filter(
-                    stock__in=stocks,
-                    date=date
-                ).select_related('stock')
+                daily_prices = prices_by_date.get(date, [])
                 
-                if not daily_prices.exists():
+                if not daily_prices:
                     continue
                     
                 # Calculate composite
@@ -1636,6 +2012,251 @@ class YahooFinanceService:
             logger.error(f"Error upserting industry/sector: {str(e)}")
             return False
     
+    def ensure_postgresql_engine(self):
+        """
+        Ensure PostgreSQL database engine is being used.
+        Raises exception if SQLite is detected per requirements.
+        
+        Raises:
+            RuntimeError: If SQLite engine is detected
+        """
+        from django.db import connection
+        
+        engine = connection.vendor
+        
+        if engine == 'sqlite':
+            raise RuntimeError(
+                "SQLite database detected. This analytics system requires PostgreSQL. "
+                "Please configure PostgreSQL database in settings."
+            )
+        elif engine != 'postgresql':
+            logger.warning(f"Unexpected database engine '{engine}'. Expected 'postgresql'.")
+        
+        logger.info(f"Database engine verified: {engine}")
+    
+    def backfill_eod_gaps(
+        self,
+        symbol: str,
+        required_years: int = 2,
+        max_attempts: int = 3
+    ) -> Dict[str, Any]:
+        """
+        Backfill missing EOD data for stock, sector, and industry with retry logic.
+        
+        Args:
+            symbol: Stock ticker symbol
+            required_years: Years of history required
+            max_attempts: Maximum retry attempts for each data type
+            
+        Returns:
+            Dict with backfill results:
+            {
+                'success': bool,
+                'stock_backfilled': int,
+                'sector_backfilled': int, 
+                'industry_backfilled': int,
+                'attempts_used': int,
+                'errors': List[str]
+            }
+        """
+        from Data.repo.price_reader import PriceReader
+        
+        result = {
+            'success': False,
+            'stock_backfilled': 0,
+            'sector_backfilled': 0,
+            'industry_backfilled': 0,
+            'attempts_used': 0,
+            'errors': []
+        }
+        
+        try:
+            # Ensure PostgreSQL engine
+            self.ensure_postgresql_engine()
+            
+            price_reader = PriceReader()
+            
+            # Calculate date range with trading day limit
+            # Target precise trading day count with minimal excess data
+            end_date = timezone.now()
+            
+            # Calculate calendar days needed for target trading days
+            # Use conservative multiplier to avoid fetching excess data
+            target_trading_days = required_years * 252  # Standard trading days per year
+            calendar_days_needed = int(target_trading_days / 0.690420)  # Inverse of trading day ratio
+            start_date = end_date - timezone.timedelta(days=calendar_days_needed)
+            
+            for attempt in range(1, max_attempts + 1):
+                result['attempts_used'] = attempt
+                logger.info(f"Backfill attempt {attempt}/{max_attempts} for {symbol}")
+                
+                try:
+                    # Check current coverage
+                    coverage = price_reader.check_data_coverage(symbol, required_years)
+                    
+                    # Backfill stock data if needed
+                    if not coverage['stock']['has_data'] or coverage['stock']['gap_count'] > 50:
+                        logger.info(f"Backfilling stock data for {symbol}")
+                        stock_data = self.fetchStockEodHistory(symbol, start_date, end_date)
+                        if stock_data:
+                            # Convert to StockPrice format and upsert
+                            stock_rows = []
+                            for item in stock_data:
+                                stock_rows.append({
+                                    'symbol': symbol,
+                                    'date': item['date'],
+                                    'open': item['open'],
+                                    'high': item['high'],
+                                    'low': item['low'],
+                                    'close': item['close'],
+                                    'adjusted_close': item['adjusted_close'],
+                                    'volume': item['volume'],
+                                    'data_source': 'yahoo'
+                                })
+                            
+                            backfilled = self._upsert_stock_prices(stock_rows)
+                            result['stock_backfilled'] += backfilled
+                            logger.info(f"Backfilled {backfilled} stock price records")
+                    
+                    # Create sector/industry classifications if stock was backfilled successfully
+                    if result['stock_backfilled'] > 0:
+                        try:
+                            from Data.models import Stock
+                            stock_record = Stock.objects.get(symbol=symbol)
+                            
+                            # Create classification record if sector/industry strings exist but FK relationships don't
+                            if (stock_record.sector and stock_record.industry and 
+                                not stock_record.sector_id and not stock_record.industry_id):
+                                
+                                # Normalize keys for classification
+                                sector_key = self._normalizeSectorKey(stock_record.sector)
+                                industry_key = self._normalizeIndustryKey(f"{stock_record.industry}_{stock_record.sector}")
+                                
+                                classification_row = {
+                                    'symbol': symbol,
+                                    'sectorKey': sector_key,
+                                    'sectorName': stock_record.sector,
+                                    'industryKey': industry_key,
+                                    'industryName': stock_record.industry,
+                                    'updatedAt': timezone.now()
+                                }
+                                
+                                logger.info(f"Creating sector/industry classification for {symbol}")
+                                self.upsertClassification([classification_row])
+                                
+                        except Exception as e:
+                            logger.error(f"Error creating classification for {symbol}: {str(e)}")
+                    
+                    # Get sector/industry keys (should now exist after classification)
+                    sector_key, industry_key = price_reader.get_stock_sector_industry_keys(symbol)
+                    
+                    # Backfill sector composite if needed and available
+                    if sector_key and not coverage['sector']['has_data']:
+                        logger.info(f"Backfilling sector composite for {sector_key}")
+                        sector_result = self.composeSectorIndustryEod((start_date, end_date))
+                        result['sector_backfilled'] += sector_result.get('sector_prices_created', 0)
+                    
+                    # Backfill industry composite if needed and available  
+                    if industry_key and not coverage['industry']['has_data']:
+                        logger.info(f"Backfilling industry composite for {industry_key}")
+                        industry_result = self.composeSectorIndustryEod((start_date, end_date))
+                        result['industry_backfilled'] += industry_result.get('industry_prices_created', 0)
+                    
+                    # Check if gaps are adequately filled
+                    final_coverage = price_reader.check_data_coverage(symbol, required_years)
+                    
+                    stock_adequate = (final_coverage['stock']['has_data'] and 
+                                    final_coverage['stock']['gap_count'] <= 50)
+                    
+                    sector_adequate = (not sector_key or 
+                                     (final_coverage['sector']['has_data'] and 
+                                      final_coverage['sector']['gap_count'] <= 50))
+                    
+                    industry_adequate = (not industry_key or 
+                                       (final_coverage['industry']['has_data'] and 
+                                        final_coverage['industry']['gap_count'] <= 50))
+                    
+                    if stock_adequate and sector_adequate and industry_adequate:
+                        result['success'] = True
+                        logger.info(f"Backfill complete for {symbol} after {attempt} attempts")
+                        break
+                    else:
+                        logger.info(f"Gaps still exist after attempt {attempt}, retrying...")
+                        
+                except Exception as e:
+                    error_msg = f"Attempt {attempt} failed: {str(e)}"
+                    result['errors'].append(error_msg)
+                    logger.error(error_msg)
+                    
+                    # Add exponential backoff with jitter
+                    if attempt < max_attempts:
+                        delay = (2 ** attempt) + random.uniform(0, 1)
+                        logger.info(f"Waiting {delay:.2f}s before retry...")
+                        time.sleep(delay)
+            
+            if not result['success']:
+                error_msg = f"Failed to adequately backfill {symbol} after {max_attempts} attempts"
+                result['errors'].append(error_msg)
+                logger.error(error_msg)
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Critical error in backfill_eod_gaps: {str(e)}"
+            result['errors'].append(error_msg)
+            logger.error(error_msg)
+            return result
+    
+    def _upsert_stock_prices(self, stock_rows: List[Dict]) -> int:
+        """Helper method to upsert stock price records."""
+        try:
+            if not stock_rows:
+                return 0
+                
+            upserted_count = 0
+            
+            with transaction.atomic():
+                for row in stock_rows:
+                    try:
+                        stock = Stock.objects.get(symbol=row['symbol'].upper())
+                        
+                        price, created = StockPrice.objects.get_or_create(
+                            stock=stock,
+                            date=row['date'],
+                            defaults={
+                                'open': row['open'],
+                                'high': row['high'],
+                                'low': row['low'],
+                                'close': row['close'],
+                                'adjusted_close': row['adjusted_close'],
+                                'volume': row['volume'],
+                                'data_source': row['data_source']
+                            }
+                        )
+                        
+                        if not created:
+                            # Update existing record if data is different
+                            price.open = row['open']
+                            price.high = row['high']
+                            price.low = row['low']
+                            price.close = row['close']
+                            price.adjusted_close = row['adjusted_close']
+                            price.volume = row['volume']
+                            price.data_source = row['data_source']
+                            price.save()
+                        
+                        upserted_count += 1
+                        
+                    except Stock.DoesNotExist:
+                        logger.warning(f"Stock {row['symbol']} not found for price upsert")
+                        continue
+                        
+            return upserted_count
+            
+        except Exception as e:
+            logger.error(f"Error upserting stock prices: {str(e)}")
+            return 0
+
     def upsertHistoryBars(self, rows: List[Dict]) -> int:
         """
         Upsert history.AdjClose and history.Volume time-series data.

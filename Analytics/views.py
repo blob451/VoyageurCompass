@@ -15,7 +15,7 @@ from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 
-from Analytics.services.engine import analytics_engine
+from Analytics.engine.ta_engine import TechnicalAnalysisEngine
 from Data.services.yahoo_finance import yahoo_finance_service
 from Data.models import Portfolio
 
@@ -112,57 +112,22 @@ def analyze_stock(request, symbol):
     
     # Run analysis
     try:
-        analysis = analytics_engine.run_full_analysis(symbol, analysis_months=months)
+        engine = TechnicalAnalysisEngine()
+        analysis = engine.analyze_stock(symbol)
         
-        if not analysis.get('success'):
-            error_msg = analysis.get('error', 'Analysis failed')
-            if 'No data found' in error_msg:
-                return Response(
-                    {'error': f'Stock {symbol} not found or no data available'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            return Response(
-                {'error': error_msg},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # New engine always returns successful analysis or raises exception
         
-        # Format response
+        # Format response for new TA engine
         response_data = {
             'success': True,
-            'symbol': symbol,
-            'signal': analysis['signal'],
-            'signal_reason': analysis['signal_reason'],
-            'analysis': {
-                'company': analysis.get('company_name'),
-                'sector': analysis.get('sector'),
-                'current_price': analysis.get('current_price'),
-                'target_price': analysis.get('target_price'),
-                'metrics': {
-                    'stock_return': analysis.get('stock_return'),
-                    'etf_return': analysis.get('etf_return'),
-                    'outperformance': analysis.get('outperformance'),
-                    'volatility': analysis.get('volatility'),
-                    'sharpe_ratio': analysis.get('sharpe_ratio'),
-                },
-                'technical_indicators': {
-                    'rsi': analysis.get('rsi'),
-                    'macd': analysis.get('macd'),
-                    'bollinger_bands': analysis.get('bollinger_bands'),
-                    'ma_20': analysis.get('ma_20'),
-                    'ma_50': analysis.get('ma_50'),
-                    'ma_200': analysis.get('ma_200'),
-                },
-                'signals': {
-                    'criteria_met': analysis.get('criteria_met'),
-                    'rsi_oversold': analysis.get('rsi_oversold'),
-                    'rsi_overbought': analysis.get('rsi_overbought'),
-                    'price_above_ma20': analysis.get('price_above_ma20'),
-                    'price_above_ma50': analysis.get('price_above_ma50'),
-                    'price_above_ma200': analysis.get('price_above_ma200'),
-                },
-                'analysis_date': analysis.get('analysis_date'),
-                'analysis_period_months': analysis.get('analysis_period_months'),
-            }
+            'symbol': analysis['symbol'],
+            'analysis_date': analysis['analysis_date'].isoformat(),
+            'horizon': analysis['horizon'],
+            'composite_score': analysis['score_0_10'],
+            'composite_raw': analysis['composite_raw'],
+            'indicators': analysis['components'],
+            'weighted_scores': {k: float(v) for k, v in analysis['weighted_scores'].items()},
+            'analytics_result_id': analysis['analytics_result_id']
         }
         
         return Response(response_data)
@@ -219,9 +184,14 @@ def analyze_portfolio(request, portfolio_id):
             status=status.HTTP_404_NOT_FOUND
         )
     
-    # Run portfolio analysis
+    # Run portfolio analysis (simplified implementation)
     try:
-        analysis = analytics_engine.analyze_portfolio(portfolio_id)
+        # For now, disable portfolio analysis - could be implemented later
+        # by running individual stock analyses for each holding
+        return Response(
+            {'error': 'Portfolio analysis not yet implemented with new TA engine'},
+            status=status.HTTP_501_NOT_IMPLEMENTED
+        )
         
         if not analysis.get('success', True):
             return Response(
@@ -301,27 +271,22 @@ def batch_analysis(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Run analysis for each symbol
+    # Run analysis for each symbol with new TA engine
     results = {}
+    engine = TechnicalAnalysisEngine()
+    
     for symbol in symbols:
         symbol = symbol.upper()
         try:
-            analysis = analytics_engine.run_full_analysis(symbol, analysis_months=months)
+            analysis = engine.analyze_stock(symbol)
             
-            if analysis.get('success'):
-                results[symbol] = {
-                    'success': True,
-                    'signal': analysis['signal'],
-                    'signal_reason': analysis['signal_reason'],
-                    'current_price': analysis.get('current_price'),
-                    'stock_return': analysis.get('stock_return'),
-                    'volatility': analysis.get('volatility'),
-                }
-            else:
-                results[symbol] = {
-                    'success': False,
-                    'error': analysis.get('error', 'Analysis failed')
-                }
+            results[symbol] = {
+                'success': True,
+                'composite_score': analysis['score_0_10'],
+                'composite_raw': analysis['composite_raw'],
+                'analysis_date': analysis['analysis_date'].isoformat(),
+                'horizon': analysis['horizon']
+            }
         except Exception as e:
             results[symbol] = {
                 'success': False,
@@ -359,18 +324,18 @@ def market_overview(request):
     }
     
     results = {}
+    engine = TechnicalAnalysisEngine()
+    
     for symbol, name in indices.items():
         try:
-            analysis = analytics_engine.run_full_analysis(symbol, analysis_months=3)
+            analysis = engine.analyze_stock(symbol, horizon='short')
             
-            if analysis.get('success'):
-                results[symbol] = {
-                    'name': name,
-                    'current_price': analysis.get('current_price'),
-                    'return_3m': analysis.get('stock_return'),
-                    'volatility': analysis.get('volatility'),
-                    'signal': analysis.get('signal'),
-                }
+            results[symbol] = {
+                'name': name,
+                'composite_score': analysis['score_0_10'],
+                'analysis_date': analysis['analysis_date'].isoformat(),
+                'horizon': analysis['horizon']
+            }
         except:
             results[symbol] = {
                 'name': name,

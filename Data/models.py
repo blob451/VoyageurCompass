@@ -943,3 +943,153 @@ class PortfolioHolding(models.Model):
         
         # Update portfolio total value after saving
         self.portfolio.update_value()
+
+
+class AnalyticsResults(models.Model):
+    """
+    Model to store technical analysis results for stocks.
+    """
+    
+    stock = models.ForeignKey(
+        Stock,
+        on_delete=models.CASCADE,
+        related_name='analytics_results',
+        help_text="Related stock"
+    )
+    as_of = models.DateTimeField(
+        help_text="Analysis timestamp"
+    )
+    horizon = models.CharField(
+        max_length=16,
+        choices=[
+            ('short', 'Short'),
+            ('medium', 'Medium'), 
+            ('long', 'Long'),
+            ('blend', 'Blend'),
+        ],
+        default='blend',
+        help_text="Analysis time horizon"
+    )
+    
+    # Weighted indicator results (12 indicators)
+    w_sma50vs200 = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted SMA 50/200 crossover score"
+    )
+    w_pricevs50 = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted price vs 50-day SMA score"
+    )
+    w_rsi14 = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted RSI(14) score"
+    )
+    w_macd12269 = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted MACD(12,26,9) histogram score"
+    )
+    w_bbpos20 = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted Bollinger %B (20,2) score"
+    )
+    w_bbwidth20 = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted Bollinger Bandwidth (20,2) score"
+    )
+    w_volsurge = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted Volume Surge score"
+    )
+    w_obv20 = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted OBV 20-day trend score"
+    )
+    w_rel1y = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted Relative Strength 1Y score"
+    )
+    w_rel2y = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted Relative Strength 2Y score"
+    )
+    w_candlerev = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted Candlestick Reversal score"
+    )
+    w_srcontext = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Weighted Support/Resistance Context score"
+    )
+    
+    # Composite results
+    components = models.JSONField(
+        default=dict,
+        help_text="Raw and normalized values per indicator: {name: {raw: value, score: normalized_value}}"
+    )
+    composite_raw = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Sum of all weighted scores"
+    )
+    score_0_10 = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Final composite score (0-10, rounded)"
+    )
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'analytics_results'
+        ordering = ['-as_of']
+        verbose_name = 'Analytics Result'
+        verbose_name_plural = 'Analytics Results'
+        unique_together = [['stock', 'as_of']]
+        indexes = [
+            models.Index(fields=['stock', '-as_of']),
+            models.Index(fields=['as_of']),
+            models.Index(fields=['stock', 'horizon', '-as_of']),
+        ]
+    
+    def __str__(self):
+        return f"{self.stock.symbol} - {self.as_of}: {self.score_0_10}/10"
