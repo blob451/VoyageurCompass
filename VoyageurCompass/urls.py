@@ -14,6 +14,7 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -21,26 +22,30 @@ from django.conf.urls.static import static
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
-    SpectacularSwaggerView
+    SpectacularSwaggerView,
 )
-from Core.views import healthCheck as health_check_liveness, readinessCheck as readiness_check
+from Core.views import (
+    healthCheck as health_check_liveness,
+    readinessCheck as readiness_check,
+)
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    
+    path("admin/", admin.site.urls),
     # Health checks at root level
-    path('healthz', health_check_liveness, name='health_liveness_root'),
-    path('readyz', readiness_check, name='health_readiness_root'),
-    
+    path("healthz", health_check_liveness, name="health_liveness_root"),
+    path("readyz", readiness_check, name="health_readiness_root"),
     # API endpoints
-    path('api/v1/', include('Core.urls')),
-    path('api/v1/', include('Data.urls')),
-    path('api/v1/', include('Analytics.urls')),
-    
+    path("api/v1/", include("Core.urls")),
+    path("api/v1/", include("Data.urls")),
+    path("api/v1/", include("Analytics.urls")),
     # API Documentation
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "api/docs/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
+    path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 ]
 
 # Serve static and media files during development

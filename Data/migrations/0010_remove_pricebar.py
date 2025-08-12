@@ -6,11 +6,11 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('Data', '0009_remove_pricebar_data_priceb_datasou_16437b_idx_and_more'),
+        ("Data", "0009_remove_pricebar_data_priceb_datasou_16437b_idx_and_more"),
     ]
 
     operations = [
         migrations.DeleteModel(
-            name='PriceBar',
+            name="PriceBar",
         ),
     ]

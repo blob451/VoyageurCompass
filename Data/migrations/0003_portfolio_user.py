@@ -8,14 +8,21 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('Data', '0002_alter_portfolioholding_options_and_more'),
+        ("Data", "0002_alter_portfolioholding_options_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='portfolio',
-            name='user',
-            field=models.ForeignKey(blank=True, help_text='Portfolio owner', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='portfolios', to=settings.AUTH_USER_MODEL),
+            model_name="portfolio",
+            name="user",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="Portfolio owner",
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="portfolios",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
     ]
