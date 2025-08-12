@@ -11,8 +11,14 @@ from django.test import TestCase
 from django.utils import timezone
 
 from Analytics.engine.ta_engine import IndicatorResult, TechnicalAnalysisEngine
-from Data.models import (DataIndustry, DataIndustryPrice, DataSector,
-                         DataSectorPrice, Stock, StockPrice)
+from Data.models import (
+    DataIndustry,
+    DataIndustryPrice,
+    DataSector,
+    DataSectorPrice,
+    Stock,
+    StockPrice,
+)
 from Data.repo.price_reader import PriceData
 
 

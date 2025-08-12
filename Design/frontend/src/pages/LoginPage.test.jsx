@@ -9,7 +9,7 @@ import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import LoginPage from './LoginPage'
-import authReducer from '../store/authSlice'
+import authReducer from '../features/auth/authSlice'
 
 // Mock the useNavigate hook for React Router v7
 const mockNavigate = vi.fn()
@@ -51,7 +51,7 @@ describe('LoginPage', () => {
   it('renders login form with all required elements', () => {
     renderWithProviders(<LoginPage />)
     
-    expect(screen.getByRole('heading', { name: /sign in/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /welcome back/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()

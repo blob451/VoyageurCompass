@@ -2,14 +2,23 @@
  * Tests for Layout component
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Outlet } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import Layout from './Layout'
 import authSlice from '../../features/auth/authSlice'
+
+// Mock the Outlet component to render test content
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    Outlet: () => <div data-testid="test-content">Test Content</div>
+  }
+})
 
 // Create a mock store
 const createMockStore = (initialState = {}) => {
@@ -49,9 +58,7 @@ describe('Layout', () => {
 
     render(
       <TestWrapper store={mockStore}>
-        <Layout>
-          <div data-testid="test-content">Test Content</div>
-        </Layout>
+        <Layout />
       </TestWrapper>
     )
 
@@ -76,9 +83,7 @@ describe('Layout', () => {
 
     render(
       <TestWrapper store={mockStore}>
-        <Layout>
-          <div data-testid="test-content">Test Content</div>
-        </Layout>
+        <Layout />
       </TestWrapper>
     )
 
@@ -102,9 +107,7 @@ describe('Layout', () => {
 
     render(
       <TestWrapper store={mockStore}>
-        <Layout>
-          <div data-testid="main-content">Main Content</div>
-        </Layout>
+        <Layout />
       </TestWrapper>
     )
 
@@ -126,9 +129,7 @@ describe('Layout', () => {
 
     render(
       <TestWrapper store={mockStore}>
-        <Layout>
-          <div data-testid="layout-content">Content</div>
-        </Layout>
+        <Layout />
       </TestWrapper>
     )
 
@@ -139,7 +140,7 @@ describe('Layout', () => {
     
     // Verify content is properly nested within main region
     const mainElement = screen.getByRole('main')
-    const contentElement = screen.getByTestId('layout-content')
+    const contentElement = screen.getByTestId('test-content')
     expect(mainElement).toContainElement(contentElement)
   })
 })

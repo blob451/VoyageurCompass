@@ -16,7 +16,7 @@ const Navbar = () => {
   };
 
   return (
-    <AppBar position="static" sx={{ bgcolor: '#1a1a2e' }}>
+    <AppBar position="static" sx={{ bgcolor: '#1a1a2e' }} component="nav">
       <Toolbar>
         <IconButton
           edge="start"

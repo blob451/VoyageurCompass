@@ -5,10 +5,18 @@ URL configuration for Core app.
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from Core.views import (ChangePasswordView, CustomTokenObtainPairView,
-                        LogoutView, RegisterView, UserProfileView, api_info,
-                        health_check, health_comprehensive, health_database,
-                        health_redis)
+from Core.views import (
+    ChangePasswordView,
+    CustomTokenObtainPairView,
+    LogoutView,
+    RegisterView,
+    UserProfileView,
+    api_info,
+    health_check,
+    health_comprehensive,
+    health_database,
+    health_redis,
+)
 from Core.views import healthCheck as health_check_liveness
 from Core.views import readinessCheck as readiness_check
 from Core.views import server_time, system_status, user_stats

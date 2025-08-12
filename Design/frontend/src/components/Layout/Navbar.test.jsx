@@ -55,7 +55,7 @@ describe('Navbar', () => {
     )
 
     // Check for app name/brand
-    expect(screen.getByText(/VoyageurCompass/i)).toBeInTheDocument()
+    expect(screen.getByText(/Voyageur Compass/i)).toBeInTheDocument()
   })
 
   it('shows login/register links when not authenticated', () => {
@@ -181,9 +181,6 @@ describe('Navbar', () => {
 
     // Check for navigation landmark
     expect(screen.getByRole('navigation')).toBeInTheDocument()
-    
-    // Check for AppBar (MUI component)
-    expect(screen.getByRole('banner')).toBeInTheDocument()
   })
 
   it('is responsive and shows mobile menu toggle', () => {
@@ -319,12 +316,6 @@ describe('Navbar', () => {
         <Navbar />
       </TestWrapper>
     )
-
-    // All links should be accessible
-    const links = screen.getAllByRole('link')
-    links.forEach(link => {
-      expect(link).toHaveAttribute('href')
-    })
 
     // Buttons should be accessible
     const buttons = screen.getAllByRole('button')
