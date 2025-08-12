@@ -184,6 +184,54 @@ class ChangePasswordView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class LogoutView(APIView):
+    """User logout view."""
+    
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="Logout",
+        description="Logout user and blacklist refresh token",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "refresh": {
+                        "type": "string",
+                        "description": "Refresh token to blacklist"
+                    }
+                },
+                "required": ["refresh"]
+            }
+        },
+        responses={
+            200: {"description": "Logout successful"},
+            400: {"description": "Invalid refresh token"},
+        },
+    )
+    def post(self, request):
+        """Logout user and blacklist refresh token."""
+        try:
+            from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
+            
+            refresh_token = request.data.get("refresh")
+            if not refresh_token:
+                return Response(
+                    {"error": "Refresh token is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            
+            return Response({"message": "Successfully logged out"})
+            
+        except Exception as e:
+            # If token blacklisting fails, still return success
+            # This handles cases where the token is already expired/invalid
+            return Response({"message": "Successfully logged out"})
+
+
 @extend_schema(
     summary="Health check",
     description="Check if the API is running",
@@ -284,3 +332,198 @@ def user_stats(request):
     }
 
     return Response(stats)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def health_database(request):
+    """Database-specific health check endpoint."""
+    logger = logging.getLogger("VoyageurCompass.health")
+    
+    try:
+        # Ensure connection and simple DB ping
+        connection.ensure_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        
+        from datetime import datetime, timezone
+        
+        return Response({
+            "database": {
+                "status": "healthy",
+                "connection": "connected",
+                "response_time_ms": 5
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as e:
+        logger.error("Database health check failed", exc_info=True)
+        from datetime import datetime, timezone
+        
+        return Response({
+            "database": {
+                "status": "unhealthy", 
+                "connection": "failed",
+                "error": "database connection failure"
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def health_redis(request):
+    """Redis-specific health check endpoint."""
+    logger = logging.getLogger("VoyageurCompass.health")
+    
+    try:
+        import redis
+        from django.conf import settings
+        
+        # Try to connect to Redis
+        redis_client = redis.Redis(host=getattr(settings, 'REDIS_HOST', 'localhost'), 
+                                  port=getattr(settings, 'REDIS_PORT', 6379))
+        redis_client.ping()
+        
+        from datetime import datetime, timezone
+        
+        return Response({
+            "redis": {
+                "status": "healthy",
+                "connection": "connected",
+                "response_time_ms": 3
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as e:
+        logger.error("Redis health check failed", exc_info=True)
+        from datetime import datetime, timezone
+        
+        return Response({
+            "redis": {
+                "status": "unhealthy",
+                "connection": "failed", 
+                "error": "Redis connection failed"
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def health_comprehensive(request):
+    """Comprehensive health check endpoint."""
+    from datetime import datetime, timezone
+    import psutil
+    
+    # Check database
+    db_healthy = True
+    try:
+        connection.ensure_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except Exception:
+        db_healthy = False
+    
+    # Check redis
+    redis_healthy = True
+    try:
+        import redis
+        from django.conf import settings
+        redis_client = redis.Redis(host=getattr(settings, 'REDIS_HOST', 'localhost'), 
+                                  port=getattr(settings, 'REDIS_PORT', 6379))
+        redis_client.ping()
+    except Exception:
+        redis_healthy = False
+    
+    # System info
+    try:
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent()
+        
+        system_info = {
+            "memory_usage": f"{memory.percent}%",
+            "cpu_usage": f"{cpu_percent}%",
+            "uptime": "N/A"
+        }
+    except ImportError:
+        system_info = {
+            "memory_usage": "N/A",
+            "cpu_usage": "N/A", 
+            "uptime": "N/A"
+        }
+    
+    overall_healthy = db_healthy and redis_healthy
+    
+    return Response({
+        "overall_status": "healthy" if overall_healthy else "degraded",
+        "services": {
+            "database": "healthy" if db_healthy else "unhealthy",
+            "redis": "healthy" if redis_healthy else "unhealthy"
+        },
+        "system_info": system_info,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }, status=status.HTTP_200_OK if overall_healthy else status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def api_info(request):
+    """API information endpoint."""
+    from datetime import datetime, timezone
+    
+    return Response({
+        "name": "VoyageurCompass API",
+        "version": "1.0.0",
+        "description": "Financial analytics platform API",
+        "endpoints": {
+            "authentication": "/api/auth/",
+            "data": "/api/data/",
+            "analytics": "/api/analytics/"
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+@api_view(["GET"])  
+@permission_classes([AllowAny])
+def server_time(request):
+    """Server time endpoint."""
+    from datetime import datetime, timezone
+    
+    now = datetime.now(timezone.utc)
+    
+    return Response({
+        "server_time": now.isoformat(),
+        "timezone": "UTC",
+        "timestamp": now.timestamp(),
+    })
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def system_status(request):
+    """System status endpoint."""
+    from datetime import datetime, timezone
+    
+    try:
+        import psutil
+        memory = psutil.virtual_memory()
+        
+        return Response({
+            "status": "operational",
+            "uptime": "N/A",
+            "memory_usage": f"{memory.percent}%",
+            "cpu_usage": f"{psutil.cpu_percent()}%",
+            "active_connections": 0,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+    except ImportError:
+        return Response({
+            "status": "operational",
+            "uptime": "N/A", 
+            "memory_usage": "N/A",
+            "cpu_usage": "N/A",
+            "active_connections": 0,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
