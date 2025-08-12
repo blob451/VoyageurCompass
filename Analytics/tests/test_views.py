@@ -13,8 +13,11 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from Analytics.services.engine import analytics_engine
+from Analytics.engine.ta_engine import TechnicalAnalysisEngine
 from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
+
+# Create a module-level instance for testing
+analytics_engine = TechnicalAnalysisEngine()
 
 
 class AnalyticsAPITestCase(APITestCase):
@@ -85,7 +88,7 @@ class AnalyticsAPITestCase(APITestCase):
         self.assertIn("technical_indicators", response.data)
         self.assertEqual(response.data["symbol"], "AAPL")
 
-    @patch("Analytics.services.engine.analytics_engine.analyze_stock")
+    @patch("Analytics.tests.test_views.analytics_engine.analyze_stock")
     def test_stock_analysis_with_mocked_engine(self, mock_analyze):
         """Test stock analysis with mocked analytics engine."""
         mock_analyze.return_value = {
@@ -150,7 +153,7 @@ class AnalyticsAPITestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    @patch("Analytics.services.engine.analytics_engine.analyze_portfolio")
+    @patch("Analytics.tests.test_views.analytics_engine.analyze_portfolio")
     def test_portfolio_analysis_with_mocked_engine(self, mock_analyze):
         """Test portfolio analysis with mocked analytics engine."""
         mock_analyze.return_value = {
@@ -184,7 +187,7 @@ class AnalyticsAPITestCase(APITestCase):
         self.assertIn("sentiment_score", response.data)
         self.assertIn("market_indicators", response.data)
 
-    @patch("Analytics.services.engine.analytics_engine.get_market_sentiment")
+    @patch("Analytics.tests.test_views.analytics_engine.get_market_sentiment")
     def test_market_sentiment_with_mocked_engine(self, mock_sentiment):
         """Test market sentiment with mocked analytics engine."""
         mock_sentiment.return_value = {
@@ -218,7 +221,7 @@ class AnalyticsAPITestCase(APITestCase):
         self.assertIn("indicators", response.data)
         self.assertEqual(response.data["symbol"], "AAPL")
 
-    @patch("Analytics.services.engine.analytics_engine.calculate_technical_indicators")
+    @patch("Analytics.tests.test_views.analytics_engine.calculate_technical_indicators")
     def test_technical_indicators_with_mocked_engine(self, mock_indicators):
         """Test technical indicators with mocked analytics engine."""
         mock_indicators.return_value = {
@@ -260,7 +263,7 @@ class AnalyticsAPITestCase(APITestCase):
         self.assertIn("recommendations", response.data)
         self.assertEqual(response.data["symbol"], "AAPL")
 
-    @patch("Analytics.services.engine.analytics_engine.generate_recommendations")
+    @patch("Analytics.tests.test_views.analytics_engine.generate_recommendations")
     def test_stock_recommendations_with_mocked_engine(self, mock_recommendations):
         """Test stock recommendations with mocked analytics engine."""
         mock_recommendations.return_value = {
@@ -310,7 +313,7 @@ class AnalyticsAPITestCase(APITestCase):
         self.assertIn("current_allocation", response.data)
         self.assertIn("suggested_allocation", response.data)
 
-    @patch("Analytics.services.engine.analytics_engine.optimize_portfolio")
+    @patch("Analytics.tests.test_views.analytics_engine.optimize_portfolio")
     def test_portfolio_optimization_with_mocked_engine(self, mock_optimize):
         """Test portfolio optimization with mocked analytics engine."""
         mock_optimize.return_value = {
@@ -365,7 +368,7 @@ class AnalyticsAPITestCase(APITestCase):
         self.assertIn("risk_score", response.data)
         self.assertIn("risk_factors", response.data)
 
-    @patch("Analytics.services.engine.analytics_engine.assess_portfolio_risk")
+    @patch("Analytics.tests.test_views.analytics_engine.assess_portfolio_risk")
     def test_risk_assessment_with_mocked_engine(self, mock_assess):
         """Test risk assessment with mocked analytics engine."""
         mock_assess.return_value = {
@@ -420,7 +423,7 @@ class AnalyticsAPITestCase(APITestCase):
         self.assertIn("portfolio_id", response.data)
         self.assertIn("performance_metrics", response.data)
 
-    @patch("Analytics.services.engine.analytics_engine.calculate_performance_metrics")
+    @patch("Analytics.tests.test_views.analytics_engine.calculate_performance_metrics")
     def test_performance_analytics_with_mocked_engine(self, mock_performance):
         """Test performance analytics with mocked analytics engine."""
         mock_performance.return_value = {

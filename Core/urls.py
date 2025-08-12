@@ -6,16 +6,9 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from Core.views import (
-    ChangePasswordView,
-    CustomTokenObtainPairView,
-    RegisterView,
-    UserProfileView,
-    health_check,
-)
-from Core.views import healthCheck as health_check_liveness
-from Core.views import readinessCheck as readiness_check
-from Core.views import (
-    user_stats,
+    ChangePasswordView, CustomTokenObtainPairView, RegisterView, UserProfileView,
+    health_check, healthCheck as health_check_liveness,
+    readinessCheck as readiness_check, user_stats,
 )
 
 app_name = "core"

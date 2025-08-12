@@ -17,9 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from Core.serializers import (
-    ChangePasswordSerializer,
-    UserProfileSerializer,
-    UserRegistrationSerializer,
+    ChangePasswordSerializer, UserProfileSerializer, UserRegistrationSerializer,
     UserSerializer,
 )
 

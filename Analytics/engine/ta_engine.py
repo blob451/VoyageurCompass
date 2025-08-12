@@ -17,10 +17,7 @@ from django.utils import timezone
 
 from Data.repo.analytics_writer import AnalyticsWriter
 from Data.repo.price_reader import (
-    IndustryPriceData,
-    PriceData,
-    PriceReader,
-    SectorPriceData,
+    IndustryPriceData, PriceData, PriceReader, SectorPriceData,
 )
 
 logger = logging.getLogger(__name__)

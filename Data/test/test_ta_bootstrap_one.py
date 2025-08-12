@@ -16,13 +16,8 @@ from django.utils import timezone
 
 from Data.management.commands.ta_bootstrap_one import Command
 from Data.models import (
-    DataIndustry,
-    DataIndustryPrice,
-    DataSector,
-    DataSectorPrice,
-    DataSourceChoices,
-    Stock,
-    StockPrice,
+    DataIndustry, DataIndustryPrice, DataSector, DataSectorPrice, DataSourceChoices,
+    Stock, StockPrice,
 )
 from Data.services.yahoo_finance import YahooFinanceService
 

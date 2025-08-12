@@ -19,14 +19,9 @@ from rest_framework.response import Response
 
 from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
 from Data.serializers import (
-    MarketStatusSerializer,
-    PortfolioDetailSerializer,
-    PortfolioHoldingSerializer,
-    PortfolioSerializer,
-    StockDetailSerializer,
-    StockPriceSerializer,
-    StockSearchSerializer,
-    StockSerializer,
+    MarketStatusSerializer, PortfolioDetailSerializer, PortfolioHoldingSerializer,
+    PortfolioSerializer, StockDetailSerializer, StockPriceSerializer,
+    StockSearchSerializer, StockSerializer,
 )
 from Data.services.yahoo_finance import yahoo_finance_service
 

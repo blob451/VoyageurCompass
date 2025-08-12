@@ -11,12 +11,7 @@ from django.db.models import Count, Max, Min, QuerySet
 from django.utils import timezone
 
 from Data.models import (
-    DataIndustry,
-    DataIndustryPrice,
-    DataSector,
-    DataSectorPrice,
-    Stock,
-    StockPrice,
+    DataIndustry, DataIndustryPrice, DataSector, DataSectorPrice, Stock, StockPrice,
 )
 
 
