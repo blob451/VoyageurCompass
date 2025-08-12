@@ -203,8 +203,21 @@ class PriceReader:
         self,
         symbol: str,
         required_years: int = 2
-    ) -> Dict[str, Dict[str, any]]:
-        """
+--- a/Data/repo/price_reader.py
++++ b/Data/repo/price_reader.py
+@@ -1,1 +1,1 @@
+-from typing import List, Dict, Optional, Tuple, NamedTuple
++from typing import List, Dict, Optional, Tuple, NamedTuple, Any
+@@ -203,7 +203,7 @@ class PriceReader:
+     def check_data_coverage(
+         self,
+         symbol: str,
+         required_years: int = 2
+-    ) -> Dict[str, Dict[str, any]]:
++    ) -> Dict[str, Dict[str, Any]]:
+         """
+         Verify that we have at least `required_years` of data for each frequency.
+         Returns a nested dict mapping frequency -> { "start": date, "end": date, "years": int }        """
         Check 2-year EOD data coverage for stock, sector, and industry.
         
         Args:

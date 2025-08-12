@@ -121,14 +121,17 @@ def analyze_stock(request, symbol):
         response_data = {
             'success': True,
             'symbol': analysis['symbol'],
-            'analysis_date': analysis['analysis_date'].isoformat(),
-            'horizon': analysis['horizon'],
-            'composite_score': analysis['score_0_10'],
-            'composite_raw': analysis['composite_raw'],
-            'indicators': analysis['components'],
-            'weighted_scores': {k: float(v) for k, v in analysis['weighted_scores'].items()},
-            'analytics_result_id': analysis['analytics_result_id']
-        }
+        response_data = {
+            'success': True,
+            'symbol': analysis.get('symbol', symbol),
+            'analysis_date': analysis.get('analysis_date', datetime.now()).isoformat(),
+            'horizon': analysis.get('horizon', 'unknown'),
+            'composite_score': analysis.get('score_0_10', 0.0),
+            'composite_raw': analysis.get('composite_raw'),
+            'indicators': analysis.get('components', {}),
+            'weighted_scores': {k: float(v) for k, v in analysis.get('weighted_scores', {}).items()},
+            'analytics_result_id': analysis.get('analytics_result_id')
+        }        }
         
         return Response(response_data)
         
@@ -191,8 +194,7 @@ def analyze_portfolio(request, portfolio_id):
         return Response(
             {'error': 'Portfolio analysis not yet implemented with new TA engine'},
             status=status.HTTP_501_NOT_IMPLEMENTED
-        )
-        
+        )        
         if not analysis.get('success', True):
             return Response(
                 {'error': analysis.get('error', 'Analysis failed')},
