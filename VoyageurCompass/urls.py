@@ -15,19 +15,18 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
-from django.contrib import admin
-from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
+from django.urls import include, path
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
-from Core.views import (
-    healthCheck as health_check_liveness,
-    readinessCheck as readiness_check,
-)
+
+from Core.views import healthCheck as health_check_liveness
+from Core.views import readinessCheck as readiness_check
 
 urlpatterns = [
     path("admin/", admin.site.urls),

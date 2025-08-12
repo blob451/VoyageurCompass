@@ -1,7 +1,8 @@
 # Generated migration for marking existing data as yahoo source
 
-from django.db import migrations, transaction
 import logging
+
+from django.db import migrations, transaction
 
 logger = logging.getLogger(__name__)
 

@@ -5,12 +5,13 @@ Handles upsert operations to ANALYTICS_RESULTS table with PostgreSQL optimizatio
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
+
 from django.db import transaction
-from django.db.models import Count, Min, Max, Avg
+from django.db.models import Avg, Count, Max, Min
 from django.utils import timezone
 
-from Data.models import Stock, AnalyticsResults
+from Data.models import AnalyticsResults, Stock
 
 
 class AnalyticsWriter:

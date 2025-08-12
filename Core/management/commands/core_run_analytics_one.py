@@ -6,20 +6,20 @@ Usage:
     python manage.py core_run_analytics_one --symbol AAPL
 """
 
+import logging
 import os
 import uuid
-import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Any, Dict
 
 from django.core.management.base import BaseCommand, CommandError
-from django.utils import timezone
 from django.db import connection
+from django.utils import timezone
 
+from Analytics.engine.ta_engine import TechnicalAnalysisEngine
+from Data.models import AnalyticsResults, Stock
 from Data.repo.price_reader import PriceReader
 from Data.services.yahoo_finance import yahoo_finance_service
-from Analytics.engine.ta_engine import TechnicalAnalysisEngine
-from Data.models import Stock, AnalyticsResults
 
 logger = logging.getLogger(__name__)
 

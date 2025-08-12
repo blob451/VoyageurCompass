@@ -7,21 +7,21 @@ cSpell:ignore Bollinger bollinger pricevs bbpos bbwidth volsurge candlerev srcon
 """
 
 import logging
-from datetime import datetime, date, timedelta
-from decimal import Decimal
-from typing import Dict, List, Optional, Any, Tuple, NamedTuple
 import math
 import statistics
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 from django.utils import timezone
 
-from Data.repo.price_reader import (
-    PriceReader,
-    PriceData,
-    SectorPriceData,
-    IndustryPriceData,
-)
 from Data.repo.analytics_writer import AnalyticsWriter
+from Data.repo.price_reader import (
+    IndustryPriceData,
+    PriceData,
+    PriceReader,
+    SectorPriceData,
+)
 
 logger = logging.getLogger(__name__)
 

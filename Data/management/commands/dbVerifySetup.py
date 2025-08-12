@@ -5,12 +5,13 @@ Validates schema integrity and data separation.
 
 from django.core.management.base import BaseCommand
 from django.db import connection
+
 from Data.models import (
-    Stock,
-    StockPrice,
+    DataSourceChoices,
     Portfolio,
     PortfolioHolding,
-    DataSourceChoices,
+    Stock,
+    StockPrice,
 )
 
 

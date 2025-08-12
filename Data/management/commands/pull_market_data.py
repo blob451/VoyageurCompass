@@ -2,9 +2,11 @@
 Management command to pull market data from Yahoo Finance.
 """
 
-from django.core.management.base import BaseCommand, CommandError
-from Data.services.yahoo_finance import yahoo_finance_service
 import logging
+
+from django.core.management.base import BaseCommand, CommandError
+
+from Data.services.yahoo_finance import yahoo_finance_service
 
 logger = logging.getLogger(__name__)
 

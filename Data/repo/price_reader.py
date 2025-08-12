@@ -3,19 +3,20 @@ Price data reader for EOD (End of Day) stock, sector, and industry data.
 Provides typed interfaces for accessing historical price data required by analytics engine.
 """
 
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import List, Dict, Optional, Tuple, NamedTuple, Any
-from django.db.models import QuerySet, Min, Max, Count
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+
+from django.db.models import Count, Max, Min, QuerySet
 from django.utils import timezone
 
 from Data.models import (
-    Stock,
-    StockPrice,
-    DataSector,
-    DataSectorPrice,
     DataIndustry,
     DataIndustryPrice,
+    DataSector,
+    DataSectorPrice,
+    Stock,
+    StockPrice,
 )
 
 

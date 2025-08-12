@@ -10,12 +10,13 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-import environ
+import json
 import os
 import sys
-import json
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
+
+import environ
 from django.core.exceptions import ImproperlyConfigured
 
 # Guard Sentry import to prevent crashes when package not installed

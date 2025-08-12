@@ -5,12 +5,13 @@ Enhanced with Celery task integration and caching support.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Dict, List, Optional, Tuple
+
+from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
-from django.core.cache import cache
 
 from Data.models import Stock, StockPrice
 from Data.services.provider import data_provider

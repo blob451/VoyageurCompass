@@ -2,16 +2,17 @@
 Comprehensive tests for Data app API views.
 """
 
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from unittest.mock import patch
+
 import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase, APIClient
-from unittest.mock import patch
-from datetime import datetime, timedelta, date
-from decimal import Decimal
+from rest_framework.test import APIClient, APITestCase
 
-from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding
+from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
 
 
 class StockViewSetTestCase(APITestCase):

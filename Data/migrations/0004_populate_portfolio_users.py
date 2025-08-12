@@ -2,6 +2,7 @@
 
 import secrets
 import string
+
 from django.db import migrations
 
 

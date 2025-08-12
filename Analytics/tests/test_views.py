@@ -2,18 +2,19 @@
 Comprehensive tests for Analytics app API views.
 """
 
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from unittest.mock import MagicMock, patch
+
 import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.test import APITestCase, APIClient
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timedelta, date
-from decimal import Decimal
+from rest_framework.test import APIClient, APITestCase
 
-from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding
 from Analytics.services.engine import analytics_engine
+from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
 
 
 class AnalyticsAPITestCase(APITestCase):

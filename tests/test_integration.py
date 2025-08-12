@@ -8,15 +8,16 @@ import pytest
 # Mark all tests in this module as integration tests
 pytestmark = pytest.mark.integration
 
-from django.contrib.auth.models import User
-from django.urls import reverse
-from rest_framework import status
-from rest_framework.test import APITestCase, APIClient
 from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
-from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding
+from django.contrib.auth.models import User
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APIClient, APITestCase
+
+from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
 
 
 class FullWorkflowIntegrationTest(APITestCase):

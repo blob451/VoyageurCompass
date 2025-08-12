@@ -6,10 +6,11 @@ to ensure proper filtering, chaining, and handling of edge cases.
 """
 
 import pytest
-from django.test import TestCase
 from django.db import models
-from Data.models import Stock, DataSourceChoices
+from django.test import TestCase
+
 from Data.managers import DATA_SOURCE_MOCK, DATA_SOURCE_YAHOO
+from Data.models import DataSourceChoices, Stock
 
 
 class TestStockQuerySet(TestCase):

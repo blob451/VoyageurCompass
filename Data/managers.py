@@ -4,7 +4,6 @@ Custom managers for Data models to handle mock vs real data separation.
 
 from django.db import models
 
-
 # Data source constants to avoid circular imports
 # These match the values in DataSourceChoices
 DATA_SOURCE_YAHOO = "yahoo"

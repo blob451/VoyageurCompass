@@ -1,13 +1,13 @@
-from django.db import models
-from django.core.validators import MinValueValidator
-from django.utils import timezone
-from django.conf import settings
-from datetime import timedelta
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
-from dateutil.relativedelta import relativedelta
 
-from .managers import StockManager, RealDataManager
+from dateutil.relativedelta import relativedelta
+from django.conf import settings
+from django.core.validators import MinValueValidator
+from django.db import models
+from django.utils import timezone
+
+from .managers import RealDataManager, StockManager
 
 
 class DataSourceChoices(models.TextChoices):

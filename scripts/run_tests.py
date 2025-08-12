@@ -4,10 +4,10 @@ Comprehensive test runner for VoyageurCompass project.
 Runs both backend and frontend tests with coverage reporting.
 """
 
-import os
-import sys
-import subprocess
 import argparse
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 

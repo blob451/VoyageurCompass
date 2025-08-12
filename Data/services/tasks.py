@@ -3,13 +3,14 @@ Celery tasks for the Data app.
 Handles asynchronous processing and scheduled jobs.
 """
 
+import json
+import time
+from datetime import datetime, timedelta
+
 from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.core.cache import cache
 from django.utils import timezone
-from datetime import datetime, timedelta
-import json
-import time
 
 logger = get_task_logger(__name__)
 
@@ -141,8 +142,8 @@ def generate_analytics_report():
         logger.info("Generating analytics report...")
 
         # Import models and services
-        from django.db.models import Count, Avg, Sum, Q
         from django.contrib.auth import get_user_model
+        from django.db.models import Avg, Count, Q, Sum
 
         User = get_user_model()
 

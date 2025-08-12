@@ -6,26 +6,27 @@ API Views for Data app.
 Provides REST endpoints for stock data and portfolio management.
 """
 
-from rest_framework import viewsets, status, filters
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.shortcuts import get_object_or_404
+from datetime import datetime, timedelta
+
 from django.db import models
 from django.db.models import Q
-from datetime import datetime, timedelta
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from rest_framework import filters, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
 
-from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding
+from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
 from Data.serializers import (
-    StockSerializer,
-    StockDetailSerializer,
-    StockPriceSerializer,
-    PortfolioSerializer,
+    MarketStatusSerializer,
     PortfolioDetailSerializer,
     PortfolioHoldingSerializer,
+    PortfolioSerializer,
+    StockDetailSerializer,
+    StockPriceSerializer,
     StockSearchSerializer,
-    MarketStatusSerializer,
+    StockSerializer,
 )
 from Data.services.yahoo_finance import yahoo_finance_service
 

@@ -4,15 +4,18 @@ URL configuration for Core app.
 
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
+
 from Core.views import (
+    ChangePasswordView,
     CustomTokenObtainPairView,
     RegisterView,
     UserProfileView,
-    ChangePasswordView,
     health_check,
+)
+from Core.views import healthCheck as health_check_liveness
+from Core.views import readinessCheck as readiness_check
+from Core.views import (
     user_stats,
-    healthCheck as health_check_liveness,
-    readinessCheck as readiness_check,
 )
 
 app_name = "core"

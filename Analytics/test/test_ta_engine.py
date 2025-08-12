@@ -4,21 +4,22 @@ Tests all 12 indicators with Django test database only - no external API calls.
 """
 
 import unittest
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+
 from django.test import TestCase
 from django.utils import timezone
 
+from Analytics.engine.ta_engine import IndicatorResult, TechnicalAnalysisEngine
 from Data.models import (
+    DataIndustry,
+    DataIndustryPrice,
+    DataSector,
+    DataSectorPrice,
     Stock,
     StockPrice,
-    DataSector,
-    DataIndustry,
-    DataSectorPrice,
-    DataIndustryPrice,
 )
 from Data.repo.price_reader import PriceData
-from Analytics.engine.ta_engine import TechnicalAnalysisEngine, IndicatorResult
 
 
 class TechnicalAnalysisEngineTestCase(TestCase):

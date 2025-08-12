@@ -1,6 +1,7 @@
+import logging
 import time
 import uuid
-import logging
+
 from django.http import HttpResponse
 from django.utils.cache import patch_vary_headers
 from django.utils.deprecation import MiddlewareMixin

@@ -3,9 +3,10 @@ URL configuration for Analytics app.
 """
 
 from django.urls import path
+
 from Analytics.views import (
-    analyze_stock,
     analyze_portfolio,
+    analyze_stock,
     batch_analysis,
     market_overview,
 )

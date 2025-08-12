@@ -3,8 +3,9 @@ Management command to export AAPL analysis data with first 5 and last 5 rows for
 """
 
 import os
-from django.core.management.base import BaseCommand
+
 from django.apps import apps
+from django.core.management.base import BaseCommand
 from django.db import models as djm
 
 

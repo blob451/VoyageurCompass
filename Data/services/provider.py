@@ -5,10 +5,11 @@ Includes rate limiting handling and retry logic.
 """
 
 import logging
-import time
 import random
-from typing import Dict, List, Optional, Any
+import time
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import yfinance as yf
 
 logger = logging.getLogger(__name__)

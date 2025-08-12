@@ -1,8 +1,9 @@
 import json
 import logging
 import os
-from django.test import TestCase, override_settings
 from io import StringIO
+
+from django.test import TestCase, override_settings
 
 
 class LoggingConfigTestCase(TestCase):

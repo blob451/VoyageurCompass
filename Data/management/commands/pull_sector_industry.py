@@ -3,11 +3,13 @@ Management command to pull sector/industry data from Yahoo Finance.
 Validates database engine and prevents SQLite usage.
 """
 
+import logging
+
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
+
+from Data.models import DataSourceChoices, Stock
 from Data.services.yahoo_finance import yahoo_finance_service
-from Data.models import Stock, DataSourceChoices
-import logging
 
 logger = logging.getLogger(__name__)
 

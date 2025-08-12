@@ -1,6 +1,7 @@
 from unittest.mock import patch
-from django.test import TestCase, Client
+
 from django.db import connection
+from django.test import Client, TestCase
 
 
 class HealthCheckTestCase(TestCase):

@@ -2,13 +2,14 @@
 Management command to pull AAPL 3-year data with schema verification and database guard.
 """
 
-import time
 import logging
+import time
 from datetime import datetime, timedelta
+
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import connection
 from django.utils import timezone
-from django.conf import settings
 
 from Data.services.yahoo_finance import yahoo_finance_service
 
@@ -74,7 +75,7 @@ class Command(BaseCommand):
     def verify_schema(self) -> bool:
         """Verify required fields exist in DATA tables."""
         try:
-            from Data.models import Stock, DataSectorPrice, DataIndustryPrice
+            from Data.models import DataIndustryPrice, DataSectorPrice, Stock
 
             # Check Stock model for required Stocks fields
             stock_fields = [f.name for f in Stock._meta.get_fields()]

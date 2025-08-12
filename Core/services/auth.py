@@ -5,12 +5,13 @@ Handles user authentication and authorization for VoyageurCompass.
 
 import logging
 import re
-from typing import Optional, Dict
+from typing import Dict, Optional
+
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
-from django.contrib.auth.password_validation import validate_password
 
 logger = logging.getLogger(__name__)
 

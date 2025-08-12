@@ -7,17 +7,18 @@ Provides endpoints for stock analysis and trading signals.
 """
 
 from datetime import datetime
+
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
-from drf_spectacular.utils import extend_schema, OpenApiParameter
-from drf_spectacular.types import OpenApiTypes
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from Analytics.engine.ta_engine import TechnicalAnalysisEngine
-from Data.services.yahoo_finance import yahoo_finance_service
 from Data.models import Portfolio
+from Data.services.yahoo_finance import yahoo_finance_service
 
 
 class AnalysisThrottle(UserRateThrottle):

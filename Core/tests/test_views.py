@@ -2,13 +2,14 @@
 Comprehensive tests for Core app API views.
 """
 
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock, patch
+
 import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase, APIClient
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timedelta
+from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 
@@ -404,6 +405,7 @@ class RateLimitingTestCase(APITestCase):
     def test_rate_limiting(self):
         """Test rate limiting on public endpoints."""
         from unittest.mock import patch
+
         from rest_framework.throttling import AnonRateThrottle
 
         url = reverse("core:health-check")

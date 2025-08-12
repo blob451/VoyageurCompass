@@ -4,26 +4,27 @@ Unit tests for engine guard, classification upsert, and composite calculations.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from datetime import date, datetime
 from decimal import Decimal
-from datetime import datetime, date
-from django.test import TestCase, override_settings
+from unittest.mock import MagicMock, patch
+
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import connection
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
+from Data.management.commands.ta_bootstrap_one import Command
 from Data.models import (
+    DataIndustry,
+    DataIndustryPrice,
+    DataSector,
+    DataSectorPrice,
+    DataSourceChoices,
     Stock,
     StockPrice,
-    DataSector,
-    DataIndustry,
-    DataSectorPrice,
-    DataIndustryPrice,
-    DataSourceChoices,
 )
 from Data.services.yahoo_finance import YahooFinanceService
-from Data.management.commands.ta_bootstrap_one import Command
 
 
 class TaBootstrapEngineGuardTest(TestCase):

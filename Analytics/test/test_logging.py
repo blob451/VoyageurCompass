@@ -1,6 +1,7 @@
 import logging
-from django.test import TestCase
 from io import StringIO
+
+from django.test import TestCase
 
 
 class AnalyticsLoggingTestCase(TestCase):

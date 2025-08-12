@@ -2,14 +2,15 @@
 Tests for sector/industry data pull functionality.
 """
 
-from django.test import TestCase
+from datetime import timedelta
+from io import StringIO
+from unittest.mock import MagicMock, patch
+
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import connection
+from django.test import TestCase
 from django.utils import timezone
-from datetime import timedelta
-from unittest.mock import patch, MagicMock
-from io import StringIO
 
 from Data.models import Stock
 from Data.services.yahoo_finance import yahoo_finance_service

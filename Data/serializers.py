@@ -3,9 +3,10 @@ Serializers for Data app models.
 Handles data serialization/deserialization for API endpoints.
 """
 
-from rest_framework import serializers
 from django.contrib.auth.models import User
-from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding
+from rest_framework import serializers
+
+from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
 
 
 class StockPriceSerializer(serializers.ModelSerializer):

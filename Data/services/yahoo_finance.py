@@ -4,25 +4,26 @@ Handles all interactions with Yahoo Finance API for VoyageurCompass.
 This module acts as the main interface for Yahoo Finance operations.
 """
 
-import logging
-import re
-import time
-import random
-import os
 import hashlib
+import logging
+import os
+import random
+import re
 import threading
-from typing import Dict, List, Optional, Tuple
-import yfinance as yf
-import pandas as pd
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta, timezone as dt_timezone
-from decimal import Decimal
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
+from decimal import Decimal
+from typing import Any, Dict, List, Optional, Tuple
+
+import pandas as pd
 
 # Configure yfinance with proper headers to handle consent pages
 # SSL verification remains enabled for security
 import requests
+import yfinance as yf
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -30,18 +31,19 @@ from urllib3.util.retry import Retry
 # Keep a module-level default to pass explicitly to HTTP calls.
 DEFAULT_TIMEOUT = 30
 
-from Data.services.provider import data_provider
-from Data.services.synchronizer import data_synchronizer
 from django.db import models, transaction
 from django.utils import timezone
+
 from Data.models import (
+    DataIndustry,
+    DataIndustryPrice,
+    DataSector,
+    DataSectorPrice,
     Stock,
     StockPrice,
-    DataSector,
-    DataIndustry,
-    DataSectorPrice,
-    DataIndustryPrice,
 )
+from Data.services.provider import data_provider
+from Data.services.synchronizer import data_synchronizer
 
 logger = logging.getLogger(__name__)
 

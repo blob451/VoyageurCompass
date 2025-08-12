@@ -1,7 +1,8 @@
 import os
-from unittest.mock import patch, MagicMock
-from django.test import TestCase, override_settings
+from unittest.mock import MagicMock, patch
+
 from django.conf import settings
+from django.test import TestCase, override_settings
 
 
 class SentryIntegrationTestCase(TestCase):
