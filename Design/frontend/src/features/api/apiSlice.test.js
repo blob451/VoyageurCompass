@@ -109,21 +109,12 @@ describe('apiSlice', () => {
 
   describe('tag system', () => {
     it('should have correct tag types defined', () => {
-      const expectedTagTypes = [
-        'Stock', 
-        'Portfolio', 
-        'Holding', 
-        'User', 
-        'Market', 
-        'Analytics'
-      ]
-      
       // The tagTypes are stored in the internal configuration
       // We can verify them by checking the store state
       const state = store.getState()
       expect(state.api).toBeDefined()
       
-      // Alternatively, we can verify tags are used correctly by endpoints
+      // Verify tags are used correctly by endpoints
       expect(apiSlice.endpoints.getStocks).toBeDefined()
       expect(apiSlice.endpoints.getPortfolios).toBeDefined()
     })

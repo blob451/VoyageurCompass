@@ -16,12 +16,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from Core.serializers import (
-    ChangePasswordSerializer,
-    UserProfileSerializer,
-    UserRegistrationSerializer,
-    UserSerializer,
-)
+from Core.serializers import (ChangePasswordSerializer, UserProfileSerializer,
+                              UserRegistrationSerializer, UserSerializer)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -224,7 +220,8 @@ class LogoutView(APIView):
     def post(self, request):
         """Logout user and blacklist refresh token."""
         try:
-            from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
+            from rest_framework_simplejwt.token_blacklist.models import \
+                BlacklistedToken
 
             refresh_token = request.data.get("refresh")
             if not refresh_token:

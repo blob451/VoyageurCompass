@@ -136,7 +136,7 @@ describe('Layout', () => {
     // Check that the layout contains all expected semantic regions
     expect(screen.getByRole('navigation')).toBeInTheDocument()
     expect(screen.getByRole('main')).toBeInTheDocument()
-    expect(screen.getByTestId('layout-content')).toBeInTheDocument()
+    expect(screen.getByTestId('test-content')).toBeInTheDocument()
     
     // Verify content is properly nested within main region
     const mainElement = screen.getByRole('main')

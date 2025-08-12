@@ -10,14 +10,8 @@ from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 from django.db.models import Count, Max, Min, QuerySet
 from django.utils import timezone
 
-from Data.models import (
-    DataIndustry,
-    DataIndustryPrice,
-    DataSector,
-    DataSectorPrice,
-    Stock,
-    StockPrice,
-)
+from Data.models import (DataIndustry, DataIndustryPrice, DataSector,
+                         DataSectorPrice, Stock, StockPrice)
 
 
 class PriceData(NamedTuple):
