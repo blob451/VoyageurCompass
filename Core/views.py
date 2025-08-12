@@ -535,7 +535,6 @@ def health_redis(request):
 def health_comprehensive(request):
     """Comprehensive health check endpoint."""
     from datetime import datetime, timezone
-    import psutil
     
     # Check database
     db_healthy = True

@@ -131,7 +131,7 @@ class DataSectorPrice(models.Model):
     close_index = models.DecimalField(
         max_digits=20,
         decimal_places=6,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Sector composite close index",
     )
     fiftyTwoWeekChange = models.DecimalField(
@@ -216,7 +216,7 @@ class DataIndustryPrice(models.Model):
     close_index = models.DecimalField(
         max_digits=20,
         decimal_places=6,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Industry composite close index",
     )
     fiftyTwoWeekChange = models.DecimalField(
@@ -565,31 +565,31 @@ class StockPrice(models.Model):
     open = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Opening price",
     )
     high = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Highest price of the day",
     )
     low = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Lowest price of the day",
     )
     close = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Closing price",
     )
     adjusted_close = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         null=True,
         blank=True,
         help_text="Adjusted closing price (accounts for splits, dividends)",
@@ -705,14 +705,14 @@ class Portfolio(models.Model):
         max_digits=12,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Initial investment amount",
     )
     current_value = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Current portfolio value",
     )
 
@@ -783,20 +783,20 @@ class PortfolioHolding(models.Model):
     quantity = models.DecimalField(
         max_digits=12,
         decimal_places=4,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Number of shares",
     )
     average_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Average purchase price per share",
     )
     current_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Current market price per share",
     )
 
@@ -805,14 +805,14 @@ class PortfolioHolding(models.Model):
         max_digits=12,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Total investment cost",
     )
     current_value = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal(0))],
         help_text="Current market value",
     )
 
