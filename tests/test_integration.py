@@ -13,7 +13,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.db import transaction, connection
+from django.db import connection, transaction
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
@@ -250,7 +250,7 @@ class FullWorkflowIntegrationTest(APITestCase):
         )
         access_token = login_response.data["access"]
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
-        
+
         compare_url = reverse("data:compare-stocks")
         compare_data = {"symbols": ["AAPL", "MSFT"], "metrics": ["price", "market_cap"]}
         compare_response = self.client.post(compare_url, compare_data, format="json")
@@ -435,12 +435,12 @@ class FullWorkflowIntegrationTest(APITestCase):
 
         # Create regular user first
         User.objects.create_user(**self.user_data)
-        
+
         # Create admin user for bulk operations
         admin_user = User.objects.create_superuser(
             username="admin", password="adminpass123", email="admin@test.com"
         )
-        
+
         # Authenticate as admin for bulk operations
         self.client.force_authenticate(user=admin_user)
 
@@ -550,12 +550,15 @@ class PerformanceIntegrationTest(APITestCase):
         """Test handling of concurrent operations."""
         import threading
         import time
+
         from django.db import connection
         from django.test import override_settings
-        
+
         # Skip test if using SQLite, as it has limited concurrency support
-        if 'sqlite' in connection.settings_dict['ENGINE']:
-            self.skipTest("SQLite has limited concurrency support - skipping concurrent operations test")
+        if "sqlite" in connection.settings_dict["ENGINE"]:
+            self.skipTest(
+                "SQLite has limited concurrency support - skipping concurrent operations test"
+            )
 
         portfolio = Portfolio.objects.create(
             user=self.user, name="Concurrent Test Portfolio"
@@ -584,15 +587,18 @@ class PerformanceIntegrationTest(APITestCase):
                         },
                         format="json",
                     )
-                    
+
                     # Thread-safe result storage
                     with results_lock:
                         results.append(response.status_code)
                     return  # Success, exit retry loop
-                    
+
                 except Exception as e:
                     error_msg = str(e)
-                    if "database table is locked" in error_msg and attempt < max_retries - 1:
+                    if (
+                        "database table is locked" in error_msg
+                        and attempt < max_retries - 1
+                    ):
                         # Wait a bit before retrying
                         time.sleep(0.1 * (attempt + 1))  # Exponential backoff
                         continue
@@ -604,12 +610,14 @@ class PerformanceIntegrationTest(APITestCase):
 
         # Create multiple threads to add holdings concurrently
         threads = []
-        stock_symbols = [f"TEST{i:03d}" for i in range(2)]  # Reduce to 2 for better SQLite compatibility
+        stock_symbols = [
+            f"TEST{i:03d}" for i in range(2)
+        ]  # Reduce to 2 for better SQLite compatibility
 
         for symbol in stock_symbols:
             thread = threading.Thread(target=add_holding, args=(symbol,))
             threads.append(thread)
-            
+
         # Start threads with staggered delays to reduce database contention
         for i, thread in enumerate(threads):
             thread.start()
@@ -627,6 +635,6 @@ class PerformanceIntegrationTest(APITestCase):
             total_operations,
             f"Expected {total_operations} results, but got {len(results)}. Results: {results}",
         )
-        
+
         # In SQLite environment, we primarily test that the system doesn't crash
         # rather than expecting perfect concurrency

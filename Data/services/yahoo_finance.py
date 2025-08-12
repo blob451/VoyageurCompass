@@ -13,12 +13,12 @@ import threading
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
-
 # Configure yfinance with proper headers to handle consent pages
 # SSL verification remains enabled for security
 import requests
@@ -33,14 +33,8 @@ DEFAULT_TIMEOUT = 30
 from django.db import models, transaction
 from django.utils import timezone
 
-from Data.models import (
-    DataIndustry,
-    DataIndustryPrice,
-    DataSector,
-    DataSectorPrice,
-    Stock,
-    StockPrice,
-)
+from Data.models import (DataIndustry, DataIndustryPrice, DataSector,
+                         DataSectorPrice, Stock, StockPrice)
 from Data.services.provider import data_provider
 from Data.services.synchronizer import data_synchronizer
 

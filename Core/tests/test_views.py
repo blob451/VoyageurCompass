@@ -420,7 +420,10 @@ class RateLimitingTestCase(APITestCase):
             # Test that throttling is configured but don't expect specific behavior
             response = self.client.get(url)
             # Just verify endpoint works - throttling behavior varies by environment
-            self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_429_TOO_MANY_REQUESTS])
+            self.assertIn(
+                response.status_code,
+                [status.HTTP_200_OK, status.HTTP_429_TOO_MANY_REQUESTS],
+            )
 
         # Alternative test: verify throttle configuration exists
         from django.conf import settings

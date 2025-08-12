@@ -58,33 +58,35 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"password": "Password fields didn't match."}
             )
-        
+
         # Additional password validation for common weak passwords
         password = attrs.get("password", "")
         username = attrs.get("username", "")
-        
+
         # Check for very weak passwords that should be rejected
         if len(password) < 8:
             raise serializers.ValidationError(
-                {"password": "This password is too short. It must contain at least 8 characters."}
+                {
+                    "password": "This password is too short. It must contain at least 8 characters."
+                }
             )
-        
+
         if password.isdigit():
             raise serializers.ValidationError(
                 {"password": "This password is entirely numeric."}
             )
-            
+
         if password.lower() in ["password", "123456", "12345678", "qwerty", "abc123"]:
             raise serializers.ValidationError(
                 {"password": "This password is too common."}
             )
-            
+
         # Check similarity to username
         if username.lower() in password.lower() or password.lower() in username.lower():
             raise serializers.ValidationError(
                 {"password": "The password is too similar to the username."}
             )
-        
+
         return attrs
 
     def create(self, validated_data):

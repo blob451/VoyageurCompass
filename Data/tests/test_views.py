@@ -257,7 +257,7 @@ class PortfolioViewSetTestCase(APITestCase):
         def create_stock_side_effect(*args, **kwargs):
             Stock.objects.create(symbol="MSFT", short_name="Microsoft")
             return {"symbol": "MSFT"}
-        
+
         mock_get_stock_data.side_effect = create_stock_side_effect
 
         url = reverse("data:portfolio-add-holding", args=[self.portfolio.id])

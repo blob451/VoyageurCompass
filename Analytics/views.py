@@ -11,7 +11,8 @@ from datetime import datetime
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.decorators import (api_view, permission_classes,
+                                       throttle_classes)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
@@ -25,11 +26,11 @@ class AnalysisThrottle(UserRateThrottle):
     """Custom throttle for analysis endpoints."""
 
     rate = "100/hour"
-    
+
     def allow_request(self, request, view):
         """Override to be more permissive during testing."""
         # Check if we're in testing mode and allow higher rates
-        if hasattr(request, 'user') and request.user.is_authenticated:
+        if hasattr(request, "user") and request.user.is_authenticated:
             return super().allow_request(request, view)
         # For unauthenticated requests, still apply throttling but be more lenient
         return True
@@ -121,6 +122,7 @@ def analyze_stock(request, symbol):
     # Validate symbol first
     try:
         from Data.services.yahoo_finance import yahoo_finance_service
+
         if not yahoo_finance_service.validate_symbol(symbol):
             return Response(
                 {"error": f"Invalid stock symbol: {symbol}"},
@@ -156,13 +158,13 @@ def analyze_stock(request, symbol):
                 **analysis.get("components", {}),
                 "sma_20": 150.25,
                 "sma_50": 148.80,
-                "rsi": 65.5
+                "rsi": 65.5,
             },
             "technical_indicators": {
                 **analysis.get("components", {}),
                 "sma_20": 150.25,  # Add missing technical indicators expected by tests
                 "sma_50": 148.80,
-                "ema_12": 151.10
+                "ema_12": 151.10,
             },  # CRITICAL: Add field expected by tests
             "weighted_scores": {
                 k: float(v) for k, v in analysis.get("weighted_scores", {}).items()
@@ -175,12 +177,21 @@ def analyze_stock(request, symbol):
     except Exception as e:
         error_msg = str(e).lower()
         # Check if error indicates invalid symbol
-        if any(keyword in error_msg for keyword in ['not found', 'invalid symbol', 'does not exist', 'no data', 'no price data']):
+        if any(
+            keyword in error_msg
+            for keyword in [
+                "not found",
+                "invalid symbol",
+                "does not exist",
+                "no data",
+                "no price data",
+            ]
+        ):
             return Response(
                 {"error": f"Stock symbol '{symbol}' not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        
+
         return Response(
             {"error": f"Analysis failed: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -228,68 +239,76 @@ def analyze_portfolio(request, portfolio_id):
     # Run portfolio analysis
     try:
         engine = TechnicalAnalysisEngine()
-        
+
         # Get all holdings in the portfolio
         holdings = portfolio.holdings.all()
-        
+
         if not holdings.exists():
             return Response(
                 {"error": "Portfolio has no holdings to analyze"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         results = []
         total_value = 0
         weighted_score = 0
-        
+
         for holding in holdings:
             try:
                 # Analyze each stock in the portfolio
                 analysis = engine.analyze_stock(holding.stock.symbol)
-                stock_value = float(holding.current_value) if holding.current_value else 0
-                
-                results.append({
-                    "symbol": holding.stock.symbol,
-                    "composite_score": analysis.get("score_0_10", 0),
-                    "current_value": stock_value,
-                    "analysis_date": analysis.get("analysis_date", datetime.now()).isoformat(),
-                })
-                
+                stock_value = (
+                    float(holding.current_value) if holding.current_value else 0
+                )
+
+                results.append(
+                    {
+                        "symbol": holding.stock.symbol,
+                        "composite_score": analysis.get("score_0_10", 0),
+                        "current_value": stock_value,
+                        "analysis_date": analysis.get(
+                            "analysis_date", datetime.now()
+                        ).isoformat(),
+                    }
+                )
+
                 total_value += stock_value
                 weighted_score += analysis.get("score_0_10", 0) * stock_value
-                
+
             except Exception as e:
-                results.append({
-                    "symbol": holding.stock.symbol,
-                    "error": str(e),
-                    "current_value": float(holding.current_value) if holding.current_value else 0,
-                })
-        
+                results.append(
+                    {
+                        "symbol": holding.stock.symbol,
+                        "error": str(e),
+                        "current_value": (
+                            float(holding.current_value) if holding.current_value else 0
+                        ),
+                    }
+                )
+
         # Calculate portfolio-level metrics
         portfolio_score = weighted_score / total_value if total_value > 0 else 0
-        
-        return Response({
-            "portfolio_id": portfolio_id,
-            "analysis_date": datetime.now().isoformat(),
-            "total_holdings": len(results),
-            "total_value": total_value,
-            "portfolio_score": portfolio_score,
-            "holdings": results,
-            "diversification": {
-                "score": 0.75,
-                "by_sector": {"Technology": 0.6, "Healthcare": 0.4},
-                "by_industry": {"Software": 0.4, "Hardware": 0.2, "Pharma": 0.4},
-                "concentration_risk": "moderate"
-            },
-            "risk_metrics": {
-                "volatility": 0.25,
-                "beta": 1.2, 
-                "sharpe_ratio": 1.5
-            },
-            "technical_strength": portfolio_score / 10.0,
-            "risk_score": min(10.0, max(1.0, portfolio_score)),
-            "risk_level": "Moderate"
-        })
+
+        return Response(
+            {
+                "portfolio_id": portfolio_id,
+                "analysis_date": datetime.now().isoformat(),
+                "total_holdings": len(results),
+                "total_value": total_value,
+                "portfolio_score": portfolio_score,
+                "holdings": results,
+                "diversification": {
+                    "score": 0.75,
+                    "by_sector": {"Technology": 0.6, "Healthcare": 0.4},
+                    "by_industry": {"Software": 0.4, "Hardware": 0.2, "Pharma": 0.4},
+                    "concentration_risk": "moderate",
+                },
+                "risk_metrics": {"volatility": 0.25, "beta": 1.2, "sharpe_ratio": 1.5},
+                "technical_strength": portfolio_score / 10.0,
+                "risk_score": min(10.0, max(1.0, portfolio_score)),
+                "risk_level": "Moderate",
+            }
+        )
 
     except Exception as e:
         return Response(
@@ -375,7 +394,7 @@ def batch_analysis(request):
                 date_str = analysis_date
             else:
                 date_str = analysis_date.isoformat()
-                
+
             results[symbol] = {
                 "success": True,
                 "composite_score": analysis.get("score_0_10", 0),
@@ -392,7 +411,7 @@ def batch_analysis(request):
         result_item = {"symbol": symbol}
         result_item.update(result)
         results_list.append(result_item)
-    
+
     return Response(
         {
             "success": True,
@@ -433,7 +452,9 @@ def market_overview(request):
             results[symbol] = {
                 "name": name,
                 "composite_score": analysis.get("score_0_10", 0),
-                "analysis_date": analysis.get("analysis_date", datetime.now()).isoformat(),
+                "analysis_date": analysis.get(
+                    "analysis_date", datetime.now()
+                ).isoformat(),
                 "horizon": analysis.get("horizon", "unknown"),
             }
         except:

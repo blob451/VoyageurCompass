@@ -11,14 +11,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, models, transaction
 from django.utils import timezone
 
-from Data.models import (
-    DataIndustry,
-    DataIndustryPrice,
-    DataSector,
-    DataSectorPrice,
-    Stock,
-    StockPrice,
-)
+from Data.models import (DataIndustry, DataIndustryPrice, DataSector,
+                         DataSectorPrice, Stock, StockPrice)
 from Data.services.yahoo_finance import create_yahoo_finance_service
 
 logger = logging.getLogger(__name__)

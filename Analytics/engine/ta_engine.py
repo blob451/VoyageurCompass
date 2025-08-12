@@ -16,12 +16,8 @@ from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 from django.utils import timezone
 
 from Data.repo.analytics_writer import AnalyticsWriter
-from Data.repo.price_reader import (
-    IndustryPriceData,
-    PriceData,
-    PriceReader,
-    SectorPriceData,
-)
+from Data.repo.price_reader import (IndustryPriceData, PriceData, PriceReader,
+                                    SectorPriceData)
 
 logger = logging.getLogger(__name__)
 
@@ -1128,20 +1124,22 @@ class TechnicalAnalysisEngine:
 
         return filtered_levels[-3:]  # Return bottom 3 levels
 
-    def analyze_portfolio(self, portfolio_id: int, analysis_date: Optional[datetime] = None) -> Dict:
+    def analyze_portfolio(
+        self, portfolio_id: int, analysis_date: Optional[datetime] = None
+    ) -> Dict:
         """
         Analyze a portfolio's technical indicators and performance.
-        
+
         Args:
             portfolio_id: Portfolio ID to analyze
             analysis_date: Date for analysis (defaults to current time)
-            
+
         Returns:
             Dictionary containing portfolio analysis results
         """
         if analysis_date is None:
             analysis_date = timezone.now()
-            
+
         # Placeholder implementation - would need actual portfolio data access
         return {
             "portfolio_id": portfolio_id,
@@ -1150,30 +1148,26 @@ class TechnicalAnalysisEngine:
                 "score": 0.75,
                 "by_sector": {},
                 "by_industry": {},
-                "concentration_risk": "moderate"
+                "concentration_risk": "moderate",
             },
             "technical_strength": 0.65,
-            "risk_metrics": {
-                "beta": 1.2,
-                "volatility": 0.18,
-                "sharpe_ratio": 1.1
-            },
-            "recommendations": ["Consider rebalancing", "Review sector allocation"]
+            "risk_metrics": {"beta": 1.2, "volatility": 0.18, "sharpe_ratio": 1.1},
+            "recommendations": ["Consider rebalancing", "Review sector allocation"],
         }
 
     def get_market_sentiment(self, analysis_date: Optional[datetime] = None) -> Dict:
         """
         Get current market sentiment analysis.
-        
+
         Args:
             analysis_date: Date for analysis (defaults to current time)
-            
+
         Returns:
             Dictionary containing market sentiment data
         """
         if analysis_date is None:
             analysis_date = timezone.now()
-            
+
         # Placeholder implementation
         return {
             "sentiment_score": 0.62,
@@ -1182,32 +1176,34 @@ class TechnicalAnalysisEngine:
             "market_indicators": {
                 "advance_decline_ratio": 1.3,
                 "new_highs_lows": 0.8,
-                "volatility_index": 18.5
+                "volatility_index": 18.5,
             },
-            "analysis_date": analysis_date.isoformat()
+            "analysis_date": analysis_date.isoformat(),
         }
 
-    def calculate_technical_indicators(self, symbol: str, indicators: List[str] = None) -> Dict:
+    def calculate_technical_indicators(
+        self, symbol: str, indicators: List[str] = None
+    ) -> Dict:
         """
         Calculate specific technical indicators for a stock.
-        
+
         Args:
             symbol: Stock symbol
             indicators: List of indicator names to calculate
-            
+
         Returns:
             Dictionary containing calculated indicators
         """
         if indicators is None:
             indicators = ["sma", "ema", "rsi", "macd"]
-            
+
         # Placeholder implementation - would use actual indicator calculations
         result = {
             "symbol": symbol,
             "indicators": {},
-            "calculation_date": timezone.now().isoformat()
+            "calculation_date": timezone.now().isoformat(),
         }
-        
+
         for indicator in indicators:
             if indicator == "sma":
                 result["indicators"]["sma_20"] = 150.25
@@ -1221,23 +1217,25 @@ class TechnicalAnalysisEngine:
                 result["indicators"]["macd_line"] = 1.25
                 result["indicators"]["macd_signal"] = 0.95
                 result["indicators"]["macd_histogram"] = 0.30
-                
+
         return result
 
-    def generate_recommendations(self, symbol: str, analysis_date: Optional[datetime] = None) -> Dict:
+    def generate_recommendations(
+        self, symbol: str, analysis_date: Optional[datetime] = None
+    ) -> Dict:
         """
         Generate stock recommendations based on technical analysis.
-        
+
         Args:
             symbol: Stock symbol
             analysis_date: Date for analysis (defaults to current time)
-            
+
         Returns:
             Dictionary containing recommendations
         """
         if analysis_date is None:
             analysis_date = timezone.now()
-            
+
         # Placeholder implementation
         return {
             "symbol": symbol,
@@ -1248,17 +1246,19 @@ class TechnicalAnalysisEngine:
             "resistance_levels": [160.00, 165.00],
             "risk_factors": ["Market volatility", "Sector rotation"],
             "catalysts": ["Earnings release", "Technical breakout"],
-            "analysis_date": analysis_date.isoformat()
+            "analysis_date": analysis_date.isoformat(),
         }
 
-    def optimize_portfolio(self, portfolio_id: int, objective: str = "maximize_return") -> Dict:
+    def optimize_portfolio(
+        self, portfolio_id: int, objective: str = "maximize_return"
+    ) -> Dict:
         """
         Optimize portfolio allocation based on technical analysis.
-        
+
         Args:
             portfolio_id: Portfolio ID to optimize
             objective: Optimization objective ("maximize_return", "minimize_risk", "balanced")
-            
+
         Returns:
             Dictionary containing optimization results
         """
@@ -1271,17 +1271,17 @@ class TechnicalAnalysisEngine:
             "expected_return": 0.12,
             "expected_risk": 0.15,
             "optimization_date": timezone.now().isoformat(),
-            "rebalancing_needed": True
+            "rebalancing_needed": True,
         }
 
     def assess_portfolio_risk(self, portfolio_id: int, time_horizon: int = 252) -> Dict:
         """
         Assess portfolio risk metrics.
-        
+
         Args:
             portfolio_id: Portfolio ID to assess
             time_horizon: Time horizon in days for risk calculation
-            
+
         Returns:
             Dictionary containing risk assessment
         """
@@ -1295,17 +1295,19 @@ class TechnicalAnalysisEngine:
             "beta": 1.15,
             "correlation_matrix": {},
             "sector_concentrations": {},
-            "assessment_date": timezone.now().isoformat()
+            "assessment_date": timezone.now().isoformat(),
         }
 
-    def calculate_performance_metrics(self, portfolio_id: int, benchmark: str = "^GSPC") -> Dict:
+    def calculate_performance_metrics(
+        self, portfolio_id: int, benchmark: str = "^GSPC"
+    ) -> Dict:
         """
         Calculate portfolio performance metrics.
-        
+
         Args:
             portfolio_id: Portfolio ID to analyze
             benchmark: Benchmark symbol for comparison
-            
+
         Returns:
             Dictionary containing performance metrics
         """
@@ -1323,5 +1325,5 @@ class TechnicalAnalysisEngine:
             "win_rate": 0.65,
             "calmar_ratio": 0.85,
             "sortino_ratio": 1.35,
-            "calculation_date": timezone.now().isoformat()
+            "calculation_date": timezone.now().isoformat(),
         }

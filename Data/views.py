@@ -18,16 +18,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
-from Data.serializers import (
-    MarketStatusSerializer,
-    PortfolioDetailSerializer,
-    PortfolioHoldingSerializer,
-    PortfolioSerializer,
-    StockDetailSerializer,
-    StockPriceSerializer,
-    StockSearchSerializer,
-    StockSerializer,
-)
+from Data.serializers import (MarketStatusSerializer,
+                              PortfolioDetailSerializer,
+                              PortfolioHoldingSerializer, PortfolioSerializer,
+                              StockDetailSerializer, StockPriceSerializer,
+                              StockSearchSerializer, StockSerializer)
 from Data.services.yahoo_finance import yahoo_finance_service
 
 
@@ -690,6 +685,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
             if "quantity" in request.data:
                 try:
                     from decimal import Decimal
+
                     quantity = Decimal(str(request.data["quantity"]))
                     if quantity <= 0:
                         return Response(
@@ -706,6 +702,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
             if "average_price" in request.data:
                 try:
                     from decimal import Decimal
+
                     average_price = Decimal(str(request.data["average_price"]))
                     if average_price <= 0:
                         return Response(
@@ -777,7 +774,9 @@ class PortfolioViewSet(viewsets.ModelViewSet):
 
         for holding in holdings:
             percentage = float(
-                (float(holding.current_value) / float(total_value) * 100) if total_value > 0 else 0
+                (float(holding.current_value) / float(total_value) * 100)
+                if total_value > 0
+                else 0
             )
 
             # Stock allocation
@@ -805,12 +804,16 @@ class PortfolioViewSet(viewsets.ModelViewSet):
         # Calculate percentages after aggregating all values to avoid rounding drift
         for sector_data in allocation["by_sector"].values():
             sector_data["percentage"] = float(
-                (float(sector_data["value"]) / float(total_value) * 100) if total_value > 0 else 0
+                (float(sector_data["value"]) / float(total_value) * 100)
+                if total_value > 0
+                else 0
             )
 
         for industry_data in allocation["by_industry"].values():
             industry_data["percentage"] = float(
-                (float(industry_data["value"]) / float(total_value) * 100) if total_value > 0 else 0
+                (float(industry_data["value"]) / float(total_value) * 100)
+                if total_value > 0
+                else 0
             )
 
         # Sort by value
