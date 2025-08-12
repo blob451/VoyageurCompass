@@ -252,8 +252,13 @@ class PortfolioViewSetTestCase(APITestCase):
         mock_validate.return_value = True
         mock_get_stock_data.return_value = {"symbol": "MSFT"}
 
-        # Create MSFT stock
-        Stock.objects.create(symbol="MSFT", short_name="Microsoft")
+        # Don't create MSFT stock beforehand to test the validation path
+        # The view will call validate_symbol and get_stock_data, then create the stock
+        def create_stock_side_effect(*args, **kwargs):
+            Stock.objects.create(symbol="MSFT", short_name="Microsoft")
+            return {"symbol": "MSFT"}
+        
+        mock_get_stock_data.side_effect = create_stock_side_effect
 
         url = reverse("data:portfolio-add-holding", args=[self.portfolio.id])
         data = {

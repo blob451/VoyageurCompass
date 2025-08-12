@@ -30,7 +30,7 @@ class AuthenticationTestCase(APITestCase):
 
     def test_user_registration(self):
         """Test user registration endpoint."""
-        url = reverse("core:auth-register")
+        url = reverse("core:register")
         data = {
             "username": "newuser",
             "email": "newuser@example.com",
@@ -52,7 +52,7 @@ class AuthenticationTestCase(APITestCase):
 
     def test_user_registration_password_mismatch(self):
         """Test registration with password mismatch."""
-        url = reverse("core:auth-register")
+        url = reverse("core:register")
         data = {
             "username": "newuser",
             "email": "newuser@example.com",
@@ -68,7 +68,7 @@ class AuthenticationTestCase(APITestCase):
 
     def test_user_registration_duplicate_username(self):
         """Test registration with existing username."""
-        url = reverse("core:auth-register")
+        url = reverse("core:register")
         data = {
             "username": "testuser",  # Already exists
             "email": "another@example.com",
@@ -82,7 +82,7 @@ class AuthenticationTestCase(APITestCase):
 
     def test_user_login(self):
         """Test user login endpoint."""
-        url = reverse("core:auth-login")
+        url = reverse("core:token_obtain_pair")
         data = {"username": "testuser", "password": "testpass123"}
         response = self.client.post(url, data, format="json")
 
@@ -94,7 +94,7 @@ class AuthenticationTestCase(APITestCase):
 
     def test_user_login_invalid_credentials(self):
         """Test login with invalid credentials."""
-        url = reverse("core:auth-login")
+        url = reverse("core:token_obtain_pair")
         data = {"username": "testuser", "password": "wrongpassword"}
         response = self.client.post(url, data, format="json")
 
@@ -106,7 +106,7 @@ class AuthenticationTestCase(APITestCase):
         # Get initial tokens
         refresh = RefreshToken.for_user(self.user)
 
-        url = reverse("core:auth-refresh")
+        url = reverse("core:token_refresh")
         data = {"refresh": str(refresh)}
         response = self.client.post(url, data, format="json")
 
@@ -115,7 +115,7 @@ class AuthenticationTestCase(APITestCase):
 
     def test_token_refresh_invalid(self):
         """Test token refresh with invalid token."""
-        url = reverse("core:auth-refresh")
+        url = reverse("core:token_refresh")
         data = {"refresh": "invalid_token"}
         response = self.client.post(url, data, format="json")
 
@@ -137,7 +137,7 @@ class AuthenticationTestCase(APITestCase):
     def test_user_profile(self):
         """Test user profile endpoint."""
         self.client.force_authenticate(user=self.user)
-        url = reverse("core:auth-profile")
+        url = reverse("core:user_profile")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -146,7 +146,7 @@ class AuthenticationTestCase(APITestCase):
 
     def test_user_profile_unauthenticated(self):
         """Test profile access without authentication."""
-        url = reverse("core:auth-profile")
+        url = reverse("core:user_profile")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -154,7 +154,7 @@ class AuthenticationTestCase(APITestCase):
     def test_update_user_profile(self):
         """Test updating user profile."""
         self.client.force_authenticate(user=self.user)
-        url = reverse("core:auth-profile")
+        url = reverse("core:user_profile")
         data = {
             "first_name": "Updated",
             "last_name": "Name",
@@ -181,7 +181,7 @@ class HealthCheckTestCase(APITestCase):
 
     def test_health_check(self):
         """Test basic health check endpoint."""
-        url = reverse("core:health-check")
+        url = reverse("core:health_check")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -316,7 +316,7 @@ class PermissionTestCase(APITestCase):
         """Test that protected endpoints require authentication."""
         # This would test specific protected endpoints
         # For now, testing profile endpoint as an example
-        url = reverse("core:auth-profile")
+        url = reverse("core:user_profile")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -348,7 +348,7 @@ class PermissionTestCase(APITestCase):
 
     def test_cors_headers(self):
         """Test CORS headers are properly set."""
-        url = reverse("core:health-check")
+        url = reverse("core:health_check")
         response = self.client.get(url)
 
         # Check for CORS headers (if CORS is enabled)
@@ -372,14 +372,14 @@ class ErrorHandlingTestCase(APITestCase):
 
     def test_method_not_allowed(self):
         """Test method not allowed error."""
-        url = reverse("core:health-check")
+        url = reverse("core:health_check")
         response = self.client.post(url)  # GET-only endpoint
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_validation_error_response(self):
         """Test validation error response format."""
-        url = reverse("core:auth-register")
+        url = reverse("core:register")
         data = {}  # Empty data should cause validation errors
         response = self.client.post(url, data, format="json")
 
@@ -388,7 +388,7 @@ class ErrorHandlingTestCase(APITestCase):
 
     def test_authentication_error_response(self):
         """Test authentication error response format."""
-        url = reverse("core:auth-profile")
+        url = reverse("core:user_profile")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -408,7 +408,7 @@ class RateLimitingTestCase(APITestCase):
 
         from rest_framework.throttling import AnonRateThrottle
 
-        url = reverse("core:health-check")
+        url = reverse("core:health_check")
 
         # Test with mocked throttle to verify rate limiting behavior
         with patch(
@@ -467,7 +467,7 @@ class SecurityTestCase(APITestCase):
         user = User.objects.create_user(username="testuser", password="testpass123")
 
         # Login to get tokens
-        url = reverse("core:auth-login")
+        url = reverse("core:token_obtain_pair")
         data = {"username": "testuser", "password": "testpass123"}
         response = self.client.post(url, data, format="json")
 
@@ -476,7 +476,7 @@ class SecurityTestCase(APITestCase):
 
         # Test that access token works
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
-        profile_url = reverse("core:auth-profile")
+        profile_url = reverse("core:user_profile")
         response = self.client.get(profile_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -485,7 +485,7 @@ class SecurityTestCase(APITestCase):
 
     def test_password_requirements(self):
         """Test password strength requirements."""
-        url = reverse("core:auth-register")
+        url = reverse("core:register")
 
         # Test too short password (less than 8 characters)
         data = {
@@ -557,7 +557,7 @@ class SecurityTestCase(APITestCase):
         from django.contrib.auth.models import User
 
         # Test malicious input in username field during registration
-        url = reverse("core:auth-register")
+        url = reverse("core:register")
         malicious_username = "admin'; DROP TABLE auth_user; --"
 
         data = {
@@ -575,7 +575,7 @@ class SecurityTestCase(APITestCase):
         self.assertTrue(User.objects.count() >= initial_user_count)
 
         # Test malicious input in login
-        login_url = reverse("core:auth-login")
+        login_url = reverse("core:token_obtain_pair")
         login_data = {"username": "admin' OR '1'='1", "password": "any_password"}
         response = self.client.post(login_url, login_data, format="json")
 
@@ -587,7 +587,7 @@ class SecurityTestCase(APITestCase):
         from django.contrib.auth.models import User
 
         # Test XSS in user profile fields during registration
-        url = reverse("core:auth-register")
+        url = reverse("core:register")
         xss_payload = '<script>alert("XSS")</script>'
 
         data = {
@@ -609,7 +609,7 @@ class SecurityTestCase(APITestCase):
             self.assertEqual(user.first_name, xss_payload)
 
             # Test that API responses are properly serialized (no script execution)
-            profile_url = reverse("core:auth-profile")
+            profile_url = reverse("core:user_profile")
             self.client.force_authenticate(user=user)
             profile_response = self.client.get(profile_url)
 

@@ -253,7 +253,7 @@ class FullWorkflowIntegrationTest(APITestCase):
         """Test analytics functionality with real data."""
 
         # Step 1: Get stock analysis
-        analysis_url = reverse("analytics:stock-analysis", args=["AAPL"])
+        analysis_url = reverse("analytics:analyze_stock", args=["AAPL"])
         analysis_response = self.client.get(analysis_url)
 
         self.assertEqual(analysis_response.status_code, status.HTTP_200_OK)
@@ -318,7 +318,7 @@ class FullWorkflowIntegrationTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
         # Step 2: Test invalid stock symbol
-        invalid_stock_url = reverse("analytics:stock-analysis", args=["INVALID"])
+        invalid_stock_url = reverse("analytics:analyze_stock", args=["INVALID"])
         response = self.client.get(invalid_stock_url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 

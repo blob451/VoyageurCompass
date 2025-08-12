@@ -689,7 +689,8 @@ class PortfolioViewSet(viewsets.ModelViewSet):
             # Update fields if provided with validation
             if "quantity" in request.data:
                 try:
-                    quantity = float(request.data["quantity"])
+                    from decimal import Decimal
+                    quantity = Decimal(str(request.data["quantity"]))
                     if quantity <= 0:
                         return Response(
                             {"error": "Quantity must be a positive number"},
@@ -704,7 +705,8 @@ class PortfolioViewSet(viewsets.ModelViewSet):
 
             if "average_price" in request.data:
                 try:
-                    average_price = float(request.data["average_price"])
+                    from decimal import Decimal
+                    average_price = Decimal(str(request.data["average_price"]))
                     if average_price <= 0:
                         return Response(
                             {"error": "Average price must be a positive number"},
@@ -775,7 +777,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
 
         for holding in holdings:
             percentage = float(
-                (holding.current_value / total_value * 100) if total_value > 0 else 0
+                (float(holding.current_value) / total_value * 100) if total_value > 0 else 0
             )
 
             # Stock allocation
