@@ -7,7 +7,11 @@ from django.core.management.base import BaseCommand
 from django.db import connection
 
 from Data.models import (
-    DataSourceChoices, Portfolio, PortfolioHolding, Stock, StockPrice,
+    DataSourceChoices,
+    Portfolio,
+    PortfolioHolding,
+    Stock,
+    StockPrice,
 )
 
 

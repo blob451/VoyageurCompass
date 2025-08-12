@@ -308,9 +308,16 @@ if DEBUG:
     ]
 else:
     # Production: require explicit origins from environment
+    # For CI/CD testing, allow a default if TESTING environment variable is set
     corsOrigins = env.list("CORS_ALLOWED_ORIGINS", default=[])
     if not corsOrigins:
-        raise ImproperlyConfigured("CORS_ALLOWED_ORIGINS must be set in production!")
+        # Check if we're in a CI/CD testing environment
+        if env.bool("TESTING", default=False) or env.bool("CI", default=False):
+            corsOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+        else:
+            raise ImproperlyConfigured(
+                "CORS_ALLOWED_ORIGINS must be set in production!"
+            )
 
 CORS_ALLOWED_ORIGINS = corsOrigins
 

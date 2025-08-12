@@ -20,11 +20,14 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import (
-    SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView,
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
 )
 
 from Core.views import (
-    healthCheck as health_check_liveness, readinessCheck as readiness_check,
+    healthCheck as health_check_liveness,
+    readinessCheck as readiness_check,
 )
 
 urlpatterns = [

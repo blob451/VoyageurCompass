@@ -12,7 +12,12 @@ from django.db import connection, models, transaction
 from django.utils import timezone
 
 from Data.models import (
-    DataIndustry, DataIndustryPrice, DataSector, DataSectorPrice, Stock, StockPrice,
+    DataIndustry,
+    DataIndustryPrice,
+    DataSector,
+    DataSectorPrice,
+    Stock,
+    StockPrice,
 )
 from Data.services.yahoo_finance import create_yahoo_finance_service
 
