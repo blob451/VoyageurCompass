@@ -357,17 +357,17 @@ jobs:
       run: |
         echo "Running Bandit security scan..."
         if bandit -r . --configfile pyproject.toml; then
-          echo "✅ No security issues found"
+          echo "PASS No security issues found"
         else
           exit_code=$?
-          echo "⚠️ Security scan found issues (exit code: $exit_code)"
+          echo "WARN Security scan found issues (exit code: $exit_code)"
           echo "This may include low-severity issues that don't block deployment"
           # Only fail if exit code indicates critical issues (not just findings)
           if [ $exit_code -eq 2 ]; then
-            echo "❌ Critical security scan error"
+            echo "FAIL Critical security scan error"
             exit 2
           else
-            echo "ℹ️ Security findings reported but not blocking pipeline"
+            echo "INFO Security findings reported but not blocking pipeline"
             exit 0
           fi
         fi
@@ -424,7 +424,7 @@ jobs:
           if curl -f http://localhost:8000/healthz >/dev/null 2>&1; then
             echo "Django server is ready!"
             echo "Testing additional endpoints..."
-            curl -f http://localhost:8000/api/v1/health/ >/dev/null 2>&1 && echo "✅ API health endpoint ready"
+            curl -f http://localhost:8000/api/v1/health/ >/dev/null 2>&1 && echo "PASS API health endpoint ready"
             break
           fi
           if [ $i -eq 30 ]; then
@@ -444,9 +444,9 @@ jobs:
         if [ -f django.pid ]; then
           DJANGO_PID=$(cat django.pid)
           if ps -p $DJANGO_PID > /dev/null; then
-            echo "✅ Django server is still running (PID: $DJANGO_PID)"
+            echo "PASS Django server is still running (PID: $DJANGO_PID)"
           else
-            echo "❌ Django server stopped. Restarting..."
+            echo "FAIL Django server stopped. Restarting..."
             python manage.py runserver 0.0.0.0:8000 &
             echo $! > django.pid
             sleep 10
@@ -455,7 +455,7 @@ jobs:
         
         # Final connectivity test
         echo "Final connectivity test before ZAP scan..."
-        curl -f http://localhost:8000/healthz >/dev/null 2>&1 && echo "✅ Server accessible" || exit 1
+        curl -f http://localhost:8000/healthz >/dev/null 2>&1 && echo "PASS Server accessible" || exit 1
         
         # Create ZAP working directory and set permissions
         sudo chmod 755 .
@@ -485,7 +485,7 @@ jobs:
     # Phase 5.4: Container Image Security Scanning  
     - name: Build security test image
       run: |
-        echo "::group::🐳 Building container for security scanning"
+        echo "::group::Building container for security scanning"
         docker build -t voyageur-security-test:latest .
         echo "::endgroup::"
 
@@ -499,59 +499,59 @@ jobs:
     # Phase 5.4: Secrets Detection Enhancement
     - name: Enhanced secrets scanning
       run: |
-        echo "::group::🔍 Phase 5.4: Enhanced Secrets Detection"
+        echo "::group::Analyzing Phase 5.4: Enhanced Secrets Detection"
         
         # Install additional secret detection tools
         pip install detect-secrets
         
         # Run comprehensive secrets scan
-        echo "🔎 Scanning for secrets in codebase..."
+        echo "Scanning for secrets in codebase..."
         detect-secrets scan --all-files --baseline .secrets.baseline || true
         
         # Check for common secret patterns
-        echo "🔍 Checking for common credential patterns..."
+        echo "Checking for common credential patterns..."
         if grep -r -E "(password|secret|key|token).*=.*['\"][^'\"]{8,}" . --exclude-dir=.git --exclude="*.md" --exclude-dir=node_modules --exclude-dir=__pycache__ || true; then
-          echo "⚠️  Potential hardcoded credentials detected - review above matches"
+          echo "WARN  Potential hardcoded credentials detected - review above matches"
         else
-          echo "✅ No obvious hardcoded credentials found"
+          echo "PASS No obvious hardcoded credentials found"
         fi
         
         # Verify no secrets in environment files
-        echo "🔐 Checking environment file patterns..."
+        echo "Security Checking environment file patterns..."
         find . -name "*.env*" -type f -exec echo "Found env file: {}" \;
         
-        echo "✅ Secrets scanning completed"
+        echo "PASS Secrets scanning completed"
         echo "::endgroup::"
 
     # Phase 5.4: Security Policy Validation
     - name: Security policy compliance check
       run: |
-        echo "::group::📋 Security Policy Compliance Validation"
+        echo "::group::Policy Security Policy Compliance Validation"
         
         # Check Docker security best practices
-        echo "🐳 Validating Docker security practices..."
+        echo "Container Validating Docker security practices..."
         if grep -q "USER" Dockerfile; then
-          echo "✅ Non-root user configured in Dockerfile"
+          echo "PASS Non-root user configured in Dockerfile"
         else
-          echo "⚠️  Consider adding non-root user to Dockerfile"
+          echo "WARN  Consider adding non-root user to Dockerfile"
         fi
         
         # Check for security headers in Django settings
-        echo "⚙️  Validating Django security configuration..."
+        echo "Config  Validating Django security configuration..."
         if grep -q "SECURE_" VoyageurCompass/settings.py; then
-          echo "✅ Security headers configured"
+          echo "PASS Security headers configured"
         else
-          echo "⚠️  Consider adding security headers configuration"
+          echo "WARN  Consider adding security headers configuration"
         fi
         
         # Validate CORS configuration
         if grep -q "CORS_" VoyageurCompass/settings.py; then
-          echo "✅ CORS configuration found"
+          echo "PASS CORS configuration found"
         else
-          echo "⚠️  CORS configuration may need review"
+          echo "WARN  CORS configuration may need review"
         fi
         
-        echo "📊 Security compliance check completed"
+        echo "Metrics Security compliance check completed"
         echo "::endgroup::"
 
     # Upload security scan results
@@ -770,7 +770,7 @@ jobs:
 
     - name: Collect Pipeline Metrics
       run: |
-        echo "::group::📊 Phase 5.4: Pipeline Execution Metrics"
+        echo "::group::Metrics Phase 5.4: Pipeline Execution Metrics"
         
         # Calculate pipeline execution time
         PIPELINE_END_TIME=$(date +%s)
@@ -778,7 +778,7 @@ jobs:
         PIPELINE_DURATION=$((PIPELINE_END_TIME - PIPELINE_START_UNIX))
         
         # Collect job statuses
-        echo "🔍 Pipeline Execution Analysis:"
+        echo "Analyzing Pipeline Execution Analysis:"
         echo "  Pipeline ID: ${{ env.WORKFLOW_ID }}"
         echo "  Commit SHA: ${{ env.COMMIT_SHA }}"
         echo "  Branch: ${{ env.BRANCH_NAME }}"
@@ -789,16 +789,16 @@ jobs:
         echo ""
         
         # Job execution metrics
-        echo "📋 Job Execution Summary:"
-        echo "  ✅ Quick Checks: ${{ needs.quick-checks.result }}"
-        echo "  ✅ Backend Tests: ${{ needs.backend-tests.result }}"
-        echo "  ✅ Frontend Tests: ${{ needs.frontend-tests.result }}"
-        echo "  ✅ Integration Tests: ${{ needs.integration-tests.result }}"
-        echo "  ⚠️  Performance Tests: ${{ needs.performance-tests.result }}"
-        echo "  ⚠️  Security Scan: ${{ needs.security-scan.result }}"
-        echo "  ✅ Code Quality: ${{ needs.code-quality.result }}"
-        echo "  ✅ Build Test: ${{ needs.build-test.result }}"
-        echo "  ✅ Quality Dashboard: ${{ needs.quality-dashboard.result }}"
+        echo "Policy Job Execution Summary:"
+        echo "  PASS Quick Checks: ${{ needs.quick-checks.result }}"
+        echo "  PASS Backend Tests: ${{ needs.backend-tests.result }}"
+        echo "  PASS Frontend Tests: ${{ needs.frontend-tests.result }}"
+        echo "  PASS Integration Tests: ${{ needs.integration-tests.result }}"
+        echo "  WARN  Performance Tests: ${{ needs.performance-tests.result }}"
+        echo "  WARN  Security Scan: ${{ needs.security-scan.result }}"
+        echo "  PASS Code Quality: ${{ needs.code-quality.result }}"
+        echo "  PASS Build Test: ${{ needs.build-test.result }}"
+        echo "  PASS Quality Dashboard: ${{ needs.quality-dashboard.result }}"
         echo ""
         
         # Calculate success metrics
@@ -816,7 +816,7 @@ jobs:
         
         SUCCESS_RATE=$((SUCCESSFUL_JOBS * 100 / TOTAL_JOBS))
         
-        echo "📈 Pipeline Performance Metrics:"
+        echo "Status Pipeline Performance Metrics:"
         echo "  Success Rate: ${SUCCESS_RATE}% (${SUCCESSFUL_JOBS}/${TOTAL_JOBS} jobs)"
         echo "  Critical Path Status: ${{ needs.backend-tests.result == 'success' && needs.code-quality.result == 'success' && 'PASSED' || 'FAILED' }}"
         echo "  Pipeline Health: ${{ success() && 'HEALTHY' || failure() && 'CRITICAL' || 'WARNING' }}"
@@ -849,7 +849,7 @@ jobs:
         }
         EOF
         
-        echo "💾 Pipeline metrics saved to pipeline_metrics.json"
+        echo "Saved Pipeline metrics saved to pipeline_metrics.json"
         echo "::endgroup::"
 
     - name: Upload Pipeline Metrics
@@ -876,7 +876,7 @@ jobs:
 
     - name: Generate comprehensive status report
       run: |
-        echo "::group::🚀 VoyageurCompass CI/CD Pipeline Status Report"
+        echo "::group::Ready VoyageurCompass CI/CD Pipeline Status Report"
         echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
         echo "Workflow: ${{ github.workflow }}"
         echo "Run ID: ${{ github.run_id }}"
@@ -885,7 +885,7 @@ jobs:
         echo ""
         
         # Job status summary
-        echo "📊 Job Results:"
+        echo "Metrics Job Results:"
         echo "  Quick Checks: ${{ needs.quick-checks.result }}"
         echo "  Backend Tests: ${{ needs.backend-tests.result }}"
         echo "  Frontend Tests: ${{ needs.frontend-tests.result }}"
@@ -896,16 +896,16 @@ jobs:
         echo "  Build Test: ${{ needs.build-test.result }}"
         echo "  Quality Dashboard: ${{ needs.quality-dashboard.result }}"
         echo ""
-        echo "📈 Quality Gates Status:"
-        echo "  Performance Monitoring: ${{ needs.performance-tests.result == 'success' && '✅ Passed' || '❌ Failed' }}"
-        echo "  Security Compliance: ${{ needs.security-scan.result == 'success' && '✅ Passed' || '❌ Failed' }}"
-        echo "  Code Quality Gates: ${{ needs.code-quality.result == 'success' && '✅ Passed' || '❌ Failed' }}"
-        echo "  Quality Dashboard: ${{ needs.quality-dashboard.result == 'success' && '✅ Generated' || '❌ Failed' }}"
+        echo "Status Quality Gates Status:"
+        echo "  Performance Monitoring: ${{ needs.performance-tests.result == 'success' && 'PASS Passed' || 'FAIL Failed' }}"
+        echo "  Security Compliance: ${{ needs.security-scan.result == 'success' && 'PASS Passed' || 'FAIL Failed' }}"
+        echo "  Code Quality Gates: ${{ needs.code-quality.result == 'success' && 'PASS Passed' || 'FAIL Failed' }}"
+        echo "  Quality Dashboard: ${{ needs.quality-dashboard.result == 'success' && 'PASS Generated' || 'FAIL Failed' }}"
         echo ""
         
         # Quality metrics summary (if available)
         if [ -f "quality_metrics_report.json" ]; then
-          echo "🎯 Quality Metrics Summary:"
+          echo "Target Quality Metrics Summary:"
           # Extract key metrics using jq if available, or grep as fallback
           if command -v jq >/dev/null 2>&1; then
             OVERALL_SCORE=$(jq -r '.quality_score.overall_score // "N/A"' quality_metrics_report.json)
@@ -940,13 +940,13 @@ jobs:
           case $job in
             "backend-tests")
               if [[ "${{ needs.backend-tests.result }}" != "success" ]]; then
-                echo "❌ Critical job failed: $job"
+                echo "FAIL Critical job failed: $job"
                 CRITICAL_FAILED=true
               fi
               ;;
             "code-quality")
               if [[ "${{ needs.code-quality.result }}" != "success" ]]; then
-                echo "❌ Critical job failed: $job"
+                echo "FAIL Critical job failed: $job"
                 CRITICAL_FAILED=true
               fi
               ;;
@@ -958,25 +958,25 @@ jobs:
           case $job in
             "frontend-tests")
               if [[ "${{ needs.frontend-tests.result }}" != "success" ]]; then
-                echo "⚠️ Important job failed: $job"
+                echo "WARN Important job failed: $job"
                 IMPORTANT_FAILED=true
               fi
               ;;
             "security-scan")
               if [[ "${{ needs.security-scan.result }}" != "success" ]]; then
-                echo "⚠️ Important job failed: $job"
+                echo "WARN Important job failed: $job"
                 IMPORTANT_FAILED=true
               fi
               ;;
             "performance-tests")
               if [[ "${{ needs.performance-tests.result }}" != "success" ]]; then
-                echo "⚠️ Important job failed: $job"
+                echo "WARN Important job failed: $job"
                 IMPORTANT_FAILED=true
               fi
               ;;
             "quality-dashboard")
               if [[ "${{ needs.quality-dashboard.result }}" != "success" ]]; then
-                echo "⚠️ Important job failed: $job"
+                echo "WARN Important job failed: $job"
                 IMPORTANT_FAILED=true
               fi
               ;;
@@ -986,18 +986,18 @@ jobs:
         # Final decision
         if [[ "$CRITICAL_FAILED" == "true" ]]; then
           echo ""
-          echo "💥 Pipeline FAILED - Critical jobs failed"
-          echo "🔧 Action required: Fix critical issues before merging"
+          echo "CRITICAL Pipeline FAILED - Critical jobs failed"
+          echo "ACTION Action required: Fix critical issues before merging"
           exit 1
         elif [[ "$IMPORTANT_FAILED" == "true" ]]; then
           echo ""
-          echo "⚠️ Pipeline completed with WARNINGS"
-          echo "📝 Recommendation: Address warnings before merging"
+          echo "WARN Pipeline completed with WARNINGS"
+          echo "NOTE Recommendation: Address warnings before merging"
           exit 0
         else
           echo ""
-          echo "✅ Pipeline PASSED - All checks successful!"
-          echo "🚀 Ready for merge"
+          echo "PASS Pipeline PASSED - All checks successful!"
+          echo "Ready for merge"
           exit 0
         fi
 
@@ -1010,14 +1010,14 @@ jobs:
     - name: Success notification
       if: needs.status-report.result == 'success'
       run: |
-        echo "🎉 VoyageurCompass CI/CD Pipeline completed successfully!"
-        echo "✅ All quality gates passed"
-        echo "🚀 Ready for deployment"
+        echo "SUCCESS VoyageurCompass CI/CD Pipeline completed successfully!"
+        echo "PASS All quality gates passed"
+        echo "Ready Ready for deployment"
 
     - name: Failure notification
       if: needs.status-report.result == 'failure'
       run: |
-        echo "❌ VoyageurCompass CI/CD Pipeline failed!"
-        echo "🔍 Check the status report for details"
-        echo "🛠️ Action required before merge"
+        echo "FAIL VoyageurCompass CI/CD Pipeline failed!"
+        echo "Analyzing Check the status report for details"
+        echo "REPAIR Action required before merge"
         exit 1
