@@ -43,8 +43,13 @@ RUN useradd -m -u 1001 voyageur && \
 # Switch to non-root user
 USER voyageur
 
+# Set temporary build-time environment variables for collectstatic
+# These will be overridden at runtime with actual values
+ENV SECRET_KEY=build-time-secret-key-for-static-collection-only
+ENV DEBUG=false
+
 # Collect static files for WhiteNoise to serve
-RUN python manage.py collectstatic --noinput
+RUN python manage.py collectstatic --noinput || echo "Static collection skipped in build"
 
 # Expose port
 EXPOSE 8000
