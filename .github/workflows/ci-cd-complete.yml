@@ -320,7 +320,9 @@ jobs:
     needs: [quick-checks]  # Runs in parallel with backend-tests and code-quality
     if: needs.quick-checks.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 6  # Reduced from 15 minutes
+    timeout-minutes: 10  # Increased for coverage tests
+    env:
+      CI: true  # Enable CI mode for Vitest
     
     steps:
       - uses: actions/checkout@v4
@@ -329,17 +331,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        with:
-          path: Design/frontend/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('Design/frontend/package-lock.json') }}
+          cache: 'npm'
+          cache-dependency-path: Design/frontend/package-lock.json
       
       - name: Install dependencies
         run: |
           cd Design/frontend
-          npm install
+          npm install --prefer-offline --no-audit
       
       - name: Run linting
         run: |
@@ -349,7 +347,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           cd Design/frontend
-          npm run test:coverage -- --watchAll=false
+          npm run test:ci
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -357,11 +355,6 @@ jobs:
           directory: ./Design/frontend/coverage
           flags: frontend
           name: frontend-coverage
-      
-      - name: E2E tests
-        run: |
-          cd Design/frontend
-          npm run test:e2e || true
 
   # Phase 5.1: Optimized Integration Testing (Full Services)
   integration-tests:

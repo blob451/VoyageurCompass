@@ -11,6 +11,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
+    "test:ci": "vitest run --coverage --reporter=verbose",
     "perf:audit": "lhci autorun",
     "perf:upload": "lhci upload"
   },
@@ -26,6 +27,21 @@
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.1.1",
     "recharts": "^2.15.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "overrides": {
+    "react-router": {
+      "engines": {
+        "node": ">=18.0.0"
+      }
+    },
+    "react-router-dom": {
+      "engines": {
+        "node": ">=18.0.0"
+      }
+    }
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

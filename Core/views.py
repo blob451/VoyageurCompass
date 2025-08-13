@@ -602,7 +602,7 @@ def health_comprehensive(request):
     redis_healthy = True
     redis_status = "healthy"
 
-    if isinstance(caches['default'], DummyCache):
+    if isinstance(caches["default"], DummyCache):
         # In test environment with DummyCache - consider it healthy
         redis_status = "test_mode"
         redis_healthy = True

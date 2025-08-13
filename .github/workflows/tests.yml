@@ -115,12 +115,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: quick-checks
     if: needs.quick-checks.outputs.should-run-tests == 'true'
-
-    strategy:
-      matrix:
-        test-type: [lint, test]
-      fail-fast: true
-
+    timeout-minutes: 8
+    env:
+      CI: true
+    
     steps:
     - uses: actions/checkout@v4
 
@@ -131,46 +129,34 @@ jobs:
         cache: 'npm'
         cache-dependency-path: Design/frontend/package-lock.json
 
-    - name: Cache node_modules
-      uses: actions/cache@v4
-      with:
-        path: Design/frontend/node_modules
-        key: ${{ runner.os }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('Design/frontend/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-${{ env.NODE_VERSION }}-
-          ${{ runner.os }}-node-
-
     - name: Install frontend dependencies
       run: |
         cd Design/frontend
         npm install --prefer-offline --no-audit
 
     - name: Run frontend linting
-      if: matrix.test-type == 'lint'
       run: |
         cd Design/frontend
         npm run lint
 
-    - name: Run frontend tests
-      if: matrix.test-type == 'test'
+    - name: Run frontend tests with coverage
       run: |
         cd Design/frontend
-        npm run test:coverage
+        npm run test:ci
 
     - name: Upload frontend coverage
-      if: matrix.test-type == 'test'
       uses: actions/upload-artifact@v4
       with:
-        name: frontend-coverage
+        name: frontend-coverage-tests-workflow
         path: Design/frontend/coverage/
         retention-days: 7
 
     - name: Upload frontend coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
-        file: ./Design/frontend/coverage/clover.xml
+        directory: ./Design/frontend/coverage
         flags: frontend
-        name: frontend-coverage
+        name: frontend-coverage-tests
         fail_ci_if_error: false
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -244,46 +230,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend-tests, frontend-tests]
     if: needs.quick-checks.outputs.should-run-tests == 'true'
+    timeout-minutes: 15
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: test_voyageur_compass
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      
-      redis:
-        image: redis:7
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    env:
-      DJANGO_SETTINGS_MODULE: VoyageurCompass.settings
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_voyageur_compass
-      DB_NAME: test_voyageur_compass
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_HOST: localhost
-      DB_PORT: 5432
-      REDIS_URL: redis://localhost:6379/0
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
-      SECRET_KEY: test-secret-key-for-ci
-      DEBUG: false
-      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    # No services needed for frontend performance testing
 
     steps:
     - uses: actions/checkout@v4
@@ -554,15 +503,15 @@ jobs:
 
     - name: Build Docker images
       run: |
-        docker compose -f docker compose.yml build --no-cache
+        docker compose -f docker-compose.yml build --no-cache
 
     - name: Test Docker stack
       run: |
-        docker compose -f docker compose.yml up -d
+        docker compose -f docker-compose.yml up -d
         sleep 30
-        docker compose -f docker compose.yml ps
-        docker compose -f docker compose.yml logs
-        docker compose -f docker compose.yml down
+        docker compose -f docker-compose.yml ps
+        docker compose -f docker-compose.yml logs
+        docker compose -f docker-compose.yml down
 
   # Quality metrics dashboard
   quality-dashboard:

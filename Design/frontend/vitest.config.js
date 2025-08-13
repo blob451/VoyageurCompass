@@ -9,6 +9,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.jsx'],
     css: true,
+    // CI optimizations
+    watch: false,
+    run: process.env.CI === 'true',
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -59,8 +62,11 @@ export default defineConfig({
     restoreMocks: true,
     // Timeout for long-running tests
     testTimeout: 10000,
-    // Parallel test execution
-    threads: true,
+    // Parallel test execution - reduced for CI stability
+    threads: process.env.CI === 'true' ? 2 : true,
+    // CI-specific performance optimizations
+    minWorkers: process.env.CI === 'true' ? 1 : undefined,
+    maxWorkers: process.env.CI === 'true' ? 2 : undefined,
     // Test environment options
     environmentOptions: {
       jsdom: {
