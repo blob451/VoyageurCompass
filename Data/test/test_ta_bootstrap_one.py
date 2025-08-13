@@ -15,8 +15,15 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from Data.management.commands.ta_bootstrap_one import Command
-from Data.models import (DataIndustry, DataIndustryPrice, DataSector,
-                         DataSectorPrice, DataSourceChoices, Stock, StockPrice)
+from Data.models import (
+    DataIndustry,
+    DataIndustryPrice,
+    DataSector,
+    DataSectorPrice,
+    DataSourceChoices,
+    Stock,
+    StockPrice,
+)
 from Data.services.yahoo_finance import YahooFinanceService
 
 

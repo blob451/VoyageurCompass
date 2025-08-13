@@ -5,11 +5,12 @@ Comprehensive tests for Data app models.
 from datetime import date, timedelta
 from decimal import Decimal
 
-import pytest
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import timezone
+
+import pytest
 
 from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
 

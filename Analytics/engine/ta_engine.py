@@ -16,8 +16,12 @@ from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 from django.utils import timezone
 
 from Data.repo.analytics_writer import AnalyticsWriter
-from Data.repo.price_reader import (IndustryPriceData, PriceData, PriceReader,
-                                    SectorPriceData)
+from Data.repo.price_reader import (
+    IndustryPriceData,
+    PriceData,
+    PriceReader,
+    SectorPriceData,
+)
 
 logger = logging.getLogger(__name__)
 

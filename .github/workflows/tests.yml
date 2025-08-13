@@ -6,9 +6,54 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+# Cancel in-progress workflows on new pushes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Global environment variables
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+  DJANGO_SETTINGS_MODULE: VoyageurCompass.settings
+  SECRET_KEY: test-secret-key-for-ci
+  DEBUG: true
+  CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+
 jobs:
+  # Quick validation job to fail fast on critical issues
+  quick-checks:
+    runs-on: ubuntu-latest
+    outputs:
+      should-run-tests: ${{ steps.changes.outputs.should-run }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check for relevant changes
+      id: changes
+      run: |
+        if git diff --name-only ${{ github.event.before }}..${{ github.sha }} | grep -E '\.(py|js|jsx|ts|tsx|yml|yaml|json|md)$' > /dev/null; then
+          echo "should-run=true" >> $GITHUB_OUTPUT
+        else
+          echo "should-run=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Quick syntax and import checks
+      run: |
+        python -m py_compile manage.py
+        python -c "import django; print(f'Django version: {django.VERSION}')"
+
   backend-tests:
     runs-on: ubuntu-latest
+    needs: quick-checks
+    if: needs.quick-checks.outputs.should-run-tests == 'true'
     
     services:
       postgres:
@@ -36,7 +81,6 @@ jobs:
           - 6379:6379
 
     env:
-      DJANGO_SETTINGS_MODULE: VoyageurCompass.settings
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_voyageur_compass
       DB_NAME: test_voyageur_compass
       DB_USER: postgres
@@ -46,24 +90,22 @@ jobs:
       REDIS_URL: redis://localhost:6379/0
       REDIS_HOST: localhost
       REDIS_PORT: 6379
-      SECRET_KEY: test-secret-key-for-ci
-      DEBUG: true
-      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python 3.11
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v4
       with:
-        python-version: 3.11
+        python-version: ${{ env.PYTHON_VERSION }}
 
     - name: Cache pip dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        key: ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
+          ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-
           ${{ runner.os }}-pip-
 
     - name: Install dependencies
@@ -71,6 +113,16 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest-cov pytest-django
+
+    - name: Cache Django migrations
+      uses: actions/cache@v4
+      with:
+        path: |
+          */migrations/*.py
+          db.sqlite3
+        key: ${{ runner.os }}-django-migrations-${{ hashFiles('**/models.py') }}
+        restore-keys: |
+          ${{ runner.os }}-django-migrations-
 
     - name: Run Django checks
       run: python manage.py check
@@ -99,31 +151,57 @@ jobs:
 
   frontend-tests:
     runs-on: ubuntu-latest
+    needs: quick-checks
+    if: needs.quick-checks.outputs.should-run-tests == 'true'
+
+    strategy:
+      matrix:
+        test-type: [lint, test]
+      fail-fast: true
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Node.js 18
+    - name: Set up Node.js ${{ env.NODE_VERSION }}
       uses: actions/setup-node@v4
       with:
-        node-version: 18
+        node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         cache-dependency-path: Design/frontend/package-lock.json
+
+    - name: Cache node_modules
+      uses: actions/cache@v4
+      with:
+        path: Design/frontend/node_modules
+        key: ${{ runner.os }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('Design/frontend/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-${{ env.NODE_VERSION }}-
+          ${{ runner.os }}-node-
 
     - name: Install frontend dependencies
       run: |
         cd Design/frontend
-        npm ci
+        npm ci --prefer-offline --no-audit
 
     - name: Run frontend linting
+      if: matrix.test-type == 'lint'
       run: |
         cd Design/frontend
         npm run lint
 
     - name: Run frontend tests
+      if: matrix.test-type == 'test'
       run: |
         cd Design/frontend
         npm run test:coverage
+
+    - name: Upload frontend coverage
+      if: matrix.test-type == 'test'
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-coverage
+        path: Design/frontend/coverage/
+        retention-days: 7
 
     - name: Upload frontend coverage to Codecov
       uses: codecov/codecov-action@v4
@@ -223,13 +301,30 @@ jobs:
 
   code-quality:
     runs-on: ubuntu-latest
+    needs: quick-checks
+    if: needs.quick-checks.outputs.should-run-tests == 'true'
+    
+    strategy:
+      matrix:
+        tool: [black, isort, flake8]
+      fail-fast: false
+
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python 3.11
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v4
       with:
-        python-version: 3.11
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Cache pip dependencies for quality tools
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-quality-tools-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-quality-tools-${{ env.PYTHON_VERSION }}-
+          ${{ runner.os }}-quality-tools-
 
     - name: Install quality tools
       run: |
@@ -237,30 +332,25 @@ jobs:
         pip install black==25.1.0 isort==6.0.1 flake8==7.1.1
 
     - name: Run Black formatting check
-      run: black --check --diff .
+      if: matrix.tool == 'black'
+      run: |
+        echo "::group::Black formatting check"
+        black --check --diff .
+        echo "::endgroup::"
 
     - name: Run isort import sorting check
-      run: isort --check-only --diff .
+      if: matrix.tool == 'isort'
+      run: |
+        echo "::group::isort import sorting check"
+        isort --check-only --diff .
+        echo "::endgroup::"
 
     - name: Run Flake8 linting
-      run: flake8 .
-
-    - name: Set up Node.js for frontend quality checks
-      uses: actions/setup-node@v4
-      with:
-        node-version: 18
-        cache: 'npm'
-        cache-dependency-path: Design/frontend/package-lock.json
-
-    - name: Install frontend dependencies
+      if: matrix.tool == 'flake8'
       run: |
-        cd Design/frontend
-        npm ci
-
-    - name: Run frontend linting
-      run: |
-        cd Design/frontend
-        npm run lint
+        echo "::group::Flake8 linting check"
+        flake8 . --statistics --count
+        echo "::endgroup::"
 
   build-test:
     runs-on: ubuntu-latest
@@ -284,18 +374,114 @@ jobs:
         docker compose -f docker compose.yml logs
         docker compose -f docker compose.yml down
 
-  notify:
+  # Comprehensive status report
+  status-report:
     runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-tests, integration-tests, security-scan, code-quality, build-test]
+    needs: [quick-checks, backend-tests, frontend-tests, integration-tests, security-scan, code-quality, build-test]
     if: always()
     
     steps:
-    - name: Notify success
-      if: needs.backend-tests.result == 'success' && needs.frontend-tests.result == 'success'
-      run: echo "✅ All tests passed successfully!"
-
-    - name: Notify failure
-      if: needs.backend-tests.result == 'failure' || needs.frontend-tests.result == 'failure'
+    - name: Generate comprehensive status report
       run: |
-        echo "❌ Tests failed!"
+        echo "::group::🚀 VoyageurCompass CI/CD Pipeline Status Report"
+        echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        echo "Workflow: ${{ github.workflow }}"
+        echo "Run ID: ${{ github.run_id }}"
+        echo "Commit: ${{ github.sha }}"
+        echo "Branch: ${{ github.ref_name }}"
+        echo ""
+        
+        # Job status summary
+        echo "📊 Job Results:"
+        echo "  Quick Checks: ${{ needs.quick-checks.result }}"
+        echo "  Backend Tests: ${{ needs.backend-tests.result }}"
+        echo "  Frontend Tests: ${{ needs.frontend-tests.result }}"
+        echo "  Integration Tests: ${{ needs.integration-tests.result }}"
+        echo "  Security Scan: ${{ needs.security-scan.result }}"
+        echo "  Code Quality: ${{ needs.code-quality.result }}"
+        echo "  Build Test: ${{ needs.build-test.result }}"
+        echo "::endgroup::"
+
+    - name: Check overall success
+      run: |
+        # Define critical jobs that must pass
+        CRITICAL_JOBS=("backend-tests" "code-quality")
+        IMPORTANT_JOBS=("frontend-tests" "security-scan")
+        
+        CRITICAL_FAILED=false
+        IMPORTANT_FAILED=false
+        
+        # Check critical jobs
+        for job in "${CRITICAL_JOBS[@]}"; do
+          case $job in
+            "backend-tests")
+              if [[ "${{ needs.backend-tests.result }}" != "success" ]]; then
+                echo "❌ Critical job failed: $job"
+                CRITICAL_FAILED=true
+              fi
+              ;;
+            "code-quality")
+              if [[ "${{ needs.code-quality.result }}" != "success" ]]; then
+                echo "❌ Critical job failed: $job"
+                CRITICAL_FAILED=true
+              fi
+              ;;
+          esac
+        done
+        
+        # Check important jobs
+        for job in "${IMPORTANT_JOBS[@]}"; do
+          case $job in
+            "frontend-tests")
+              if [[ "${{ needs.frontend-tests.result }}" != "success" ]]; then
+                echo "⚠️ Important job failed: $job"
+                IMPORTANT_FAILED=true
+              fi
+              ;;
+            "security-scan")
+              if [[ "${{ needs.security-scan.result }}" != "success" ]]; then
+                echo "⚠️ Important job failed: $job"
+                IMPORTANT_FAILED=true
+              fi
+              ;;
+          esac
+        done
+        
+        # Final decision
+        if [[ "$CRITICAL_FAILED" == "true" ]]; then
+          echo ""
+          echo "💥 Pipeline FAILED - Critical jobs failed"
+          echo "🔧 Action required: Fix critical issues before merging"
+          exit 1
+        elif [[ "$IMPORTANT_FAILED" == "true" ]]; then
+          echo ""
+          echo "⚠️ Pipeline completed with WARNINGS"
+          echo "📝 Recommendation: Address warnings before merging"
+          exit 0
+        else
+          echo ""
+          echo "✅ Pipeline PASSED - All checks successful!"
+          echo "🚀 Ready for merge"
+          exit 0
+        fi
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [status-report]
+    if: always()
+    
+    steps:
+    - name: Success notification
+      if: needs.status-report.result == 'success'
+      run: |
+        echo "🎉 VoyageurCompass CI/CD Pipeline completed successfully!"
+        echo "✅ All quality gates passed"
+        echo "🚀 Ready for deployment"
+
+    - name: Failure notification
+      if: needs.status-report.result == 'failure'
+      run: |
+        echo "❌ VoyageurCompass CI/CD Pipeline failed!"
+        echo "🔍 Check the status report for details"
+        echo "🛠️ Action required before merge"
         exit 1

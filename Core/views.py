@@ -7,6 +7,7 @@ import logging
 
 from django.contrib.auth.models import User
 from django.db import connection
+
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
@@ -16,8 +17,12 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from Core.serializers import (ChangePasswordSerializer, UserProfileSerializer,
-                              UserRegistrationSerializer, UserSerializer)
+from Core.serializers import (
+    ChangePasswordSerializer,
+    UserProfileSerializer,
+    UserRegistrationSerializer,
+    UserSerializer,
+)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -220,8 +225,7 @@ class LogoutView(APIView):
     def post(self, request):
         """Logout user and blacklist refresh token."""
         try:
-            from rest_framework_simplejwt.token_blacklist.models import \
-                BlacklistedToken
+            from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
             refresh_token = request.data.get("refresh")
             if not refresh_token:
@@ -379,8 +383,9 @@ def health_redis(request):
     from datetime import datetime, timezone
 
     try:
-        import redis
         from django.conf import settings
+
+        import redis
 
         redis_client = redis.Redis(host=getattr(settings, "REDIS_HOST", "localhost"))
         redis_client.ping()
@@ -415,8 +420,9 @@ def health_comprehensive(request):
 
     redis_healthy = True
     try:
-        import redis
         from django.conf import settings
+
+        import redis
 
         redis_client = redis.Redis(host=getattr(settings, "REDIS_HOST", "localhost"))
         redis_client.ping()
@@ -534,8 +540,9 @@ def health_redis(request):
     logger = logging.getLogger("VoyageurCompass.health")
 
     try:
-        import redis
         from django.conf import settings
+
+        import redis
 
         # Try to connect to Redis
         redis_client = redis.Redis(
@@ -591,8 +598,9 @@ def health_comprehensive(request):
     # Check redis
     redis_healthy = True
     try:
-        import redis
         from django.conf import settings
+
+        import redis
 
         redis_client = redis.Redis(
             host=getattr(settings, "REDIS_HOST", "localhost"),

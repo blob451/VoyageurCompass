@@ -5,9 +5,10 @@ Comprehensive tests for Core app API views.
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
+
+import pytest
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken

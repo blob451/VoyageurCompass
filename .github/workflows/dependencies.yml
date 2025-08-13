@@ -1,0 +1,161 @@
+name: Dependency Management & Security
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch: # Allow manual triggering
+  push:
+    paths:
+      - 'requirements.txt'
+      - 'Design/frontend/package*.json'
+      - 'pyproject.toml'
+
+jobs:
+  dependency-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install safety pip-audit
+
+    - name: Run Python security scan
+      run: |
+        echo "::group::Python Security Scan (Safety)"
+        safety check --json --output safety-report.json || true
+        echo "::endgroup::"
+        
+        echo "::group::Python Security Audit (pip-audit)"
+        pip-audit --format=json --output=pip-audit-report.json || true
+        echo "::endgroup::"
+
+    - name: Set up Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: Design/frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      run: |
+        cd Design/frontend
+        npm ci
+
+    - name: Run frontend security audit
+      run: |
+        cd Design/frontend
+        echo "::group::NPM Security Audit"
+        npm audit --audit-level=moderate --json > ../npm-audit-report.json || true
+        echo "::endgroup::"
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-reports
+        path: |
+          safety-report.json
+          pip-audit-report.json
+          npm-audit-report.json
+        retention-days: 30
+
+  dependency-updates:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Check for Python package updates
+      run: |
+        pip install pip-tools
+        echo "::group::Checking for Python package updates"
+        pip list --outdated --format=json > python-outdated.json || true
+        echo "::endgroup::"
+
+    - name: Set up Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Check for frontend package updates
+      run: |
+        cd Design/frontend
+        echo "::group::Checking for frontend package updates"
+        npm outdated --json > ../frontend-outdated.json || true
+        echo "::endgroup::"
+
+    - name: Upload update reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-updates
+        path: |
+          python-outdated.json
+          frontend-outdated.json
+        retention-days: 30
+
+  license-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install license checker
+      run: |
+        pip install pip-licenses
+
+    - name: Check Python package licenses
+      run: |
+        pip install -r requirements.txt
+        echo "::group::Python Package Licenses"
+        pip-licenses --format=json --output-file=python-licenses.json
+        pip-licenses --format=markdown --output-file=python-licenses.md
+        echo "::endgroup::"
+
+    - name: Set up Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install frontend license checker
+      run: |
+        npm install -g license-checker
+
+    - name: Check frontend package licenses
+      run: |
+        cd Design/frontend
+        npm ci
+        echo "::group::Frontend Package Licenses"
+        license-checker --json --out ../frontend-licenses.json
+        license-checker --markdown --out ../frontend-licenses.md
+        echo "::endgroup::"
+
+    - name: Upload license reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: license-reports
+        path: |
+          python-licenses.json
+          python-licenses.md
+          frontend-licenses.json
+          frontend-licenses.md
+        retention-days: 90

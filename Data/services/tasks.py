@@ -7,10 +7,11 @@ import json
 import time
 from datetime import datetime, timedelta
 
-from celery import shared_task
-from celery.utils.log import get_task_logger
 from django.core.cache import cache
 from django.utils import timezone
+
+from celery import shared_task
+from celery.utils.log import get_task_logger
 
 logger = get_task_logger(__name__)
 

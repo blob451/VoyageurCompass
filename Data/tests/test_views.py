@@ -6,9 +6,10 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
-import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
+
+import pytest
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 

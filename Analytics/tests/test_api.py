@@ -6,9 +6,10 @@ Tests the full API flow including authentication and data validation.
 from datetime import date, timedelta
 from decimal import Decimal
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+
+import pytest
 from rest_framework import status
 from rest_framework.test import APITestCase
 

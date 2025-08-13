@@ -10,6 +10,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import LoginPage from './LoginPage'
 import authReducer from '../features/auth/authSlice'
+import { apiSlice } from '../features/api/apiSlice'
 
 // Mock the useNavigate hook for React Router v7
 const mockNavigate = vi.fn()
@@ -21,12 +22,29 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-// Create a test store
+// Mock the login mutation hook
+const mockLoginMutation = vi.fn()
+vi.mock('../features/api/apiSlice', () => ({
+  useLoginMutation: () => [
+    mockLoginMutation,
+    { isLoading: false, error: null }
+  ],
+  apiSlice: {
+    reducer: (state = {}) => state,
+    reducerPath: 'api',
+    middleware: [],
+  }
+}))
+
+// Create a test store with mocked API slice
 const createTestStore = () => {
   return configureStore({
     reducer: {
       auth: authReducer,
+      api: apiSlice.reducer,
     },
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware().concat(apiSlice.middleware),
   })
 }
 
@@ -45,7 +63,7 @@ const renderWithProviders = (component) => {
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    window.fetch = vi.fn()
+    
     // Clear localStorage to prevent auto-redirect
     Object.defineProperty(window, 'localStorage', {
       value: {
@@ -56,6 +74,9 @@ describe('LoginPage', () => {
       },
       writable: true,
     })
+    
+    // Reset the mock login mutation
+    mockLoginMutation.mockReset()
   })
 
   it('renders login form with all required elements', () => {
@@ -95,19 +116,20 @@ describe('LoginPage', () => {
 
   it('successfully logs in and redirects on valid credentials', async () => {
     // Mock successful login response
-    window.fetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        access: 'fake-jwt-token',
-        refresh: 'fake-refresh-token',
-        user: {
-          id: 1,
-          username: 'testuser',
-          email: 'test@example.com'
-        }
-      })
-    })
+    const mockLoginResponse = {
+      access: 'fake-jwt-token',
+      refresh: 'fake-refresh-token',
+      user: {
+        id: 1,
+        username: 'testuser',
+        email: 'test@example.com'
+      }
+    }
+    
+    // Setup the mock to return a successful unwrap() result
+    mockLoginMutation.mockImplementation(() => ({
+      unwrap: () => Promise.resolve(mockLoginResponse)
+    }))
     
     renderWithProviders(<LoginPage />)
     
@@ -119,12 +141,17 @@ describe('LoginPage', () => {
     fireEvent.change(passwordInput, { target: { value: 'testpass123' } })
     fireEvent.click(submitButton)
     
-    // Wait for the login to complete and navigation to occur
+    // Wait for the login mutation to be called
+    await waitFor(() => {
+      expect(mockLoginMutation).toHaveBeenCalledWith({
+        username: 'testuser',
+        password: 'testpass123'
+      })
+    })
+    
+    // Wait for navigation to occur after successful login
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/dashboard')
-    }, { timeout: 3000 })
-    
-    // Verify that fetch was called (RTK Query will handle the details)
-    expect(window.fetch).toHaveBeenCalled()
+    }, { timeout: 1000 })
   })
 })

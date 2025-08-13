@@ -12,17 +12,23 @@ from django.db import models
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
-from Data.serializers import (MarketStatusSerializer,
-                              PortfolioDetailSerializer,
-                              PortfolioHoldingSerializer, PortfolioSerializer,
-                              StockDetailSerializer, StockPriceSerializer,
-                              StockSearchSerializer, StockSerializer)
+from Data.serializers import (
+    MarketStatusSerializer,
+    PortfolioDetailSerializer,
+    PortfolioHoldingSerializer,
+    PortfolioSerializer,
+    StockDetailSerializer,
+    StockPriceSerializer,
+    StockSearchSerializer,
+    StockSerializer,
+)
 from Data.services.yahoo_finance import yahoo_finance_service
 
 

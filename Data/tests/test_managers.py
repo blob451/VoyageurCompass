@@ -5,9 +5,10 @@ Tests StockQuerySet methods (real, mock, active) and StockManager/RealDataManage
 to ensure proper filtering, chaining, and handling of edge cases.
 """
 
-import pytest
 from django.db import models
 from django.test import TestCase
+
+import pytest
 
 from Data.managers import DATA_SOURCE_MOCK, DATA_SOURCE_YAHOO
 from Data.models import DataSourceChoices, Stock

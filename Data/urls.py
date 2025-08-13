@@ -3,13 +3,23 @@ URL configuration for Data app.
 """
 
 from django.urls import include, path
+
 from rest_framework.routers import DefaultRouter
 
-from Data.market_views import (bulk_price_update, compare_stocks,
-                               economic_calendar, market_overview,
-                               sector_performance, sync_watchlist)
-from Data.views import (PortfolioHoldingViewSet, PortfolioViewSet,
-                        StockPriceViewSet, StockViewSet)
+from Data.market_views import (
+    bulk_price_update,
+    compare_stocks,
+    economic_calendar,
+    market_overview,
+    sector_performance,
+    sync_watchlist,
+)
+from Data.views import (
+    PortfolioHoldingViewSet,
+    PortfolioViewSet,
+    StockPriceViewSet,
+    StockViewSet,
+)
 
 app_name = "data"
 

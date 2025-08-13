@@ -16,8 +16,9 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 
-import environ
 from django.core.exceptions import ImproperlyConfigured
+
+import environ
 
 # Guard Sentry import to prevent crashes when package not installed
 try:
