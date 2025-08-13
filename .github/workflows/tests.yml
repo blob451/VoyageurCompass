@@ -283,8 +283,143 @@ jobs:
       run: |
         pytest tests/test_integration.py -v --tb=short
 
+  performance-tests:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    if: needs.quick-checks.outputs.should-run-tests == 'true'
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_voyageur_compass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    env:
+      DJANGO_SETTINGS_MODULE: VoyageurCompass.settings
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_voyageur_compass
+      DB_NAME: test_voyageur_compass
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: 5432
+      REDIS_URL: redis://localhost:6379/0
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      SECRET_KEY: test-secret-key-for-ci
+      DEBUG: false
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # Backend Performance Testing
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Install backend dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run database migrations
+      run: python manage.py migrate
+
+    - name: Establish API performance baselines
+      run: |
+        python manage.py establish_performance_baselines --runs 5 --output performance_baselines.json --verbose
+
+    - name: Upload performance baselines
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-baselines
+        path: performance_baselines.json
+        retention-days: 30
+
+    # Frontend Performance Testing
+    - name: Set up Node.js ${{ env.NODE_VERSION }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: Design/frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      run: |
+        cd Design/frontend
+        npm ci --prefer-offline --no-audit
+
+    - name: Build frontend for performance testing
+      run: |
+        cd Design/frontend
+        npm run build
+
+    - name: Install Lighthouse CI
+      run: npm install -g @lhci/cli@0.12.x
+
+    - name: Run Lighthouse CI
+      run: |
+        cd Design/frontend
+        lhci autorun
+      env:
+        LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+    - name: Upload Lighthouse results
+      uses: actions/upload-artifact@v4
+      with:
+        name: lighthouse-results
+        path: Design/frontend/lighthouse-results/
+        retention-days: 7
+
   security-scan:
     runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_voyageur_compass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DJANGO_SETTINGS_MODULE: VoyageurCompass.settings
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_voyageur_compass
+      DB_NAME: test_voyageur_compass
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: 5432
+      SECRET_KEY: test-secret-key-for-ci
+      DEBUG: false
+
     steps:
     - uses: actions/checkout@v4
 
@@ -296,9 +431,10 @@ jobs:
     - name: Install security tools
       run: |
         python -m pip install --upgrade pip
-        pip install bandit[toml] safety
+        pip install bandit[toml] safety semgrep
 
-    - name: Run Bandit security scan
+    # Static Application Security Testing (SAST)
+    - name: Run Bandit SAST scan
       run: |
         echo "Running Bandit security scan..."
         if bandit -r . --configfile pyproject.toml; then
@@ -317,8 +453,84 @@ jobs:
           fi
         fi
 
-    - name: Check for known security vulnerabilities
-      run: safety check --json || true
+    - name: Run Semgrep SAST scan
+      run: |
+        echo "Running Semgrep security scan..."
+        semgrep --config=auto --json --output=semgrep-results.json . || true
+        echo "Semgrep scan completed"
+
+    # Dependency vulnerability scanning
+    - name: Check Python dependencies for vulnerabilities
+      run: |
+        echo "Checking Python dependencies for known vulnerabilities..."
+        safety check --json --output safety-results.json || true
+        echo "Python dependency scan completed"
+
+    - name: Set up Node.js for frontend security scanning
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install npm audit tools
+      run: |
+        cd Design/frontend
+        npm ci --prefer-offline --no-audit
+
+    - name: Run npm audit for frontend dependencies
+      run: |
+        cd Design/frontend
+        echo "Checking frontend dependencies for vulnerabilities..."
+        npm audit --audit-level=moderate --json > ../npm-audit-results.json || true
+        echo "Frontend dependency scan completed"
+
+    # OWASP ZAP Dynamic Application Security Testing (DAST)
+    - name: Install backend dependencies for DAST
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run database migrations for DAST
+      run: python manage.py migrate
+
+    - name: Start Django server for DAST
+      run: |
+        python manage.py runserver 8000 &
+        sleep 10
+        echo "Django server started for DAST testing"
+
+    - name: Run OWASP ZAP Baseline Scan
+      uses: zaproxy/action-baseline@v0.7.0
+      with:
+        target: 'http://localhost:8000'
+        rules_file_name: '.zap/rules.tsv'
+        cmd_options: '-a'
+
+    # Container security scanning
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    # Upload security scan results
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-scan-results
+        path: |
+          semgrep-results.json
+          safety-results.json
+          npm-audit-results.json
+          trivy-results.sarif
+        retention-days: 30
+
+    # Upload to GitHub Security tab
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
 
   code-quality:
     runs-on: ubuntu-latest
@@ -395,13 +607,82 @@ jobs:
         docker compose -f docker compose.yml logs
         docker compose -f docker compose.yml down
 
-  # Comprehensive status report
-  status-report:
+  # Quality metrics dashboard
+  quality-dashboard:
     runs-on: ubuntu-latest
-    needs: [quick-checks, backend-tests, frontend-tests, integration-tests, security-scan, code-quality, build-test]
+    needs: [backend-tests, frontend-tests, performance-tests, security-scan, code-quality]
     if: always()
     
     steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Install dependencies for quality report
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Download coverage artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-coverage
+        path: Design/frontend/coverage/
+      continue-on-error: true
+
+    - name: Download performance baselines
+      uses: actions/download-artifact@v4
+      with:
+        name: performance-baselines
+        path: .
+      continue-on-error: true
+
+    - name: Download lighthouse results
+      uses: actions/download-artifact@v4
+      with:
+        name: lighthouse-results
+        path: Design/frontend/lighthouse-results/
+      continue-on-error: true
+
+    - name: Download security scan results
+      uses: actions/download-artifact@v4
+      with:
+        name: security-scan-results
+        path: .
+      continue-on-error: true
+
+    - name: Generate comprehensive quality report
+      run: |
+        python manage.py generate_quality_report --output quality_metrics_report.json --html --verbose
+
+    - name: Upload quality dashboard
+      uses: actions/upload-artifact@v4
+      with:
+        name: quality-dashboard
+        path: |
+          quality_metrics_report.json
+          quality_metrics_report.html
+        retention-days: 30
+
+  # Comprehensive status report
+  status-report:
+    runs-on: ubuntu-latest
+    needs: [quick-checks, backend-tests, frontend-tests, integration-tests, performance-tests, security-scan, code-quality, build-test, quality-dashboard]
+    if: always()
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download quality dashboard
+      uses: actions/download-artifact@v4
+      with:
+        name: quality-dashboard
+        path: .
+      continue-on-error: true
+
     - name: Generate comprehensive status report
       run: |
         echo "::group::🚀 VoyageurCompass CI/CD Pipeline Status Report"
@@ -418,16 +699,47 @@ jobs:
         echo "  Backend Tests: ${{ needs.backend-tests.result }}"
         echo "  Frontend Tests: ${{ needs.frontend-tests.result }}"
         echo "  Integration Tests: ${{ needs.integration-tests.result }}"
+        echo "  Performance Tests: ${{ needs.performance-tests.result }}"
         echo "  Security Scan: ${{ needs.security-scan.result }}"
         echo "  Code Quality: ${{ needs.code-quality.result }}"
         echo "  Build Test: ${{ needs.build-test.result }}"
+        echo "  Quality Dashboard: ${{ needs.quality-dashboard.result }}"
+        echo ""
+        echo "📈 Quality Gates Status:"
+        echo "  Performance Monitoring: ${{ needs.performance-tests.result == 'success' && '✅ Passed' || '❌ Failed' }}"
+        echo "  Security Compliance: ${{ needs.security-scan.result == 'success' && '✅ Passed' || '❌ Failed' }}"
+        echo "  Code Quality Gates: ${{ needs.code-quality.result == 'success' && '✅ Passed' || '❌ Failed' }}"
+        echo "  Quality Dashboard: ${{ needs.quality-dashboard.result == 'success' && '✅ Generated' || '❌ Failed' }}"
+        echo ""
+        
+        # Quality metrics summary (if available)
+        if [ -f "quality_metrics_report.json" ]; then
+          echo "🎯 Quality Metrics Summary:"
+          # Extract key metrics using jq if available, or grep as fallback
+          if command -v jq >/dev/null 2>&1; then
+            OVERALL_SCORE=$(jq -r '.quality_score.overall_score // "N/A"' quality_metrics_report.json)
+            GRADE=$(jq -r '.quality_score.grade // "N/A"' quality_metrics_report.json)
+            COVERAGE=$(jq -r '.test_coverage.overall_coverage.percentage // "N/A"' quality_metrics_report.json)
+            CODE_ISSUES=$(jq -r '[.code_quality | to_entries[] | select(.value.issues) | .value.issues] | add // 0' quality_metrics_report.json)
+            SECURITY_ISSUES=$(jq -r '[.security.bandit_issues | to_entries[] | .value] | add // 0' quality_metrics_report.json)
+            
+            echo "  Overall Quality Score: ${OVERALL_SCORE}/100 (Grade: ${GRADE})"
+            echo "  Test Coverage: ${COVERAGE}%"
+            echo "  Code Quality Issues: ${CODE_ISSUES}"
+            echo "  Security Issues: ${SECURITY_ISSUES}"
+          else
+            echo "  Quality report generated (JSON parsing not available)"
+          fi
+        else
+          echo "  Quality metrics: Not available"
+        fi
         echo "::endgroup::"
 
     - name: Check overall success
       run: |
         # Define critical jobs that must pass
         CRITICAL_JOBS=("backend-tests" "code-quality")
-        IMPORTANT_JOBS=("frontend-tests" "security-scan")
+        IMPORTANT_JOBS=("frontend-tests" "security-scan" "performance-tests" "quality-dashboard")
         
         CRITICAL_FAILED=false
         IMPORTANT_FAILED=false
@@ -461,6 +773,18 @@ jobs:
               ;;
             "security-scan")
               if [[ "${{ needs.security-scan.result }}" != "success" ]]; then
+                echo "⚠️ Important job failed: $job"
+                IMPORTANT_FAILED=true
+              fi
+              ;;
+            "performance-tests")
+              if [[ "${{ needs.performance-tests.result }}" != "success" ]]; then
+                echo "⚠️ Important job failed: $job"
+                IMPORTANT_FAILED=true
+              fi
+              ;;
+            "quality-dashboard")
+              if [[ "${{ needs.quality-dashboard.result }}" != "success" ]]; then
                 echo "⚠️ Important job failed: $job"
                 IMPORTANT_FAILED=true
               fi

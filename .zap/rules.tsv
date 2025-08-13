@@ -1,0 +1,94 @@
+# ZAP Scanning Rules for VoyageurCompass
+# Format: ID	THRESHOLD	[INSTANCE_THRESHOLD]	[URL_REGEX]	[PARAMETER_REGEX]	[OTHER_INFO_REGEX]
+#
+# THRESHOLD values:
+#   IGNORE = Ignore the rule
+#   INFO = Informational level
+#   LOW = Low risk
+#   MEDIUM = Medium risk  
+#   HIGH = High risk
+#   FAIL = Fail the build
+
+# Ignore certain rules that are not applicable or cause false positives
+10021	IGNORE	# X-Content-Type-Options header missing (handled by Django middleware)
+10020	IGNORE	# X-Frame-Options header missing (handled by Django middleware)
+10016	IGNORE	# Web Browser XSS Protection Not Enabled (modern browsers handle this)
+10054	IGNORE	# Cookie without SameSite Attribute (Django handles this)
+
+# Set important security rules to FAIL to block deployment
+40012	FAIL	# Cross Site Scripting (Reflected)
+40014	FAIL	# Cross Site Scripting (Persistent)
+40018	FAIL	# SQL Injection
+40019	FAIL	# SQL Injection - MySQL
+40020	FAIL	# SQL Injection - Hypersonic SQL
+40021	FAIL	# SQL Injection - Oracle
+40022	FAIL	# SQL Injection - PostgreSQL
+90018	FAIL	# SQL Injection - SQLite
+7	FAIL	# Remote File Inclusion
+6	FAIL	# Path Traversal
+42	FAIL	# Source Code Disclosure - SVN
+
+# Set medium risk issues to HIGH to ensure they're addressed
+10095	HIGH	# Backup File Disclosure
+10098	HIGH	# Cross-Domain Misconfiguration
+40003	HIGH	# CRLF Injection
+40008	HIGH	# Parameter Tampering
+40009	HIGH	# Server Side Include
+40013	HIGH	# Session Fixation
+40016	HIGH	# Cross Site Scripting (Persistent) - Prime
+40017	HIGH	# Cross Site Scripting (Persistent) - Spider
+90019	HIGH	# Code Injection
+90020	HIGH	# Command Injection
+90021	HIGH	# XPath Injection
+
+# Set informational and low risk items to INFO or LOW
+10010	INFO	# Cookie No HttpOnly Flag
+10011	INFO	# Cookie Without Secure Flag
+10015	INFO	# Incomplete or No Cache-control and Pragma HTTP Header Set
+10017	INFO	# Cross-Domain JavaScript Source File Inclusion
+10018	INFO	# Secure Pages Include Mixed HTTP Content
+10019	INFO	# Content-Type Header Missing
+10023	INFO	# Information Disclosure - Debug Error Messages
+10024	INFO	# Information Disclosure - Sensitive Information in URL
+10025	INFO	# Information Disclosure - Sensitive Information in HTTP Referrer Header
+10026	INFO	# HTTP Parameter Override
+10027	INFO	# Information Disclosure - Suspicious Comments
+10028	INFO	# Open Redirect
+10029	INFO	# Cookie Poisoning
+10030	INFO	# User Controllable Charset
+10031	INFO	# User Controllable HTML Element Attribute (Potential XSS)
+10032	INFO	# Viewstate without MAC Signature (Unsure)
+10033	LOW	# Directory Browsing
+10034	LOW	# Heartbleed OpenSSL Vulnerability (Indicative)
+10035	LOW	# Strict-Transport-Security Header Not Set
+10036	LOW	# Server Leaks Version Information via "Server" HTTP Response Header Field
+10037	LOW	# Server Leaks Information via "X-Powered-By" HTTP Response Header Field(s)
+10038	LOW	# Content Security Policy (CSP) Header Not Set
+10040	LOW	# Secure Pages Include Mixed HTTP Content (Including HTTPS to HTTP)
+10041	LOW	# HTTP to HTTPS Insecure Transition in Form Post
+10042	LOW	# HTTPS to HTTP Insecure Transition in Form Post
+10043	LOW	# User Controllable JavaScript Event (XSS)
+10044	LOW	# Big Redirect Detected (Potential Sensitive Information Leak)
+10045	LOW	# Source Code Disclosure - /WEB-INF folder
+10046	LOW	# Generic Error Messages Disclosure
+10047	LOW	# GET for POST
+10048	LOW	# ShellShock CVE-2014-6271
+10049	LOW	# Content Cacheability
+10050	LOW	# Retrieved from Cache
+10051	LOW	# Relative Path Confusion
+10052	LOW	# X-ChromeLogger-Data (XCOLD) Header Information Leak
+10055	LOW	# CSP Scanner: Wildcard Directive
+10056	LOW	# CSP Scanner: Missing Anti-clickjacking Directive
+10057	LOW	# Username Hash Found
+10061	LOW	# X-AspNet-Version Response Header
+10062	LOW	# PII Scanner
+10063	LOW	# Feature Policy Header Not Set
+10096	LOW	# Timestamp Disclosure
+10097	LOW	# Hash Disclosure
+10104	LOW	# User Agent Fuzzer
+10105	LOW	# Weak Authentication Method
+10106	LOW	# HTTP Only Site
+10107	LOW	# Httpoxy - Proxy Header Misuse
+10108	LOW	# Reverse Tabnabbing
+10109	LOW	# Modern Web Application
+10110	LOW	# Dangerous JS Functions

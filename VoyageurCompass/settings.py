@@ -90,6 +90,8 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # Add WhiteNoise for static file serving
     "Core.middleware.CustomCorsMiddleware",  # Use custom CORS middleware with preflight handling
+    "Core.middleware.performance.PerformanceMonitoringMiddleware",  # Performance monitoring
+    "Core.middleware.performance.DatabasePerformanceMiddleware",  # Database performance monitoring
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
