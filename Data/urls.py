@@ -28,7 +28,9 @@ router = DefaultRouter()
 router.register(r"stocks", StockViewSet, basename="stock")
 router.register(r"prices", StockPriceViewSet, basename="price")
 router.register(r"portfolios", PortfolioViewSet, basename="portfolio")
-router.register(r"portfolio", PortfolioViewSet, basename="portfolio-alt")  # Alternative URL for performance tests
+router.register(
+    r"portfolio", PortfolioViewSet, basename="portfolio-alt"
+)  # Alternative URL for performance tests
 router.register(r"holdings", PortfolioHoldingViewSet, basename="holding")
 
 # Additional URL patterns for custom views

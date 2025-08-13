@@ -92,7 +92,7 @@ class Command(BaseCommand):
             {
                 "name": "stocks_list",
                 "method": "GET",
-                "url": "/api/v1/data/stocks/",
+                "url": "/api/v1/stocks/",
                 "data": None,
                 "auth_required": True,
                 "budget_ms": 1000,
@@ -100,7 +100,7 @@ class Command(BaseCommand):
             {
                 "name": "portfolio_list",
                 "method": "GET",
-                "url": "/api/v1/data/portfolio/",
+                "url": "/api/v1/portfolio/",
                 "data": None,
                 "auth_required": True,
                 "budget_ms": 800,
@@ -109,7 +109,7 @@ class Command(BaseCommand):
             {
                 "name": "analytics_indicators",
                 "method": "GET",
-                "url": "/api/v1/analytics/indicators/",
+                "url": "/api/v1/indicators/",
                 "data": None,
                 "auth_required": True,
                 "budget_ms": 2000,

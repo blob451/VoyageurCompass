@@ -330,6 +330,7 @@ jobs:
       DB_PORT: 5432
       SECRET_KEY: test-secret-key-for-ci
       DEBUG: false
+      SECURE_SSL_REDIRECT: false
 
     steps:
     - uses: actions/checkout@v4
