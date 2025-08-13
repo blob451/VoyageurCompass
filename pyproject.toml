@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+extend-exclude = '''
+(
+  /(
+    \\.eggs
+    | \\.git
+    | \\.hg
+    | \\.mypy_cache
+    | \\.pytest_cache
+    | \\.tox
+    | \\.venv
+    | venv
+    | \\.env
+    | _build
+    | buck-out
+    | build
+    | dist
+    | migrations
+    | Design/frontend/node_modules
+  )/
+)
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip_glob = ["*/migrations/*", "Design/frontend/node_modules/*"]
+known_django = "django"
+known_first_party = ["Analytics", "Core", "Data", "VoyageurCompass"]
+sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "VoyageurCompass.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+addopts = "--tb=short --strict-markers"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+[tool.coverage.run]
+source = ["Analytics", "Core", "Data"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/test_*",
+    "*/venv/*",
+    "*/node_modules/*",
+    "manage.py",
+    "*/settings/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

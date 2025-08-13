@@ -69,3 +69,9 @@ webencodings==0.5.1
 whitenoise==6.9.0
 yfinance==0.2.65
 sentry-sdk[django]==1.40.0
+
+# Development tools for code quality
+black==25.1.0
+isort==6.0.1
+flake8==7.1.1
+pre-commit==4.0.1
