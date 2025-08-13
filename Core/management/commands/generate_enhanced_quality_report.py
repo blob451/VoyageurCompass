@@ -276,29 +276,28 @@ class Command(BaseCommand):
                 <p>Phase 5.4 Enhanced Pipeline Observability & Monitoring</p>
                 <p>Generated: {data['report_metadata']['generated_at']}</p>
             </div>
-            
+
             <div class="metric-card">
                 <h2>Overall Assessment</h2>
-                <div class="score">{data['overall_assessment']['overall_score']}/100 
+                <div class="score">{data['overall_assessment']['overall_score']}/100
                     <span class="grade">Grade: {data['overall_assessment']['grade']}</span>
                 </div>
                 <p><strong>Assessment Level:</strong> {data['overall_assessment']['assessment_level']}</p>
             </div>
-            
+
             <div class="metric-card">
                 <h2>Pipeline Performance</h2>
                 <p><strong>Success Rate:</strong> {data['pipeline_metrics']['success_rate_percent']}%</p>
                 <p><strong>Jobs:</strong> {data['pipeline_metrics']['successful_jobs']}/{data['pipeline_metrics']['total_jobs']}</p>
                 <p><strong>Execution Time:</strong> {data['pipeline_metrics']['execution_time_seconds']}s</p>
             </div>
-            
+
             <div class="metric-card">
                 <h2>Security Posture</h2>
                 <p><strong>Container Security:</strong> Enhanced scanning implemented</p>
                 <p><strong>Secrets Detection:</strong> No secrets detected</p>
                 <p><strong>Compliance:</strong> Security headers configured</p>
             </div>
-            
             <div class="recommendations">
                 <h2>Recommendations</h2>
                 <ul>
