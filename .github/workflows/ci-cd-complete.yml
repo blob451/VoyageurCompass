@@ -19,7 +19,8 @@ on:
 env:
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '18'
-  DJANGO_SETTINGS_MODULE: VoyageurCompass.settings
+  DJANGO_SETTINGS_MODULE: VoyageurCompass.test_settings
+  TEST_FAST_MODE: true
   SECRET_KEY: ${{ secrets.SECRET_KEY || 'test-secret-key-for-ci' }}
   DEBUG: ${{ github.ref != 'refs/heads/main' }}
   CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
@@ -250,46 +251,16 @@ jobs:
             performance_baselines.json
             .lighthouseci/
 
-  # Phase 4A: Enhanced Backend Testing
+  # Phase 5.1: Optimized Backend Testing (Performance Enhanced)
   backend-tests:
-    name: Backend Tests
+    name: Backend Tests (Optimized)
     needs: [quick-checks, code-quality]
     if: needs.quick-checks.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 8  # Reduced from 20 minutes
     
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_voyageur_compass
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      
-      redis:
-        image: redis:7
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-    
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_voyageur_compass
-      REDIS_URL: redis://localhost:6379/0
-      DB_NAME: test_voyageur_compass
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_HOST: localhost
-      DB_PORT: 5432
+    # Removed PostgreSQL/Redis services for unit tests (using SQLite in-memory)
+    # Services only needed for integration tests
     
     steps:
       - uses: actions/checkout@v4
@@ -303,25 +274,27 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
+          key: ${{ runner.os }}-pip-optimized-${{ hashFiles('requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-optimized-
+            ${{ runner.os }}-pip-
       
-      - name: Install dependencies
+      - name: Install dependencies with performance tools
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest-cov pytest-django
+          pip install pytest-cov pytest-django pytest-xdist==3.7.0 pytest-benchmark==4.0.0
       
-      - name: Run migrations
+      - name: Run optimized backend tests with parallelization
         run: |
-          python manage.py migrate --no-input
-      
-      - name: Run backend tests with coverage
-        run: |
-          pytest --cov=Data --cov=Analytics --cov=Core \
+          pytest -n auto --dist=worksteal \
+                 --cov=Data --cov=Analytics --cov=Core \
                  --cov-report=xml --cov-report=html \
                  --cov-report=term-missing \
                  --cov-branch \
                  --junit-xml=test-results.xml \
+                 --durations=10 \
+                 --reuse-db --nomigrations \
                  -v
       
       - name: Upload coverage to Codecov
@@ -341,13 +314,13 @@ jobs:
             htmlcov/
             coverage.xml
 
-  # Phase 4A: Enhanced Frontend Testing
+  # Phase 5.1: Optimized Frontend Testing
   frontend-tests:
-    name: Frontend Tests
-    needs: [quick-checks, code-quality]
+    name: Frontend Tests (Optimized)
+    needs: [quick-checks]  # Runs in parallel with backend-tests and code-quality
     if: needs.quick-checks.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 6  # Reduced from 15 minutes
     
     steps:
       - uses: actions/checkout@v4
@@ -390,12 +363,12 @@ jobs:
           cd Design/frontend
           npm run test:e2e || true
 
-  # Phase 4A: Integration Testing
+  # Phase 5.1: Optimized Integration Testing (Full Services)
   integration-tests:
-    name: Integration Tests
-    needs: [backend-tests, frontend-tests]
+    name: Integration Tests (Full Stack)
+    needs: [backend-tests, frontend-tests]  # Sequential after optimized unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 12  # Reduced from 25 minutes
     
     services:
       postgres:
