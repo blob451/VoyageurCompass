@@ -79,10 +79,22 @@ DEBUG = False
 USE_TZ = False  # Faster datetime handling in tests
 SECRET_KEY = "test-secret-key-not-for-production"
 
-# Disable template caching
-TEMPLATES[0]["OPTIONS"]["loaders"] = [
-    "django.template.loaders.filesystem.Loader",
-    "django.template.loaders.app_directories.Loader",
+# Configure templates for tests - disable caching and fix loader conflict
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,  # Use APP_DIRS instead of explicit loaders
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+            # Remove loaders specification to avoid conflict with APP_DIRS=True
+        },
+    },
 ]
 
 # Keep essential apps but remove heavy ones
