@@ -17,33 +17,33 @@ class Command(BaseCommand):
     """
     Management command to generate comprehensive quality metrics report.
     """
-    
-    help = 'Generate comprehensive quality metrics dashboard report'
+
+    help = "Generate comprehensive quality metrics dashboard report"
 
     def add_arguments(self, parser):
         """Add command line arguments."""
         parser.add_argument(
-            '--output',
+            "--output",
             type=str,
-            default='quality_metrics_report.json',
-            help='Output file for quality report (default: quality_metrics_report.json)'
+            default="quality_metrics_report.json",
+            help="Output file for quality report (default: quality_metrics_report.json)"
         )
         parser.add_argument(
-            '--html',
+            "--html",
             action='store_true',
-            help='Generate HTML dashboard report'
+            help="Generate HTML dashboard report"
         )
         parser.add_argument(
-            '--verbose',
+            "--verbose",
             action='store_true',
-            help='Enable verbose output'
+            help="Enable verbose output"
         )
 
     def handle(self, *args, **options):
         """Main command handler."""
-        self.output_file = options['output']
-        self.generate_html = options['html']
-        self.verbose = options['verbose']
+        self.output_file = options["output"]
+        self.generate_html = options["html"]
+        self.verbose = options["verbose"]
         
         self.stdout.write(
             self.style.SUCCESS('Generating comprehensive quality metrics report...')
@@ -51,23 +51,23 @@ class Command(BaseCommand):
         
         # Collect all quality metrics
         quality_report = {
-            'metadata': {
-                'generated_at': datetime.now().isoformat(),
-                'project_name': 'VoyageurCompass',
-                'report_version': '1.0'
+            "metadata": {
+                "generated_at": datetime.now().isoformat(),
+                "project_name": "VoyageurCompass",
+                "report_version": "1.0"
             },
-            'code_quality': self._collect_code_quality_metrics(),
-            'test_coverage': self._collect_coverage_metrics(),
-            'security': self._collect_security_metrics(),
-            'performance': self._collect_performance_metrics(),
-            'dependencies': self._collect_dependency_metrics(),
-            'code_complexity': self._collect_complexity_metrics(),
-            'technical_debt': self._calculate_technical_debt(),
-            'quality_score': {}
+            "code_quality": self._collect_code_quality_metrics(),
+            "test_coverage": self._collect_coverage_metrics(),
+            "security": self._collect_security_metrics(),
+            "performance": self._collect_performance_metrics(),
+            "dependencies": self._collect_dependency_metrics(),
+            "code_complexity": self._collect_complexity_metrics(),
+            "technical_debt": self._calculate_technical_debt(),
+            "quality_score": {},
         }
-        
+
         # Calculate overall quality score
-        quality_report['quality_score'] = self._calculate_quality_score(quality_report)
+        quality_report["quality_score"] = self._calculate_quality_score(quality_report)
         
         # Save JSON report
         self._save_json_report(quality_report)
