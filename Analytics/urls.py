@@ -14,6 +14,7 @@ from Analytics.views import (
 app_name = "analytics"
 
 urlpatterns = [
+    path("indicators/", market_overview, name="indicators"),  # Simple indicators endpoint for performance testing
     path("analyze/<str:symbol>/", analyze_stock, name="analyze_stock"),
     path(
         "analyze-portfolio/<int:portfolio_id>/",

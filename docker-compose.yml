@@ -66,6 +66,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: development
     container_name: voyageur-backend
     restart: unless-stopped
     volumes:
@@ -131,6 +132,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: development
     container_name: voyageur-celery-worker
     restart: unless-stopped
     volumes:
@@ -175,6 +177,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: development
     container_name: voyageur-celery-beat
     restart: unless-stopped
     volumes:
