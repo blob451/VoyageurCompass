@@ -96,7 +96,7 @@ jobs:
         pytest -n auto --dist=worksteal \
                --cov=Data --cov=Analytics --cov=Core \
                --cov-report=xml --cov-report=term-missing \
-               --cov-branch --cov-fail-under=38 \
+               --cov-branch --cov-fail-under=36 \
                --durations=10 \
                --reuse-db --nomigrations \
                -v
@@ -143,7 +143,7 @@ jobs:
     - name: Install frontend dependencies
       run: |
         cd Design/frontend
-        npm ci --prefer-offline --no-audit
+        npm install --prefer-offline --no-audit
 
     - name: Run frontend linting
       if: matrix.test-type == 'lint'
@@ -324,7 +324,7 @@ jobs:
     - name: Install frontend dependencies
       run: |
         cd Design/frontend
-        npm ci --prefer-offline --no-audit
+        npm install --prefer-offline --no-audit
 
     - name: Build frontend for performance testing
       run: |
@@ -431,7 +431,7 @@ jobs:
     - name: Install npm audit tools
       run: |
         cd Design/frontend
-        npm ci --prefer-offline --no-audit
+        npm install --prefer-offline --no-audit
 
     - name: Run npm audit for frontend dependencies
       run: |

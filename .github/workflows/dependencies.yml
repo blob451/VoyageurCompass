@@ -49,7 +49,7 @@ jobs:
     - name: Install frontend dependencies
       run: |
         cd Design/frontend
-        npm ci
+        npm install
 
     - name: Run frontend security audit
       run: |
@@ -143,7 +143,7 @@ jobs:
     - name: Check frontend package licenses
       run: |
         cd Design/frontend
-        npm ci
+        npm install
         echo "::group::Frontend Package Licenses"
         license-checker --json --out ../frontend-licenses.json
         license-checker --markdown --out ../frontend-licenses.md

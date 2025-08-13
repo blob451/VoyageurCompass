@@ -429,7 +429,7 @@ class TestDataSectorModel:
         """Test that sectors are ordered by name."""
         DataSector.objects.create(sectorKey="tech", sectorName="Technology")
         DataSector.objects.create(sectorKey="health", sectorName="Healthcare")
-        
+
         sectors = list(DataSector.objects.all())
         assert sectors[0].sectorName == "Healthcare"
         assert sectors[1].sectorName == "Technology"
@@ -497,11 +497,11 @@ class TestDataIndustryModel:
             industryKey="software",
             industryName="Software Services",
         )
-        
+
         # Test the relationship
         assert industry.sector == sector
         assert industry in sector.industries.all()
-        
+
         # Test cascade deletion
         sector_id = sector.id
         sector.delete()

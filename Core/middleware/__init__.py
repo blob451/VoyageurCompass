@@ -1,9 +1,9 @@
 # Core middleware package
+from .cors import CustomCorsMiddleware
 from .performance import (
     PerformanceMonitoringMiddleware,
     RequestLoggingMiddleware,
 )
-from .cors import CustomCorsMiddleware
 
 __all__ = [
     "PerformanceMonitoringMiddleware",

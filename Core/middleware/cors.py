@@ -18,7 +18,9 @@ class CustomCorsMiddleware(MiddlewareMixin):
 
         # Add CORS headers
         response["Access-Control-Allow-Origin"] = "*"
-        response["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        response["Access-Control-Allow-Methods"] = (
+            "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        )
         response["Access-Control-Allow-Headers"] = (
             "Content-Type, Authorization, X-Requested-With, Accept"
         )
@@ -31,7 +33,9 @@ class CustomCorsMiddleware(MiddlewareMixin):
         if request.method == "OPTIONS":
             response = self.get_response(request)
             response["Access-Control-Allow-Origin"] = "*"
-            response["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+            response["Access-Control-Allow-Methods"] = (
+                "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+            )
             response["Access-Control-Allow-Headers"] = (
                 "Content-Type, Authorization, X-Requested-With, Accept"
             )

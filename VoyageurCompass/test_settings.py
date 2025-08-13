@@ -2,7 +2,7 @@
 Optimized Django settings for test performance.
 """
 
-from .settings import *
+from .settings import *  # noqa: F403
 
 # Test Database Configuration - Ultra-fast SQLite
 DATABASES = {
@@ -20,13 +20,15 @@ DATABASES = {
     }
 }
 
+
 # Disable migrations for faster test setup
 class DisableMigrations:
     def __contains__(self, item):
         return True
-    
+
     def __getitem__(self, item):
         return None
+
 
 MIGRATION_MODULES = DisableMigrations()
 
@@ -40,7 +42,7 @@ CACHES = {
 # Disable middleware that slows down tests
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware", 
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -101,7 +103,7 @@ TEMPLATES = [
 INSTALLED_APPS = [
     "django.contrib.admin",  # Keep for URL compatibility
     "django.contrib.auth",
-    "django.contrib.contenttypes", 
+    "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",

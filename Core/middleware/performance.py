@@ -144,8 +144,7 @@ class RequestLoggingMiddleware(MiddlewareMixin):
 
         # Log response
         self.logger.info(
-            f"Response: {response.status_code} for "
-            f"{request.method} {request.path}"
+            f"Response: {response.status_code} for " f"{request.method} {request.path}"
         )
 
         return response

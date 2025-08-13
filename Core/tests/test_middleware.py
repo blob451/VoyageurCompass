@@ -4,8 +4,9 @@ Tests for Core middleware.
 
 from unittest.mock import Mock
 
-import pytest
 from django.http import HttpRequest, HttpResponse
+
+import pytest
 
 from Core.middleware.cors import CustomCorsMiddleware
 from Core.middleware.performance import (
@@ -27,7 +28,10 @@ class TestCustomCorsMiddleware:
         response = middleware(request)
 
         assert response["Access-Control-Allow-Origin"] == "*"
-        assert "GET, POST, PUT, PATCH, DELETE, OPTIONS" in response["Access-Control-Allow-Methods"]
+        assert (
+            "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+            in response["Access-Control-Allow-Methods"]
+        )
         assert "Content-Type, Authorization" in response["Access-Control-Allow-Headers"]
         assert response["Access-Control-Max-Age"] == "3600"
 

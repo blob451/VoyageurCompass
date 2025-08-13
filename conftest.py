@@ -8,6 +8,7 @@ from pathlib import Path
 
 import django
 from django.conf import settings
+
 import pytest
 
 # Add the project root to the Python path
@@ -23,9 +24,9 @@ def pytest_configure(config):
     """Configure Django settings for pytest with performance optimizations."""
     if not settings.configured:
         django.setup()
-    
+
     # Enable fast test mode if parallel execution detected
-    if hasattr(config.option, 'numprocesses') and config.option.numprocesses:
+    if hasattr(config.option, "numprocesses") and config.option.numprocesses:
         os.environ["TEST_FAST_MODE"] = "true"
 
 
@@ -40,13 +41,13 @@ def enable_db_access_for_all_tests(django_db_setup, django_db_blocker):
 def disable_network_calls(monkeypatch):
     """Mock network calls to prevent actual API requests in tests."""
     import requests
-    
+
     def mock_get(*args, **kwargs):
         raise Exception("Network calls are disabled in tests. Use mock data instead.")
-    
+
     def mock_post(*args, **kwargs):
         raise Exception("Network calls are disabled in tests. Use mock data instead.")
-    
+
     monkeypatch.setattr(requests, "get", mock_get)
     monkeypatch.setattr(requests, "post", mock_post)
 
@@ -55,10 +56,11 @@ def disable_network_calls(monkeypatch):
 def fast_user(db):
     """Create a user for testing quickly without password hashing overhead."""
     from django.contrib.auth.models import User
+
     return User.objects.create(
         username="testuser",
         email="test@example.com",
-        password="md5$salt$hashedpassword"  # Pre-hashed for speed
+        password="md5$salt$hashedpassword",  # Pre-hashed for speed
     )
 
 
@@ -66,18 +68,13 @@ def fast_user(db):
 def sample_stock(db):
     """Create a sample stock for testing."""
     from Data.models import Stock
-    return Stock.objects.create(
-        symbol="AAPL",
-        name="Apple Inc.",
-        data_source="test"
-    )
+
+    return Stock.objects.create(symbol="AAPL", name="Apple Inc.", data_source="test")
 
 
 @pytest.fixture
 def sample_portfolio(db, fast_user):
     """Create a sample portfolio for testing."""
     from Data.models import Portfolio
-    return Portfolio.objects.create(
-        name="Test Portfolio",
-        user=fast_user
-    )
+
+    return Portfolio.objects.create(name="Test Portfolio", user=fast_user)
