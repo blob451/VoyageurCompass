@@ -66,7 +66,7 @@ class Command(BaseCommand):
             {
                 "name": "auth_login",
                 "method": "POST",
-                "url": "/api/auth/login/",
+                "url": "/api/v1/auth/login/",
                 "data": {"username": "testuser", "password": "testpass123"},
                 "auth_required": False,
                 "budget_ms": 500,
@@ -74,7 +74,7 @@ class Command(BaseCommand):
             {
                 "name": "auth_refresh",
                 "method": "POST",
-                "url": "/api/auth/refresh/",
+                "url": "/api/v1/auth/refresh/",
                 "data": None,  # Will be set dynamically
                 "auth_required": False,
                 "budget_ms": 300,
@@ -83,7 +83,7 @@ class Command(BaseCommand):
             {
                 "name": "api_health",
                 "method": "GET",
-                "url": "/api/health/",
+                "url": "/api/v1/health/",
                 "data": None,
                 "auth_required": False,
                 "budget_ms": 200,
@@ -92,7 +92,7 @@ class Command(BaseCommand):
             {
                 "name": "stocks_list",
                 "method": "GET",
-                "url": "/api/data/stocks/",
+                "url": "/api/v1/data/stocks/",
                 "data": None,
                 "auth_required": True,
                 "budget_ms": 1000,
@@ -100,7 +100,7 @@ class Command(BaseCommand):
             {
                 "name": "portfolio_list",
                 "method": "GET",
-                "url": "/api/data/portfolio/",
+                "url": "/api/v1/data/portfolio/",
                 "data": None,
                 "auth_required": True,
                 "budget_ms": 800,
@@ -109,7 +109,7 @@ class Command(BaseCommand):
             {
                 "name": "analytics_indicators",
                 "method": "GET",
-                "url": "/api/analytics/indicators/",
+                "url": "/api/v1/analytics/indicators/",
                 "data": None,
                 "auth_required": True,
                 "budget_ms": 2000,
