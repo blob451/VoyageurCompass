@@ -17,6 +17,8 @@ export default defineConfig({
   preview: {
     port: 4173,
     host: true,
+    // SPA fallback support for client-side routing
+    spa: true,
   },
   test: {
     globals: true,

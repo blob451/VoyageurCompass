@@ -1,13 +1,9 @@
 /* eslint-env node */
 module.exports = {
   ci: {
-    // Build settings
+    // Build settings - use static directory for better SPA support
     collect: {
-      url: [
-        'http://localhost:4173/',
-        'http://localhost:4173/login',
-        'http://localhost:4173/dashboard'
-      ],
+      staticDistDir: './dist',
       settings: {
         chromeFlags: '--no-sandbox --headless'
       },
@@ -35,13 +31,6 @@ module.exports = {
     upload: {
       target: 'filesystem',
       outputDir: './lighthouse-results'
-    },
-
-    // Server configuration for preview mode
-    server: {
-      command: 'npm run preview',
-      port: 4173,
-      timeout: 120000
     }
   }
 };
