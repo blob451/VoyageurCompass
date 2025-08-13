@@ -1,0 +1,69 @@
+{
+  "metadata": {
+    "timestamp": "2025-08-13T12:30:55.533874",
+    "total_runs_per_endpoint": 1,
+    "total_endpoints_tested": 6
+  },
+  "summary": {
+    "overall_avg_response_time_ms": 0,
+    "budget_violations": 0,
+    "total_errors": 6
+  },
+  "budget_violations": [],
+  "detailed_results": {
+    "auth_login": {
+      "endpoint": "auth_login",
+      "url": "/api/auth/login/",
+      "method": "POST",
+      "budget_ms": 500,
+      "runs": 0,
+      "errors": 1,
+      "error": "All requests failed"
+    },
+    "auth_refresh": {
+      "endpoint": "auth_refresh",
+      "url": "/api/auth/refresh/",
+      "method": "POST",
+      "budget_ms": 300,
+      "runs": 0,
+      "errors": 1,
+      "error": "All requests failed"
+    },
+    "api_health": {
+      "endpoint": "api_health",
+      "url": "/api/health/",
+      "method": "GET",
+      "budget_ms": 200,
+      "runs": 0,
+      "errors": 1,
+      "error": "All requests failed"
+    },
+    "stocks_list": {
+      "endpoint": "stocks_list",
+      "url": "/api/data/stocks/",
+      "method": "GET",
+      "budget_ms": 1000,
+      "runs": 0,
+      "errors": 1,
+      "error": "All requests failed"
+    },
+    "portfolio_list": {
+      "endpoint": "portfolio_list",
+      "url": "/api/data/portfolio/",
+      "method": "GET",
+      "budget_ms": 800,
+      "runs": 0,
+      "errors": 1,
+      "error": "All requests failed"
+    },
+    "analytics_indicators": {
+      "endpoint": "analytics_indicators",
+      "url": "/api/analytics/indicators/",
+      "method": "GET",
+      "budget_ms": 2000,
+      "runs": 0,
+      "errors": 1,
+      "error": "All requests failed"
+    }
+  }
+}

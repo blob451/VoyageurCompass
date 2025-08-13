@@ -17,11 +17,11 @@ CACHES = {
     }
 }
 
-# Use SQLite for performance testing
+# Use persistent SQLite for performance testing (migrations need to persist)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ":memory:",  # In-memory database for speed
+        "NAME": "performance_test.db",  # Persistent database for performance testing
         "OPTIONS": {
             "timeout": 20,
         },
@@ -30,6 +30,9 @@ DATABASES = {
 
 # Performance test specific settings
 PERFORMANCE_TEST_MODE = True
+
+# Allow testserver for performance testing
+ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1"]
 
 # Enable minimal logging for performance metrics
 LOGGING = {

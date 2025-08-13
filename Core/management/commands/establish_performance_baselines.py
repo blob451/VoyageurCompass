@@ -50,7 +50,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"🚀 Establishing performance baselines with {self.runs} runs per endpoint..."
+                f"Establishing performance baselines with {self.runs} runs per endpoint..."
             )
         )
 
@@ -133,7 +133,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"✅ Performance baselines established and saved to {self.output_file}"
+                f"Performance baselines established and saved to {self.output_file}"
             )
         )
 
@@ -344,7 +344,7 @@ class Command(BaseCommand):
         self.stdout.write(f'Budget Violations: {summary["budget_violations"]}')
 
         if violations:
-            self.stdout.write("\n⚠️  BUDGET VIOLATIONS:")
+            self.stdout.write("\nBUDGET VIOLATIONS:")
             for violation in violations:
                 self.stdout.write(
                     self.style.WARNING(
@@ -354,13 +354,13 @@ class Command(BaseCommand):
                     )
                 )
 
-        self.stdout.write("\n📋 ENDPOINT DETAILS:")
+        self.stdout.write("\nENDPOINT DETAILS:")
         for endpoint_name, result in baseline_report["detailed_results"].items():
             if "response_time_ms" in result:
                 rt = result["response_time_ms"]
                 db = result["database"]
 
-                status_icon = "✅" if rt["p95"] <= result["budget_ms"] else "⚠️"
+                status_icon = "PASS" if rt["p95"] <= result["budget_ms"] else "WARN"
 
                 self.stdout.write(
                     f"{status_icon} {endpoint_name}: "
@@ -370,6 +370,6 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(
                     self.style.ERROR(
-                        f'❌ {endpoint_name}: {result.get("error", "Failed")}'
+                        f'FAIL {endpoint_name}: {result.get("error", "Failed")}'
                     )
                 )
