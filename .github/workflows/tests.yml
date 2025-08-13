@@ -11,6 +11,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Permissions for security scanning
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
 env:
   # Global environment variables (Performance Optimized)
   PYTHON_VERSION: '3.11'
@@ -471,7 +477,7 @@ jobs:
         docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
         fail_action: false
         allow_issue_writing: false
-        artifact_name: 'zap-security-scan-results'
+        artifact_name: 'zap-baseline-scan-results'
 
     # Container security scanning
     - name: Run Trivy vulnerability scanner (Filesystem)
@@ -557,6 +563,7 @@ jobs:
     # Upload security scan results
     - name: Upload security scan results
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: security-scan-results
         path: |
@@ -566,13 +573,20 @@ jobs:
           trivy-fs-results.sarif
           trivy-image-results.sarif
         retention-days: 30
+        if-no-files-found: warn
 
     # Upload to GitHub Security tab
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
+    - name: Upload Trivy filesystem scan to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always() && hashFiles('trivy-fs-results.sarif') != ''
       with:
-        sarif_file: 'trivy-results.sarif'
+        sarif_file: 'trivy-fs-results.sarif'
+        
+    - name: Upload Trivy image scan to GitHub Security tab  
+      uses: github/codeql-action/upload-sarif@v3
+      if: always() && hashFiles('trivy-image-results.sarif') != ''
+      with:
+        sarif_file: 'trivy-image-results.sarif'
 
   code-quality:
     runs-on: ubuntu-latest

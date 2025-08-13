@@ -1,5 +1,5 @@
 /* eslint-env node */
-module.exports = {
+export default {
   ci: {
     // Build settings
     collect: {
