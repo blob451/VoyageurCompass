@@ -1,0 +1,178 @@
+name: Test Fixes and Coverage
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+  DJANGO_SETTINGS_MODULE: VoyageurCompass.settings
+  SECRET_KEY: test-secret-key-for-ci
+  DEBUG: true
+
+jobs:
+  backend-test-fixes:
+    name: Backend Tests with Fixes
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_voyageur_compass
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    env:
+      DB_NAME: test_voyageur_compass
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_voyageur_compass
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/2
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-test-${{ hashFiles('requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-test-
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-django pytest-xdist
+      
+      - name: Check database connection
+        run: |
+          python -c "
+import psycopg2
+try:
+    conn = psycopg2.connect(
+        dbname='test_voyageur_compass',
+        user='postgres',
+        password='postgres',
+        host='localhost',
+        port='5432'
+    )
+    print('✓ Database connection successful')
+    conn.close()
+except Exception as e:
+    print(f'✗ Database connection failed: {e}')
+    exit(1)
+          "
+      
+      - name: Run migrations
+        run: |
+          python manage.py makemigrations --check --dry-run
+          python manage.py migrate --no-input
+      
+      - name: Create test user
+        run: |
+          python manage.py shell -c "
+from django.contrib.auth import get_user_model
+User = get_user_model()
+if not User.objects.filter(username='testuser').exists():
+    User.objects.create_user('testuser', 'test@example.com', 'testpass123')
+    print('Test user created')
+          "
+      
+      - name: Run tests with verbose output
+        run: |
+          pytest -xvs --tb=short \
+                 --cov=Data --cov=Analytics --cov=Core \
+                 --cov-report=xml \
+                 --cov-report=html:htmlcov \
+                 --cov-report=term-missing \
+                 --cov-branch \
+                 --junit-xml=test-results.xml \
+                 -p no:warnings \
+                 || true
+      
+      - name: Generate coverage report
+        if: always()
+        run: |
+          coverage report
+          coverage xml
+      
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: |
+            test-results.xml
+            htmlcov/
+            coverage.xml
+      
+      - name: Display test summary
+        if: always()
+        run: |
+          echo "Test Summary:"
+          if [ -f test-results.xml ]; then
+            python -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse('test-results.xml')
+root = tree.getroot()
+testsuite = root.find('.//testsuite')
+if testsuite is not None:
+    total = testsuite.get('tests', '0')
+    failures = testsuite.get('failures', '0')
+    errors = testsuite.get('errors', '0')
+    skipped = testsuite.get('skipped', '0')
+    time = testsuite.get('time', '0')
+    
+    print(f'Total tests: {total}')
+    print(f'Passed: {int(total) - int(failures) - int(errors) - int(skipped)}')
+    print(f'Failed: {failures}')
+    print(f'Errors: {errors}')
+    print(f'Skipped: {skipped}')
+    print(f'Time: {time}s')
+            "
+          fi

@@ -1,0 +1,85 @@
+# Multi-stage Dockerfile for production deployment
+# Stage 1: Python dependencies
+FROM python:3.11-slim as python-deps
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python packages
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir gunicorn psycopg2-binary
+
+# Stage 2: Frontend build
+FROM node:18-alpine as frontend-build
+
+WORKDIR /frontend
+
+# Copy package files
+COPY Design/frontend/package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy frontend source
+COPY Design/frontend/ .
+
+# Build frontend
+RUN npm run build
+
+# Stage 3: Production image
+FROM python:3.11-slim as production
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DJANGO_SETTINGS_MODULE=VoyageurCompass.settings.production \
+    PORT=8000
+
+# Create non-root user
+RUN groupadd -r django && useradd -r -g django django
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python dependencies from builder
+COPY --from=python-deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=python-deps /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY --chown=django:django . .
+
+# Copy built frontend
+COPY --from=frontend-build --chown=django:django /frontend/build /app/Design/frontend/build
+
+# Create necessary directories
+RUN mkdir -p /app/staticfiles /app/media /app/logs \
+    && chown -R django:django /app
+
+# Collect static files
+RUN python manage.py collectstatic --noinput
+
+# Switch to non-root user
+USER django
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/health/ || exit 1
+
+# Expose port
+EXPOSE ${PORT}
+
+# Run gunicorn
+CMD ["sh", "-c", "gunicorn VoyageurCompass.wsgi:application --bind 0.0.0.0:${PORT} --workers 4 --threads 2 --timeout 120 --access-logfile - --error-logfile -"]

@@ -6,6 +6,7 @@ Tracks response times and performance metrics.
 import logging
 import time
 from datetime import datetime
+
 from django.conf import settings
 from django.utils.deprecation import MiddlewareMixin
 
@@ -53,7 +54,7 @@ class PerformanceMonitoringMiddleware(MiddlewareMixin):
         """Log detailed performance metrics."""
         endpoint = f"{request.method} {request.path}"
         status_code = response.status_code
-        
+
         # Create performance log entry
         perf_data = {
             "endpoint": endpoint,
@@ -86,10 +87,10 @@ class PerformanceMonitoringMiddleware(MiddlewareMixin):
         """Check if response violates performance budgets."""
         # Define performance budgets by endpoint type
         budgets = {
-            "/api/auth/": 500,      # Auth endpoints: 500ms
-            "/api/data/": 1000,     # Data endpoints: 1s
-            "/api/analytics/": 2000, # Analytics endpoints: 2s
-            "default": 1500         # Default budget: 1.5s
+            "/api/auth/": 500,  # Auth endpoints: 500ms
+            "/api/data/": 1000,  # Data endpoints: 1s
+            "/api/analytics/": 2000,  # Analytics endpoints: 2s
+            "default": 1500,  # Default budget: 1.5s
         }
 
         # Find applicable budget
@@ -108,8 +109,10 @@ class PerformanceMonitoringMiddleware(MiddlewareMixin):
                     "endpoint": f"{request.method} {request.path}",
                     "response_time_ms": response_time_ms,
                     "budget_ms": budget,
-                    "violation_percent": round(((response_time_ms - budget) / budget) * 100, 1)
-                }
+                    "violation_percent": round(
+                        ((response_time_ms - budget) / budget) * 100, 1
+                    ),
+                },
             )
 
     def _get_client_ip(self, request):
@@ -120,6 +123,43 @@ class PerformanceMonitoringMiddleware(MiddlewareMixin):
         return request.META.get("REMOTE_ADDR", "")
 
 
+class RequestLoggingMiddleware(MiddlewareMixin):
+    """
+    Middleware for logging HTTP requests and responses.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.logger = logging.getLogger("django.request")
+
+    def __call__(self, request):
+        # Log request
+        self.logger.info(
+            f"Request: {request.method} {request.path} "
+            f"from {self.get_client_ip(request)}"
+        )
+
+        # Process request
+        response = self.get_response(request)
+
+        # Log response
+        self.logger.info(
+            f"Response: {response.status_code} for "
+            f"{request.method} {request.path}"
+        )
+
+        return response
+
+    def get_client_ip(self, request):
+        """Get client IP address from request."""
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(",")[0]
+        else:
+            ip = request.META.get("REMOTE_ADDR")
+        return ip
+
+
 class DatabasePerformanceMiddleware(MiddlewareMixin):
     """
     Middleware to monitor database query performance.
@@ -128,17 +168,18 @@ class DatabasePerformanceMiddleware(MiddlewareMixin):
     def process_request(self, request):
         """Reset query count at request start."""
         from django.db import connection
+
         connection.queries_log.clear()
         request.db_query_start_count = len(connection.queries)
         return None
 
     def process_response(self, request, response):
         """Log database query performance."""
-        if not hasattr(request, 'db_query_start_count'):
+        if not hasattr(request, "db_query_start_count"):
             return response
 
         from django.db import connection
-        
+
         # Calculate query metrics
         query_count = len(connection.queries) - request.db_query_start_count
         total_query_time = sum(float(query["time"]) for query in connection.queries)
@@ -156,8 +197,8 @@ class DatabasePerformanceMiddleware(MiddlewareMixin):
                 extra={
                     "endpoint": f"{request.method} {request.path}",
                     "query_count": query_count,
-                    "total_query_time_ms": total_query_time_ms
-                }
+                    "total_query_time_ms": total_query_time_ms,
+                },
             )
         elif total_query_time_ms > 500:  # Slow queries
             logger.warning(
@@ -166,8 +207,8 @@ class DatabasePerformanceMiddleware(MiddlewareMixin):
                 extra={
                     "endpoint": f"{request.method} {request.path}",
                     "query_count": query_count,
-                    "total_query_time_ms": total_query_time_ms
-                }
+                    "total_query_time_ms": total_query_time_ms,
+                },
             )
 
         return response

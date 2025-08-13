@@ -4,13 +4,15 @@ This command tests critical API endpoints and establishes baseline metrics.
 """
 
 import json
-import time
 import statistics
+import time
 from datetime import datetime
-from django.core.management.base import BaseCommand
-from django.test import Client
+
 from django.contrib.auth.models import User
+from django.core.management.base import BaseCommand
 from django.db import connection
+from django.test import Client
+
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -28,38 +30,36 @@ class Command(BaseCommand):
             "--runs",
             type=int,
             default=10,
-            help="Number of test runs per endpoint (default: 10)"
+            help="Number of test runs per endpoint (default: 10)",
         )
         parser.add_argument(
             "--output",
             type=str,
-            default='performance_baselines.json',
-            help="Output file for baseline results (default: performance_baselines.json)"
+            default="performance_baselines.json",
+            help="Output file for baseline results (default: performance_baselines.json)",
         )
         parser.add_argument(
-            "--verbose",
-            action='store_true',
-            help="Enable verbose output"
+            "--verbose", action="store_true", help="Enable verbose output"
         )
 
     def handle(self, *args, **options):
         """Main command handler."""
-        self.runs = options['runs']
-        self.output_file = options['output']
-        self.verbose = options['verbose']
-        
+        self.runs = options["runs"]
+        self.output_file = options["output"]
+        self.verbose = options["verbose"]
+
         self.stdout.write(
             self.style.SUCCESS(
-                f'🚀 Establishing performance baselines with {self.runs} runs per endpoint...'
+                f"🚀 Establishing performance baselines with {self.runs} runs per endpoint..."
             )
         )
-        
+
         # Initialize test client
         self.client = APIClient()
-        
+
         # Create test user for authenticated endpoints
         self.test_user = self._create_test_user()
-        
+
         # Define critical endpoints to test
         endpoints = [
             # Authentication endpoints
@@ -69,17 +69,16 @@ class Command(BaseCommand):
                 "url": "/api/auth/login/",
                 "data": {"username": "testuser", "password": "testpass123"},
                 "auth_required": False,
-                "budget_ms": 500
+                "budget_ms": 500,
             },
             {
                 "name": "auth_refresh",
-                "method": "POST", 
+                "method": "POST",
                 "url": "/api/auth/refresh/",
                 "data": None,  # Will be set dynamically
                 "auth_required": False,
-                "budget_ms": 300
+                "budget_ms": 300,
             },
-            
             # Core API endpoints
             {
                 "name": "api_health",
@@ -87,9 +86,8 @@ class Command(BaseCommand):
                 "url": "/api/health/",
                 "data": None,
                 "auth_required": False,
-                "budget_ms": 200
+                "budget_ms": 200,
             },
-            
             # Data endpoints
             {
                 "name": "stocks_list",
@@ -97,7 +95,7 @@ class Command(BaseCommand):
                 "url": "/api/data/stocks/",
                 "data": None,
                 "auth_required": True,
-                "budget_ms": 1000
+                "budget_ms": 1000,
             },
             {
                 "name": "portfolio_list",
@@ -105,9 +103,8 @@ class Command(BaseCommand):
                 "url": "/api/data/portfolio/",
                 "data": None,
                 "auth_required": True,
-                "budget_ms": 800
+                "budget_ms": 800,
             },
-            
             # Analytics endpoints
             {
                 "name": "analytics_indicators",
@@ -115,27 +112,29 @@ class Command(BaseCommand):
                 "url": "/api/analytics/indicators/",
                 "data": None,
                 "auth_required": True,
-                "budget_ms": 2000
-            }
+                "budget_ms": 2000,
+            },
         ]
-        
+
         # Run performance tests
         results = {}
         for endpoint in endpoints:
             self.stdout.write(f'Testing {endpoint["name"]}...')
             results[endpoint["name"]] = self._test_endpoint(endpoint)
-            
+
         # Generate baseline report
         baseline_report = self._generate_baseline_report(results)
-        
+
         # Save results
         self._save_results(baseline_report)
-        
+
         # Display summary
         self._display_summary(baseline_report)
-        
+
         self.stdout.write(
-            self.style.SUCCESS(f'✅ Performance baselines established and saved to {self.output_file}')
+            self.style.SUCCESS(
+                f"✅ Performance baselines established and saved to {self.output_file}"
+            )
         )
 
     def _create_test_user(self):
@@ -144,9 +143,7 @@ class Command(BaseCommand):
             user = User.objects.get(username="testuser")
         except User.DoesNotExist:
             user = User.objects.create_user(
-                username="testuser",
-                email="test@example.com",
-                password="testpass123"
+                username="testuser", email="test@example.com", password="testpass123"
             )
         return user
 
@@ -175,7 +172,6 @@ class Command(BaseCommand):
             refresh = RefreshToken.for_user(self.test_user)
             data = {"refresh": str(refresh)}
 
-        
         # Run multiple tests
         for i in range(self.runs):
             # Reset query tracking
@@ -191,13 +187,14 @@ class Command(BaseCommand):
                 elif endpoint["method"] == "POST":
                     response = self.client.post(endpoint["url"], data=data)
                 else:
-                    response = self.client.generic(endpoint["method"], endpoint["url"], data=data)
+                    response = self.client.generic(
+                        endpoint["method"], endpoint["url"], data=data
+                    )
 
-                
                 # Record end time
                 end_time = time.time()
                 response_time_ms = (end_time - start_time) * 1000
-                
+
                 # Check if response is successful
                 if 200 <= response.status_code < 300:
                     response_times.append(response_time_ms)
@@ -207,24 +204,28 @@ class Command(BaseCommand):
                     total_query_time = sum(float(q["time"]) for q in connection.queries)
                     query_counts.append(query_count)
                     query_times.append(total_query_time * 1000)  # Convert to ms
-                    
+
                     if self.verbose:
                         self.stdout.write(
-                            f'  Run {i+1}: {response_time_ms:.2f}ms '
-                            f'({query_count} queries, {total_query_time*1000:.2f}ms DB)'
+                            f"  Run {i+1}: {response_time_ms:.2f}ms "
+                            f"({query_count} queries, {total_query_time*1000:.2f}ms DB)"
                         )
                 else:
                     errors += 1
                     if self.verbose:
                         self.stdout.write(
-                            self.style.WARNING(f'  Run {i+1}: Error {response.status_code}')
+                            self.style.WARNING(
+                                f"  Run {i+1}: Error {response.status_code}"
+                            )
                         )
-                        
+
             except Exception as e:
                 errors += 1
                 if self.verbose:
-                    self.stdout.write(self.style.ERROR(f'  Run {i+1}: Exception - {str(e)}'))
-        
+                    self.stdout.write(
+                        self.style.ERROR(f"  Run {i+1}: Exception - {str(e)}")
+                    )
+
         # Calculate statistics
         if response_times:
             return {
@@ -289,12 +290,21 @@ class Command(BaseCommand):
 
                 # Check budget violations
                 if result["response_time_ms"]["p95"] > result["budget_ms"]:
-                    budget_violations.append({
-                        "endpoint": endpoint_name,
-                        "p95_ms": result["response_time_ms"]["p95"],
-                        "budget_ms": result["budget_ms"],
-                        "violation_percent": ((result["response_time_ms"]["p95"] - result["budget_ms"]) / result["budget_ms"]) * 100
-                    })
+                    budget_violations.append(
+                        {
+                            "endpoint": endpoint_name,
+                            "p95_ms": result["response_time_ms"]["p95"],
+                            "budget_ms": result["budget_ms"],
+                            "violation_percent": (
+                                (
+                                    result["response_time_ms"]["p95"]
+                                    - result["budget_ms"]
+                                )
+                                / result["budget_ms"]
+                            )
+                            * 100,
+                        }
+                    )
 
         return {
             "metadata": {
@@ -326,13 +336,15 @@ class Command(BaseCommand):
         self.stdout.write("\n" + "=" * 60)
         self.stdout.write(self.style.SUCCESS("PERFORMANCE BASELINE SUMMARY"))
         self.stdout.write("=" * 60)
-        
-        self.stdout.write(f'Overall Average Response Time: {summary["overall_avg_response_time_ms"]:.2f}ms')
+
+        self.stdout.write(
+            f'Overall Average Response Time: {summary["overall_avg_response_time_ms"]:.2f}ms'
+        )
         self.stdout.write(f'Total Errors: {summary["total_errors"]}')
         self.stdout.write(f'Budget Violations: {summary["budget_violations"]}')
-        
+
         if violations:
-            self.stdout.write('\n⚠️  BUDGET VIOLATIONS:')
+            self.stdout.write("\n⚠️  BUDGET VIOLATIONS:")
             for violation in violations:
                 self.stdout.write(
                     self.style.WARNING(
@@ -341,21 +353,23 @@ class Command(BaseCommand):
                         f'+{violation["violation_percent"]:.1f}%)'
                     )
                 )
-        
-        self.stdout.write('\n📋 ENDPOINT DETAILS:')
-        for endpoint_name, result in baseline_report['detailed_results'].items():
-            if 'response_time_ms' in result:
-                rt = result['response_time_ms']
-                db = result['database']
-                
-                status_icon = '✅' if rt['p95'] <= result['budget_ms'] else '⚠️'
-                
+
+        self.stdout.write("\n📋 ENDPOINT DETAILS:")
+        for endpoint_name, result in baseline_report["detailed_results"].items():
+            if "response_time_ms" in result:
+                rt = result["response_time_ms"]
+                db = result["database"]
+
+                status_icon = "✅" if rt["p95"] <= result["budget_ms"] else "⚠️"
+
                 self.stdout.write(
-                    f'{status_icon} {endpoint_name}: '
+                    f"{status_icon} {endpoint_name}: "
                     f'P95={rt["p95"]:.2f}ms, Mean={rt["mean"]:.2f}ms '
                     f'(DB: {db["avg_query_count"]:.1f} queries, {db["avg_query_time_ms"]:.2f}ms)'
                 )
             else:
                 self.stdout.write(
-                    self.style.ERROR(f'❌ {endpoint_name}: {result.get("error", "Failed")}')
+                    self.style.ERROR(
+                        f'❌ {endpoint_name}: {result.get("error", "Failed")}'
+                    )
                 )
