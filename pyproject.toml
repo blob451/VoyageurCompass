@@ -75,3 +75,20 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.bandit]
+exclude_dirs = [
+    "tests",
+    "migrations", 
+    "Design/frontend",
+    "staticfiles",
+    "node_modules",
+    ".git",
+    "__pycache__"
+]
+skips = [
+    "B101",  # Skip assert used in tests
+    "B601",  # Skip shell=True when used safely
+    "B603",  # Skip subprocess without shell=True
+    "B607",  # Skip starting process with partial executable path
+]

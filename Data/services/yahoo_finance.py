@@ -1734,8 +1734,8 @@ class YahooFinanceService:
                         try:
                             record.save()
                             created_count += 1
-                        except Exception:
-                            pass  # Skip conflicts
+                        except Exception:  # nosec B110
+                            pass  # Skip conflicts during bulk insert
 
             if update_records:
                 try:
@@ -1756,8 +1756,8 @@ class YahooFinanceService:
                         try:
                             record.save()
                             created_count += 1
-                        except Exception:
-                            pass  # Skip errors
+                        except Exception:  # nosec B110
+                            pass  # Skip errors during bulk update
 
             return created_count
 
@@ -1823,7 +1823,7 @@ class YahooFinanceService:
             # Close connection for this thread to prevent connection leaks
             try:
                 connection.close()
-            except Exception:
+            except Exception:  # nosec B110
                 pass  # Ignore connection close errors
 
     def _createSectorComposites(

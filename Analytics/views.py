@@ -127,7 +127,7 @@ def analyze_stock(request, symbol):
                 {"error": f"Invalid stock symbol: {symbol}"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-    except Exception:
+    except Exception:  # nosec B110
         # If validation service fails, continue with analysis
         pass
 

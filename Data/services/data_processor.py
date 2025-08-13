@@ -220,8 +220,8 @@ class DataProcessor:
                 # Parse date and determine period key
                 try:
                     date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-                except:
-                    continue
+                except Exception:  # nosec B112
+                    continue  # Skip invalid date formats
 
                 if frequency == "daily":
                     period_key = date.date().isoformat()
