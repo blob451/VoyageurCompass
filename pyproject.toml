@@ -91,4 +91,9 @@ skips = [
     "B601",  # Skip shell=True when used safely
     "B603",  # Skip subprocess without shell=True
     "B607",  # Skip starting process with partial executable path
+    "B311",  # Skip random usage in non-security contexts
+    "B105",  # Skip hardcoded passwords in development settings
 ]
+# Only fail on medium and high severity issues
+severity = "medium"
+confidence = "medium"

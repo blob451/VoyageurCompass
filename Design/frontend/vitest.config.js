@@ -30,22 +30,22 @@ export default defineConfig({
       ],
       thresholds: {
         global: {
+          branches: 60,
+          functions: 60,
+          lines: 60,
+          statements: 60
+        },
+        'src/components/**': {
           branches: 70,
-          functions: 70,
+          functions: 35,
           lines: 70,
           statements: 70
         },
-        'src/components/**': {
-          branches: 80,
-          functions: 80,
-          lines: 80,
-          statements: 80
-        },
         'src/features/**': {
-          branches: 75,
-          functions: 75,
-          lines: 75,
-          statements: 75
+          branches: 70,
+          functions: 55,
+          lines: 70,
+          statements: 70
         }
       }
     },

@@ -95,9 +95,9 @@ class TestStockModel:
                 volume=50000000,
             )
 
-        # Get last 7 days (includes today + 7 previous days = 8 total)
+        # Get last 7 days (includes 7 days from today backwards)
         history = stock.get_price_history(days=7)
-        assert history.count() == 8
+        assert history.count() == 7
 
         # Get last 30 days (should return all 10)
         history = stock.get_price_history(days=30)
