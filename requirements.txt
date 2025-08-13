@@ -70,6 +70,10 @@ whitenoise==6.9.0
 yfinance==0.2.65
 sentry-sdk[django]==1.40.0
 
+# Production server
+gunicorn==22.0.0
+gevent==24.10.3
+
 # Development tools for code quality
 black==25.1.0
 isort==6.0.1

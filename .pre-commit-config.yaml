@@ -1,37 +1,131 @@
+# Pre-commit hooks configuration for VoyageurCompass
+# See https://pre-commit.com for more information
 repos:
+  # Basic Git hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^(.*\.md|.*\.txt)$
       - id: end-of-file-fixer
+        exclude: ^(.*\.svg|.*\.png|.*\.jpg|.*\.jpeg|.*\.gif|.*\.ico)$
       - id: check-yaml
-      - id: check-added-large-files
+        args: ['--unsafe']
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
       - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: debug-statements
+        language_version: python3
 
+  # Code formatting
   - repo: https://github.com/psf/black
     rev: 25.1.0
     hooks:
       - id: black
         language_version: python3.11
+        args: [--line-length=88]
         exclude: ^(.*migrations.*|Design/frontend/.*)$
 
   - repo: https://github.com/pycqa/isort
     rev: 6.0.1
     hooks:
       - id: isort
+        args: [--profile, black, --line-length=88]
         exclude: ^(.*migrations.*|Design/frontend/.*)$
 
   - repo: https://github.com/pycqa/flake8
     rev: 7.1.1
     hooks:
       - id: flake8
+        args: [--max-line-length=88, --extend-ignore=E203,W503]
         exclude: ^(.*migrations.*|Design/frontend/.*)$
 
+  # Security scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: ^(package-lock\.json|.*\.lock|.*\.sum)$
+
+  # Python security and code quality
+  - repo: https://github.com/pycqa/bandit
+    rev: '1.8.0'
+    hooks:
+      - id: bandit
+        args: ['-r', '.', '-x', 'tests/,node_modules/,Design/frontend/']
+        exclude: ^(tests/|Design/frontend/)
+
+  # Django specific checks
+  - repo: https://github.com/adamchainz/django-upgrade
+    rev: '1.21.0'
+    hooks:
+      - id: django-upgrade
+        args: [--target-version, '5.2']
+        exclude: ^(.*migrations.*|Design/frontend/.*)$
+
+  # Clean up unused imports
+  - repo: https://github.com/pycqa/autoflake
+    rev: v2.4.0
+    hooks:
+      - id: autoflake
+        args:
+          - --in-place
+          - --remove-all-unused-imports
+          - --remove-unused-variables
+          - --remove-duplicate-keys
+          - --ignore-init-module-imports
+        exclude: ^(.*migrations.*|Design/frontend/.*)$
+
+  # Local hooks for Django and frontend
   - repo: local
     hooks:
       - id: django-check
-        name: Django Check
+        name: Django System Check
         entry: python manage.py check
         language: system
         pass_filenames: false
         files: \.py$
+
+      - id: django-check-migrations
+        name: Django Migration Check
+        entry: python manage.py makemigrations --check --dry-run
+        language: system
+        pass_filenames: false
+        files: \.py$
+
+      - id: frontend-lint
+        name: Frontend ESLint
+        entry: bash -c 'cd Design/frontend && npm run lint'
+        language: system
+        files: '^Design/frontend/.*\.(js|jsx|ts|tsx)$'
+        pass_filenames: false
+
+# Configuration for specific tools
+default_language_version:
+  python: python3.11
+
+# Global excludes
+exclude: |
+  (?x)^(
+    .*migrations/.*|
+    .*node_modules/.*|
+    .*\.min\.(js|css)$|
+    .*\.bundle\.(js|css)$|
+    .*dist/.*|
+    .*build/.*|
+    .*\.lock$|
+    .*\.sum$|
+    .*staticfiles/.*
+  )$
+
+# Fail fast - stop on first failure for critical issues
+fail_fast: false
+
+# Repository settings
+minimum_pre_commit_version: '3.0.0'

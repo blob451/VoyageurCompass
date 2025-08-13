@@ -1,0 +1,297 @@
+services:
+  # PostgreSQL Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: voyageur-db-prod
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - voyageur-network
+    # Production PostgreSQL optimizations
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+
+  # Redis Cache Service
+  redis:
+    image: redis:7-alpine
+    container_name: voyageur-redis-prod
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    # Production Redis configuration
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 300
+      --timeout 300
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - voyageur-network
+
+  # Django Backend Service (Production)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: voyageur-backend-prod
+    restart: unless-stopped
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./logs:/app/logs
+    expose:
+      - "8000"
+    env_file:
+      - .env.prod
+    environment:
+      - DJANGO_SETTINGS_MODULE=VoyageurCompass.settings.production
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      # Production settings
+      - DEBUG=False
+      - SECURE_SSL_REDIRECT=True
+      - SESSION_COOKIE_SECURE=True
+      - CSRF_COOKIE_SECURE=True
+      - SECURE_HSTS_SECONDS=31536000
+      - SECURE_HSTS_INCLUDE_SUBDOMAINS=True
+      - SECURE_HSTS_PRELOAD=True
+      - USE_TZ=True
+      # Logging configuration
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      - APP_ENV=production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        while ! nc -z db 5432; do sleep 1; done &&
+        echo 'Running migrations...' &&
+        python manage.py migrate --noinput &&
+        echo 'Collecting static files...' &&
+        python manage.py collectstatic --noinput --clear &&
+        echo 'Starting Gunicorn server...' &&
+        exec gunicorn VoyageurCompass.wsgi:application
+          --bind 0.0.0.0:8000
+          --workers 4
+          --worker-class sync
+          --worker-connections 1000
+          --timeout 30
+          --keep-alive 2
+          --max-requests 1000
+          --max-requests-jitter 100
+          --preload
+          --access-logfile /app/logs/gunicorn-access.log
+          --error-logfile /app/logs/gunicorn-error.log
+          --log-level info
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+    networks:
+      - voyageur-network
+
+  # Celery Worker Service (Production)
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: voyageur-celery-worker-prod
+    restart: unless-stopped
+    volumes:
+      - media_volume:/app/media
+      - ./logs:/app/logs
+    env_file:
+      - .env.prod
+    environment:
+      - DJANGO_SETTINGS_MODULE=VoyageurCompass.settings.production
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - DEBUG=False
+      - C_FORCE_ROOT=true
+      - LOG_LEVEL=INFO
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Waiting for backend to be ready...' &&
+        sleep 30 &&
+        echo 'Starting Celery Worker...' &&
+        exec celery -A VoyageurCompass worker
+          --loglevel=info
+          --concurrency=4
+          --max-tasks-per-child=1000
+          --time-limit=300
+          --soft-time-limit=240
+          --logfile=/app/logs/celery-worker.log
+      "
+    healthcheck:
+      test: ["CMD", "celery", "-A", "VoyageurCompass", "inspect", "ping"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+    networks:
+      - voyageur-network
+
+  # Celery Beat Scheduler Service (Production)
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: voyageur-celery-beat-prod
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+      - celerybeat_schedule:/app/celerybeat-schedule
+    env_file:
+      - .env.prod
+    environment:
+      - DJANGO_SETTINGS_MODULE=VoyageurCompass.settings.production
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - DEBUG=False
+      - LOG_LEVEL=INFO
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Waiting for backend to be ready...' &&
+        sleep 45 &&
+        echo 'Starting Celery Beat...' &&
+        exec celery -A VoyageurCompass beat
+          --loglevel=info
+          --scheduler django_celery_beat.schedulers:DatabaseScheduler
+          --logfile=/app/logs/celery-beat.log
+      "
+    networks:
+      - voyageur-network
+
+  # Nginx Reverse Proxy (Production)
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.prod
+    container_name: voyageur-nginx-prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+      - static_volume:/var/www/static:ro
+      - media_volume:/var/www/media:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    environment:
+      - NGINX_HOST=${DOMAIN_NAME}
+      - NGINX_PORT=443
+    networks:
+      - voyageur-network
+
+  # React Frontend (Production Build)
+  frontend:
+    build:
+      context: ./Design/frontend
+      dockerfile: Dockerfile.prod
+      args:
+        - VITE_API_URL=${FRONTEND_API_URL}
+    container_name: voyageur-frontend-prod
+    restart: unless-stopped
+    expose:
+      - "80"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - voyageur-network
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    name: voyageur_postgres_data_prod
+  redis_data:
+    name: voyageur_redis_data_prod
+  static_volume:
+    name: voyageur_static_prod
+  media_volume:
+    name: voyageur_media_prod
+  celerybeat_schedule:
+    name: voyageur_celerybeat_schedule_prod
+
+# Production network configuration
+networks:
+  voyageur-network:
+    name: voyageur-network-prod
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16

@@ -149,9 +149,9 @@ class Command(BaseCommand):
             # Check if new tables exist
             cursor.execute(
                 """
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
                 AND table_name IN ('data_sector', 'data_industry', 'data_sectorprice', 'data_industryprice')
             """
             )
