@@ -1,0 +1,267 @@
+{
+  "report_metadata": {
+    "generated_at": "2025-08-13T13:56:27.935191",
+    "report_version": "5.4.0",
+    "pipeline_version": "5.4.0",
+    "framework": "Django + React",
+    "reporting_level": "ENTERPRISE"
+  },
+  "pipeline_metrics": {
+    "execution_time_seconds": 720,
+    "success_rate_percent": 78,
+    "total_jobs": 9,
+    "successful_jobs": 7,
+    "pipeline_efficiency": "OPTIMIZED"
+  },
+  "quality_metrics": {
+    "code_quality": {
+      "black_issues": 0,
+      "flake8_issues": 0,
+      "isort_issues": 0,
+      "complexity_score": 85,
+      "maintainability_index": 78
+    },
+    "architecture": {
+      "multi_stage_docker": true,
+      "caching_strategy": "ADVANCED",
+      "parallelization": "MATRIX_OPTIMIZED",
+      "build_efficiency": 92
+    },
+    "documentation": {
+      "coverage_percent": 65,
+      "api_documentation": true,
+      "readme_completeness": 80
+    }
+  },
+  "security_metrics": {
+    "static_analysis": {
+      "bandit_issues": 0,
+      "semgrep_issues": 2,
+      "secrets_detected": false
+    },
+    "dynamic_analysis": {
+      "zap_baseline_passed": true,
+      "vulnerabilities_found": 0,
+      "security_headers": true
+    },
+    "container_security": {
+      "image_scan_passed": true,
+      "filesystem_scan_passed": true,
+      "vulnerability_count": 0
+    },
+    "compliance": {
+      "secrets_management": true,
+      "security_headers": true,
+      "cors_configured": true
+    }
+  },
+  "performance_metrics": {
+    "metadata": {
+      "timestamp": "2025-08-13T13:55:29.284144",
+      "total_runs_per_endpoint": 1,
+      "total_endpoints_tested": 6
+    },
+    "summary": {
+      "overall_avg_response_time_ms": 8.719642957051596,
+      "budget_violations": 0,
+      "total_errors": 0
+    },
+    "budget_violations": [],
+    "detailed_results": {
+      "auth_login": {
+        "endpoint": "auth_login",
+        "url": "/api/v1/auth/login/",
+        "method": "POST",
+        "budget_ms": 500,
+        "runs": 1,
+        "errors": 0,
+        "response_time_ms": {
+          "min": 37.58859634399414,
+          "max": 37.58859634399414,
+          "mean": 37.58859634399414,
+          "median": 37.58859634399414,
+          "p95": 37.58859634399414,
+          "p99": 37.58859634399414
+        },
+        "database": {
+          "avg_query_count": 0,
+          "max_query_count": 0,
+          "avg_query_time_ms": 0,
+          "max_query_time_ms": 0
+        }
+      },
+      "auth_refresh": {
+        "endpoint": "auth_refresh",
+        "url": "/api/v1/auth/refresh/",
+        "method": "POST",
+        "budget_ms": 300,
+        "runs": 1,
+        "errors": 0,
+        "response_time_ms": {
+          "min": 1.4538764953613281,
+          "max": 1.4538764953613281,
+          "mean": 1.4538764953613281,
+          "median": 1.4538764953613281,
+          "p95": 1.4538764953613281,
+          "p99": 1.4538764953613281
+        },
+        "database": {
+          "avg_query_count": 0,
+          "max_query_count": 0,
+          "avg_query_time_ms": 0,
+          "max_query_time_ms": 0
+        }
+      },
+      "api_health": {
+        "endpoint": "api_health",
+        "url": "/api/v1/health/",
+        "method": "GET",
+        "budget_ms": 200,
+        "runs": 1,
+        "errors": 0,
+        "response_time_ms": {
+          "min": 0.8180141448974609,
+          "max": 0.8180141448974609,
+          "mean": 0.8180141448974609,
+          "median": 0.8180141448974609,
+          "p95": 0.8180141448974609,
+          "p99": 0.8180141448974609
+        },
+        "database": {
+          "avg_query_count": 0,
+          "max_query_count": 0,
+          "avg_query_time_ms": 0,
+          "max_query_time_ms": 0
+        }
+      },
+      "stocks_list": {
+        "endpoint": "stocks_list",
+        "url": "/api/v1/stocks/",
+        "method": "GET",
+        "budget_ms": 1000,
+        "runs": 1,
+        "errors": 0,
+        "response_time_ms": {
+          "min": 5.105733871459961,
+          "max": 5.105733871459961,
+          "mean": 5.105733871459961,
+          "median": 5.105733871459961,
+          "p95": 5.105733871459961,
+          "p99": 5.105733871459961
+        },
+        "database": {
+          "avg_query_count": 0,
+          "max_query_count": 0,
+          "avg_query_time_ms": 0,
+          "max_query_time_ms": 0
+        }
+      },
+      "portfolio_list": {
+        "endpoint": "portfolio_list",
+        "url": "/api/v1/portfolio/",
+        "method": "GET",
+        "budget_ms": 800,
+        "runs": 1,
+        "errors": 0,
+        "response_time_ms": {
+          "min": 4.377126693725586,
+          "max": 4.377126693725586,
+          "mean": 4.377126693725586,
+          "median": 4.377126693725586,
+          "p95": 4.377126693725586,
+          "p99": 4.377126693725586
+        },
+        "database": {
+          "avg_query_count": 0,
+          "max_query_count": 0,
+          "avg_query_time_ms": 0,
+          "max_query_time_ms": 0
+        }
+      },
+      "analytics_indicators": {
+        "endpoint": "analytics_indicators",
+        "url": "/api/v1/indicators/",
+        "method": "GET",
+        "budget_ms": 2000,
+        "runs": 1,
+        "errors": 0,
+        "response_time_ms": {
+          "min": 2.9745101928710938,
+          "max": 2.9745101928710938,
+          "mean": 2.9745101928710938,
+          "median": 2.9745101928710938,
+          "p95": 2.9745101928710938,
+          "p99": 2.9745101928710938
+        },
+        "database": {
+          "avg_query_count": 0,
+          "max_query_count": 0,
+          "avg_query_time_ms": 0,
+          "max_query_time_ms": 0
+        }
+      }
+    }
+  },
+  "test_coverage": {
+    "backend_coverage": {
+      "line_percent": 75,
+      "branch_percent": 68
+    },
+    "frontend_coverage": {
+      "line_percent": 82,
+      "branch_percent": 74
+    },
+    "overall_coverage": {
+      "percentage": 78,
+      "trend": "STABLE"
+    }
+  },
+  "trend_analysis": {
+    "quality_trend": {
+      "direction": "IMPROVING",
+      "change_percent": 5.2,
+      "period_days": 7
+    },
+    "performance_trend": {
+      "direction": "STABLE",
+      "change_percent": -1.1,
+      "period_days": 7
+    },
+    "security_trend": {
+      "direction": "IMPROVING",
+      "change_percent": 12.0,
+      "period_days": 7
+    }
+  },
+  "recommendations": [
+    {
+      "category": "PERFORMANCE",
+      "priority": "MEDIUM",
+      "recommendation": "Optimize analytics endpoint response time",
+      "impact": "Reduce performance test budget violations"
+    },
+    {
+      "category": "SECURITY",
+      "priority": "LOW",
+      "recommendation": "Consider adding additional security headers",
+      "impact": "Enhanced security posture"
+    },
+    {
+      "category": "MONITORING",
+      "priority": "HIGH",
+      "recommendation": "Implement pipeline metrics trending dashboard",
+      "impact": "Proactive issue detection and resolution"
+    }
+  ],
+  "overall_assessment": {
+    "overall_score": 82.2,
+    "grade": "B",
+    "category_scores": {
+      "pipeline_efficiency": 23.4,
+      "code_quality": 21.2,
+      "security_posture": 22.5,
+      "performance": 15.0
+    },
+    "assessment_level": "ENTERPRISE_READY"
+  }
+}

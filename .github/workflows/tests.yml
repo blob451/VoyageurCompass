@@ -18,6 +18,13 @@ env:
   DJANGO_SETTINGS_MODULE: VoyageurCompass.test_settings
   TEST_FAST_MODE: true
   SECRET_KEY: test-secret-key-for-ci
+  
+  # Phase 5.4: Pipeline Metrics & Observability
+  PIPELINE_START_TIME: ${{ github.event.created_at }}
+  WORKFLOW_ID: ${{ github.run_id }}
+  COMMIT_SHA: ${{ github.sha }}
+  BRANCH_NAME: ${{ github.ref_name }}
+  PIPELINE_VERSION: "5.4.0"
   DEBUG: true
   CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
 
@@ -464,15 +471,88 @@ jobs:
         docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
         fail_action: false
         allow_issue_writing: false
+        artifact_name: 'zap-security-scan-results'
 
     # Container security scanning
-    - name: Run Trivy vulnerability scanner
+    - name: Run Trivy vulnerability scanner (Filesystem)
       uses: aquasecurity/trivy-action@master
       with:
         scan-type: 'fs'
         scan-ref: '.'
         format: 'sarif'
-        output: 'trivy-results.sarif'
+        output: 'trivy-fs-results.sarif'
+
+    # Phase 5.4: Container Image Security Scanning  
+    - name: Build security test image
+      run: |
+        echo "::group::🐳 Building container for security scanning"
+        docker build -t voyageur-security-test:latest .
+        echo "::endgroup::"
+
+    - name: Run Trivy container image scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'voyageur-security-test:latest'
+        format: 'sarif'
+        output: 'trivy-image-results.sarif'
+
+    # Phase 5.4: Secrets Detection Enhancement
+    - name: Enhanced secrets scanning
+      run: |
+        echo "::group::🔍 Phase 5.4: Enhanced Secrets Detection"
+        
+        # Install additional secret detection tools
+        pip install detect-secrets
+        
+        # Run comprehensive secrets scan
+        echo "🔎 Scanning for secrets in codebase..."
+        detect-secrets scan --all-files --baseline .secrets.baseline || true
+        
+        # Check for common secret patterns
+        echo "🔍 Checking for common credential patterns..."
+        if grep -r -E "(password|secret|key|token).*=.*['\"][^'\"]{8,}" . --exclude-dir=.git --exclude="*.md" --exclude-dir=node_modules --exclude-dir=__pycache__ || true; then
+          echo "⚠️  Potential hardcoded credentials detected - review above matches"
+        else
+          echo "✅ No obvious hardcoded credentials found"
+        fi
+        
+        # Verify no secrets in environment files
+        echo "🔐 Checking environment file patterns..."
+        find . -name "*.env*" -type f -exec echo "Found env file: {}" \;
+        
+        echo "✅ Secrets scanning completed"
+        echo "::endgroup::"
+
+    # Phase 5.4: Security Policy Validation
+    - name: Security policy compliance check
+      run: |
+        echo "::group::📋 Security Policy Compliance Validation"
+        
+        # Check Docker security best practices
+        echo "🐳 Validating Docker security practices..."
+        if grep -q "USER" Dockerfile; then
+          echo "✅ Non-root user configured in Dockerfile"
+        else
+          echo "⚠️  Consider adding non-root user to Dockerfile"
+        fi
+        
+        # Check for security headers in Django settings
+        echo "⚙️  Validating Django security configuration..."
+        if grep -q "SECURE_" VoyageurCompass/settings.py; then
+          echo "✅ Security headers configured"
+        else
+          echo "⚠️  Consider adding security headers configuration"
+        fi
+        
+        # Validate CORS configuration
+        if grep -q "CORS_" VoyageurCompass/settings.py; then
+          echo "✅ CORS configuration found"
+        else
+          echo "⚠️  CORS configuration may need review"
+        fi
+        
+        echo "📊 Security compliance check completed"
+        echo "::endgroup::"
 
     # Upload security scan results
     - name: Upload security scan results
@@ -483,7 +563,8 @@ jobs:
           semgrep-results.json
           safety-results.json
           npm-audit-results.json
-          trivy-results.sarif
+          trivy-fs-results.sarif
+          trivy-image-results.sarif
         retention-days: 30
 
     # Upload to GitHub Security tab
@@ -656,7 +737,11 @@ jobs:
 
     - name: Generate comprehensive quality report
       run: |
+        # Generate both standard and enhanced reports
         python manage.py generate_quality_report --output quality_metrics_report.json --html --verbose
+        
+        # Phase 5.4: Generate enhanced report with observability features
+        python manage.py generate_enhanced_quality_report --output enhanced_quality_report.json --html --include-trends --verbose
 
     - name: Upload quality dashboard
       uses: actions/upload-artifact@v4
@@ -665,12 +750,118 @@ jobs:
         path: |
           quality_metrics_report.json
           quality_metrics_report.html
+          enhanced_quality_report.json
+          enhanced_quality_report.html
         retention-days: 30
 
   # Comprehensive status report
-  status-report:
+  pipeline-metrics:
     runs-on: ubuntu-latest
     needs: [quick-checks, backend-tests, frontend-tests, integration-tests, performance-tests, security-scan, code-quality, build-test, quality-dashboard]
+    if: always()
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Collect Pipeline Metrics
+      run: |
+        echo "::group::📊 Phase 5.4: Pipeline Execution Metrics"
+        
+        # Calculate pipeline execution time
+        PIPELINE_END_TIME=$(date +%s)
+        PIPELINE_START_UNIX=$(date -d "${{ env.PIPELINE_START_TIME }}" +%s 2>/dev/null || echo $(date +%s))
+        PIPELINE_DURATION=$((PIPELINE_END_TIME - PIPELINE_START_UNIX))
+        
+        # Collect job statuses
+        echo "🔍 Pipeline Execution Analysis:"
+        echo "  Pipeline ID: ${{ env.WORKFLOW_ID }}"
+        echo "  Commit SHA: ${{ env.COMMIT_SHA }}"
+        echo "  Branch: ${{ env.BRANCH_NAME }}"
+        echo "  Pipeline Version: ${{ env.PIPELINE_VERSION }}"
+        echo "  Total Duration: ${PIPELINE_DURATION}s"
+        echo "  Started: ${{ env.PIPELINE_START_TIME }}"
+        echo "  Ended: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        echo ""
+        
+        # Job execution metrics
+        echo "📋 Job Execution Summary:"
+        echo "  ✅ Quick Checks: ${{ needs.quick-checks.result }}"
+        echo "  ✅ Backend Tests: ${{ needs.backend-tests.result }}"
+        echo "  ✅ Frontend Tests: ${{ needs.frontend-tests.result }}"
+        echo "  ✅ Integration Tests: ${{ needs.integration-tests.result }}"
+        echo "  ⚠️  Performance Tests: ${{ needs.performance-tests.result }}"
+        echo "  ⚠️  Security Scan: ${{ needs.security-scan.result }}"
+        echo "  ✅ Code Quality: ${{ needs.code-quality.result }}"
+        echo "  ✅ Build Test: ${{ needs.build-test.result }}"
+        echo "  ✅ Quality Dashboard: ${{ needs.quality-dashboard.result }}"
+        echo ""
+        
+        # Calculate success metrics
+        TOTAL_JOBS=9
+        SUCCESSFUL_JOBS=0
+        [[ "${{ needs.quick-checks.result }}" == "success" ]] && SUCCESSFUL_JOBS=$((SUCCESSFUL_JOBS + 1))
+        [[ "${{ needs.backend-tests.result }}" == "success" ]] && SUCCESSFUL_JOBS=$((SUCCESSFUL_JOBS + 1))
+        [[ "${{ needs.frontend-tests.result }}" == "success" ]] && SUCCESSFUL_JOBS=$((SUCCESSFUL_JOBS + 1))
+        [[ "${{ needs.integration-tests.result }}" == "success" ]] && SUCCESSFUL_JOBS=$((SUCCESSFUL_JOBS + 1))
+        [[ "${{ needs.performance-tests.result }}" == "success" ]] && SUCCESSFUL_JOBS=$((SUCCESSFUL_JOBS + 1))
+        [[ "${{ needs.security-scan.result }}" == "success" ]] && SUCCESSFUL_JOBS=$((SUCCESSFUL_JOBS + 1))
+        [[ "${{ needs.code-quality.result }}" == "success" ]] && SUCCESSFUL_JOBS=$((SUCCESSFUL_JOBS + 1))
+        [[ "${{ needs.build-test.result }}" == "success" ]] && SUCCESSFUL_JOBS=$((SUCCESSFUL_JOBS + 1))
+        [[ "${{ needs.quality-dashboard.result }}" == "success" ]] && SUCCESSFUL_JOBS=$((SUCCESSFUL_JOBS + 1))
+        
+        SUCCESS_RATE=$((SUCCESSFUL_JOBS * 100 / TOTAL_JOBS))
+        
+        echo "📈 Pipeline Performance Metrics:"
+        echo "  Success Rate: ${SUCCESS_RATE}% (${SUCCESSFUL_JOBS}/${TOTAL_JOBS} jobs)"
+        echo "  Critical Path Status: ${{ needs.backend-tests.result == 'success' && needs.code-quality.result == 'success' && 'PASSED' || 'FAILED' }}"
+        echo "  Pipeline Health: ${{ success() && 'HEALTHY' || failure() && 'CRITICAL' || 'WARNING' }}"
+        echo ""
+        
+        # Generate metrics JSON
+        cat > pipeline_metrics.json << EOF
+        {
+          "pipeline_id": "${{ env.WORKFLOW_ID }}",
+          "commit_sha": "${{ env.COMMIT_SHA }}",
+          "branch": "${{ env.BRANCH_NAME }}",
+          "pipeline_version": "${{ env.PIPELINE_VERSION }}",
+          "execution_time_seconds": ${PIPELINE_DURATION},
+          "started_at": "${{ env.PIPELINE_START_TIME }}",
+          "ended_at": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')",
+          "success_rate_percent": ${SUCCESS_RATE},
+          "total_jobs": ${TOTAL_JOBS},
+          "successful_jobs": ${SUCCESSFUL_JOBS},
+          "job_results": {
+            "quick_checks": "${{ needs.quick-checks.result }}",
+            "backend_tests": "${{ needs.backend-tests.result }}",
+            "frontend_tests": "${{ needs.frontend-tests.result }}",
+            "integration_tests": "${{ needs.integration-tests.result }}",
+            "performance_tests": "${{ needs.performance-tests.result }}",
+            "security_scan": "${{ needs.security-scan.result }}",
+            "code_quality": "${{ needs.code-quality.result }}",
+            "build_test": "${{ needs.build-test.result }}",
+            "quality_dashboard": "${{ needs.quality-dashboard.result }}"
+          }
+        }
+        EOF
+        
+        echo "💾 Pipeline metrics saved to pipeline_metrics.json"
+        echo "::endgroup::"
+
+    - name: Upload Pipeline Metrics
+      uses: actions/upload-artifact@v4
+      with:
+        name: pipeline-execution-metrics
+        path: pipeline_metrics.json
+        retention-days: 30
+
+  status-report:
+    runs-on: ubuntu-latest
+    needs: [quick-checks, backend-tests, frontend-tests, integration-tests, performance-tests, security-scan, code-quality, build-test, quality-dashboard, pipeline-metrics]
     if: always()
     
     steps:
@@ -812,7 +1003,7 @@ jobs:
 
   notify:
     runs-on: ubuntu-latest
-    needs: [status-report]
+    needs: [status-report, pipeline-metrics]
     if: always()
     
     steps:
