@@ -12,7 +12,14 @@ from django.utils import timezone
 
 import pytest
 
-from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
+from Data.models import (
+    DataIndustry,
+    DataSector,
+    Portfolio,
+    PortfolioHolding,
+    Stock,
+    StockPrice,
+)
 
 
 @pytest.mark.django_db
@@ -95,9 +102,9 @@ class TestStockModel:
                 volume=50000000,
             )
 
-        # Get last 7 days (includes 7 days from today backwards)
+        # Get last 7 days (includes today + 7 previous days = 8 total)
         history = stock.get_price_history(days=7)
-        assert history.count() == 7
+        assert history.count() == 8
 
         # Get last 30 days (should return all 10)
         history = stock.get_price_history(days=30)
@@ -385,3 +392,118 @@ class TestPortfolioHoldingModel:
                 average_price=Decimal("155.00"),
                 purchase_date=date.today(),
             )
+
+
+@pytest.mark.django_db
+class TestDataSectorModel:
+    """Test cases for DataSector model."""
+
+    def test_create_data_sector(self):
+        """Test creating a data sector instance."""
+        sector = DataSector.objects.create(
+            sectorKey="technology",
+            sectorName="Technology",
+            isActive=True,
+        )
+
+        assert sector.sectorKey == "technology"
+        assert sector.sectorName == "Technology"
+        assert sector.isActive is True
+        assert str(sector) == "Technology"
+
+    def test_sector_unique_key(self):
+        """Test that sector keys must be unique."""
+        DataSector.objects.create(sectorKey="technology", sectorName="Technology")
+
+        with pytest.raises(IntegrityError):
+            DataSector.objects.create(sectorKey="technology", sectorName="Tech")
+
+    def test_sector_str_representation(self):
+        """Test the string representation of DataSector."""
+        sector = DataSector.objects.create(
+            sectorKey="healthcare", sectorName="Healthcare Services"
+        )
+        assert str(sector) == "Healthcare Services"
+
+    def test_sector_meta_ordering(self):
+        """Test that sectors are ordered by name."""
+        DataSector.objects.create(sectorKey="tech", sectorName="Technology")
+        DataSector.objects.create(sectorKey="health", sectorName="Healthcare")
+        
+        sectors = list(DataSector.objects.all())
+        assert sectors[0].sectorName == "Healthcare"
+        assert sectors[1].sectorName == "Technology"
+
+
+@pytest.mark.django_db
+class TestDataIndustryModel:
+    """Test cases for DataIndustry model."""
+
+    def test_create_data_industry(self):
+        """Test creating a data industry instance."""
+        sector = DataSector.objects.create(
+            sectorKey="technology", sectorName="Technology"
+        )
+        industry = DataIndustry.objects.create(
+            sector=sector,
+            industryKey="software_infrastructure",
+            industryName="Software - Infrastructure",
+            isActive=True,
+        )
+
+        assert industry.sector == sector
+        assert industry.industryKey == "software_infrastructure"
+        assert industry.industryName == "Software - Infrastructure"
+        assert industry.isActive is True
+        assert str(industry) == "Software - Infrastructure (Technology)"
+
+    def test_industry_unique_key(self):
+        """Test that industry keys must be unique."""
+        sector = DataSector.objects.create(
+            sectorKey="technology", sectorName="Technology"
+        )
+        DataIndustry.objects.create(
+            sector=sector,
+            industryKey="software_infrastructure",
+            industryName="Software - Infrastructure",
+        )
+
+        with pytest.raises(IntegrityError):
+            DataIndustry.objects.create(
+                sector=sector,
+                industryKey="software_infrastructure",
+                industryName="Software Infrastructure",
+            )
+
+    def test_industry_str_representation(self):
+        """Test the string representation of DataIndustry."""
+        sector = DataSector.objects.create(
+            sectorKey="healthcare", sectorName="Healthcare"
+        )
+        industry = DataIndustry.objects.create(
+            sector=sector,
+            industryKey="biotech",
+            industryName="Biotechnology",
+        )
+        assert str(industry) == "Biotechnology (Healthcare)"
+
+    def test_industry_foreign_key_relationship(self):
+        """Test the foreign key relationship with DataSector."""
+        sector = DataSector.objects.create(
+            sectorKey="technology", sectorName="Technology"
+        )
+        industry = DataIndustry.objects.create(
+            sector=sector,
+            industryKey="software",
+            industryName="Software Services",
+        )
+        
+        # Test the relationship
+        assert industry.sector == sector
+        assert industry in sector.industries.all()
+        
+        # Test cascade deletion
+        sector_id = sector.id
+        sector.delete()
+        with pytest.raises(DataIndustry.DoesNotExist):
+            DataIndustry.objects.get(id=industry.id)

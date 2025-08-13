@@ -15,7 +15,7 @@ class CustomCorsMiddleware(MiddlewareMixin):
 
     def __call__(self, request):
         response = self.get_response(request)
-        
+
         # Add CORS headers
         response["Access-Control-Allow-Origin"] = "*"
         response["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
@@ -23,7 +23,7 @@ class CustomCorsMiddleware(MiddlewareMixin):
             "Content-Type, Authorization, X-Requested-With, Accept"
         )
         response["Access-Control-Max-Age"] = "3600"
-        
+
         return response
 
     def process_request(self, request):
