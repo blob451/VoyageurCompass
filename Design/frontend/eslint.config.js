@@ -50,10 +50,13 @@ export default [
     },
   },
   {
-    files: ['vite.config.js', 'vitest.config.js', '*.config.js'],
+    files: ['vite.config.js', 'vitest.config.js', 'lighthouserc.js', '*.config.js'],
     languageOptions: {
       globals: {
         ...globals.node,
+        module: 'readonly',
+        require: 'readonly',
+        process: 'readonly',
         __dirname: 'readonly',
         __filename: 'readonly',
       },

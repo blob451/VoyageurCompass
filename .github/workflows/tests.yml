@@ -535,7 +535,7 @@ jobs:
     - name: Download coverage artifacts
       uses: actions/download-artifact@v4
       with:
-        name: frontend-coverage
+        name: frontend-coverage-tests-workflow
         path: Design/frontend/coverage/
       continue-on-error: true
 
