@@ -819,7 +819,7 @@ jobs:
         echo "Status Pipeline Performance Metrics:"
         echo "  Success Rate: ${SUCCESS_RATE}% (${SUCCESSFUL_JOBS}/${TOTAL_JOBS} jobs)"
         echo "  Critical Path Status: ${{ needs.backend-tests.result == 'success' && needs.code-quality.result == 'success' && 'PASSED' || 'FAILED' }}"
-        echo "  Pipeline Health: ${{ success() && 'HEALTHY' || failure() && 'CRITICAL' || 'WARNING' }}"
+        echo "  Pipeline Health: ${{ job.status == 'success' && 'HEALTHY' || job.status == 'failure' && 'CRITICAL' || 'WARNING' }}"
         echo ""
         
         # Generate metrics JSON
