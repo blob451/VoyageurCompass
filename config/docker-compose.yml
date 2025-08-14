@@ -64,20 +64,20 @@ services:
   # Django Backend Service
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: config/Dockerfile
     container_name: voyageur-backend
     restart: unless-stopped
     volumes:
       # Mount entire project for hot-reloading
-      - .:/app:delegated
+      - ..:/app:delegated
       # Prevent node_modules from frontend being copied
       - /app/Design/frontend/node_modules
       # Use named volume for static files
       - static_volume:/app/staticfiles
       - media_volume:/app/Design/media
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     env_file:
       - .env
     environment:
@@ -129,13 +129,13 @@ services:
   # Celery Worker Service
   celery_worker:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: config/Dockerfile
     container_name: voyageur-celery-worker
     restart: unless-stopped
     volumes:
       # Mount entire project
-      - .:/app:delegated
+      - ..:/app:delegated
       # Prevent node_modules from frontend being copied
       - /app/Design/frontend/node_modules
       # Share media volume with backend
@@ -173,13 +173,13 @@ services:
   # Celery Beat Scheduler Service
   celery_beat:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: config/Dockerfile
     container_name: voyageur-celery-beat
     restart: unless-stopped
     volumes:
       # Mount entire project
-      - .:/app:delegated
+      - ..:/app:delegated
       # Prevent node_modules from frontend being copied
       - /app/Design/frontend/node_modules
       # Celery beat schedule file
@@ -216,19 +216,19 @@ services:
   # React Frontend Service (Vite)
   frontend:
     build:
-      context: ./Design/frontend
+      context: ../Design/frontend
       dockerfile: Dockerfile
     container_name: voyageur-frontend
     restart: unless-stopped
     volumes:
       # Mount frontend source for hot-reloading
-      - ./Design/frontend:/app:delegated
+      - ../Design/frontend:/app:delegated
       # Use anonymous volume for node_modules to prevent conflicts
       - /app/node_modules
-    expose:
-      - "3000"
+    ports:
+      - "3000:3000"
     environment:
-      - VITE_API_URL=http://localhost:8000/api
+      - VITE_API_URL=http://localhost:8000/api/v1
       - WATCHPACK_POLLING=true  # For file watching on Windows
       - CHOKIDAR_USEPOLLING=true  # For hot reload on Windows
     depends_on:

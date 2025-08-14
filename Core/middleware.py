@@ -10,10 +10,20 @@ class CustomCorsMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        origin = request.headers.get('Origin')
+        
         # Handle preflight requests early to avoid 405s in non-DRF views
         if request.method == 'OPTIONS':
             resp = HttpResponse(status=204)
-            resp['Access-Control-Allow-Origin'] = '*'
+            
+            # Allow specific origins or localhost for development
+            if origin and (origin.startswith('http://localhost') or origin.startswith('http://127.0.0.1')):
+                resp['Access-Control-Allow-Origin'] = origin
+                resp['Access-Control-Allow-Credentials'] = 'true'
+            else:
+                resp['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+                resp['Access-Control-Allow-Credentials'] = 'true'
+            
             # Echo requested headers when present, fallback to a sensible default
             requested = request.headers.get('Access-Control-Request-Headers')
             resp['Access-Control-Allow-Headers'] = requested or 'Authorization, Content-Type'
@@ -26,8 +36,14 @@ class CustomCorsMiddleware:
         response = self.get_response(request)
 
         # Add CORS headers for non-preflight responses
-        response['Access-Control-Allow-Origin'] = '*'
-        # Expose custom headers to clients (Allow-* headers are ignored on actual responses)
+        if origin and (origin.startswith('http://localhost') or origin.startswith('http://127.0.0.1')):
+            response['Access-Control-Allow-Origin'] = origin
+            response['Access-Control-Allow-Credentials'] = 'true'
+        else:
+            response['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+            response['Access-Control-Allow-Credentials'] = 'true'
+        
+        # Expose custom headers to clients
         response['Access-Control-Expose-Headers'] = 'X-Request-Id'
         response['Vary'] = 'Origin'
         return response

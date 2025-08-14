@@ -13,6 +13,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout, selectCurrentUser } from '../../features/auth/authSlice';
+import { useLogoutMutation } from '../../features/api/apiSlice';
 import { 
   TrendingUp, 
   ExpandMore,
@@ -28,16 +29,48 @@ const Navbar = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector(selectCurrentUser);
+  const [logoutApi] = useLogoutMutation();
   const [toolsMenuAnchor, setToolsMenuAnchor] = useState(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
 
   // Mock user credits
   const userCredits = 25;
 
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate('/login');
-    setUserMenuAnchor(null);
+  const handleLogout = async () => {
+    try {
+      setUserMenuAnchor(null);
+      
+      // Get refresh token for API logout
+      const refreshToken = localStorage.getItem('refreshToken');
+      
+      // Call logout API
+      if (refreshToken) {
+        try {
+          await logoutApi(refreshToken).unwrap();
+        } catch (error) {
+          console.warn('Logout API call failed:', error);
+          // Continue with client-side logout even if API fails
+        }
+      }
+      
+      // Dispatch logout action
+      dispatch(logout({ reason: 'manual' }));
+      
+      // Navigate to logout page
+      navigate('/logout', { 
+        replace: true, 
+        state: { reason: 'manual' } 
+      });
+      
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Fallback: force logout anyway
+      dispatch(logout({ reason: 'manual' }));
+      navigate('/logout', { 
+        replace: true, 
+        state: { reason: 'error' } 
+      });
+    }
   };
 
   const handleToolsMenuOpen = (event) => {

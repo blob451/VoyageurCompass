@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { useLoginMutation } from '../features/api/apiSlice';
 import { setCredentials } from '../features/auth/authSlice';
+import { authLogger } from '../utils/logger';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -65,11 +66,13 @@ const LoginPage = () => {
     }
 
     try {
+      authLogger.info('Login attempt', { username: formData.username });
       const userData = await login(formData).unwrap();
+      authLogger.info('Login successful', { user: userData.user });
       dispatch(setCredentials(userData));
       navigate('/dashboard');
     } catch (err) {
-      console.error('Failed to login:', err);
+      authLogger.error('Login failed', { error: err.data?.detail || 'Authentication failed' });
     }
   };
 

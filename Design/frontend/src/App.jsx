@@ -5,11 +5,14 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { CircularProgress, Box, Typography } from '@mui/material';
 import Layout from './components/Layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import SessionProvider from './components/SessionProvider';
+import AuthInitializer from './components/AuthInitializer';
 
 // Lazy load page components for code splitting
 const HomePage = lazy(() => import('./pages/HomePage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const LogoutPage = lazy(() => import('./pages/LogoutPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const StockSearchPage = lazy(() => import('./pages/StockSearchPage'));
 const ComparisonPage = lazy(() => import('./pages/ComparisonPage'));
@@ -120,14 +123,17 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
+        <AuthInitializer>
+          <SessionProvider>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
               
               {/* Public routes */}
               <Route path="login" element={<LoginPage />} />
               <Route path="register" element={<RegisterPage />} />
+              <Route path="logout" element={<LogoutPage />} />
               <Route path="help" element={<HelpPage />} />
               
               {/* Protected routes */}
@@ -143,8 +149,10 @@ function App() {
               {/* Catch-all route for 404 */}
               <Route path="*" element={<NotFound />} />
             </Route>
-          </Routes>
-        </Suspense>
+              </Routes>
+            </Suspense>
+          </SessionProvider>
+        </AuthInitializer>
       </Router>
     </ThemeProvider>
   );

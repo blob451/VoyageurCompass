@@ -15,7 +15,7 @@ class TestRunner:
     """Main test runner class."""
     
     def __init__(self):
-        self.project_root = Path(__file__).parent.parent
+        self.project_root = Path(__file__).parent.parent.parent
         self.frontend_dir = self.project_root / "Design" / "frontend"
         
     def run_backend_tests(self, test_type="all", coverage=False, verbose=True):

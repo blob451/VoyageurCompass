@@ -91,6 +91,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'Core.backends.BlacklistCheckMiddleware',  # Check for blacklisted JWT tokens
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'Core.middleware.RequestLoggingMiddleware',
@@ -205,6 +206,12 @@ CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
 CELERY_BEAT_SCHEDULE = {}
 
 
+# Authentication Backends
+AUTHENTICATION_BACKENDS = [
+    'Core.backends.EmailOrUsernameModelBackend',  # Custom backend for email/username login
+    'django.contrib.auth.backends.ModelBackend',  # Fallback to default Django backend
+]
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -213,7 +220,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
         'OPTIONS': {
-            'min_length': 8,
+            'min_length': 10,
         }
     },
     {

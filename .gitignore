@@ -56,5 +56,10 @@ Design/frontend/.env.development.local
 Design/frontend/.env.test.local
 Design/frontend/.env.production.local
 
+# Docker generated directories that may be created during runtime
+celerybeat-schedule/
+staticfiles/
+certs/
+
 # Optional: Django static files (uncomment if you want to regenerate)
-# staticfiles/
+# Design/staticfiles/
