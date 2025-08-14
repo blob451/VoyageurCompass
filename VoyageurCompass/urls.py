@@ -32,8 +32,8 @@ from Core.views import readinessCheck as readiness_check
 urlpatterns = [
     path("admin/", admin.site.urls),
     # Health checks at root level
-    path("healthz", health_check_liveness, name="health_liveness_root"),
-    path("readyz", readiness_check, name="health_readiness_root"),
+    path("healthz/", health_check_liveness, name="health_liveness_root"),
+    path("readyz/", readiness_check, name="health_readiness_root"),
     # API endpoints
     path("api/v1/", include("Core.urls")),
     path("api/v1/", include("Data.urls")),

@@ -12,7 +12,7 @@ class HealthCheckTestCase(TestCase):
 
     def test_healthzReturns200Quickly(self):
         """Test /healthz returns 200 status quickly"""
-        response = self.client.get("/healthz")
+        response = self.client.get("/healthz/")
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -21,7 +21,7 @@ class HealthCheckTestCase(TestCase):
 
     def test_readyzReturns200WhenDbReachable(self):
         """Test /readyz returns 200 when database is reachable"""
-        response = self.client.get("/readyz")
+        response = self.client.get("/readyz/")
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -35,7 +35,7 @@ class HealthCheckTestCase(TestCase):
         # Mock database connection failure
         mock_cursor.side_effect = Exception("Database connection failed")
 
-        response = self.client.get("/readyz")
+        response = self.client.get("/readyz/")
 
         self.assertEqual(response.status_code, 503)
         data = response.json()
