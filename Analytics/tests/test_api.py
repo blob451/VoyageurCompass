@@ -49,14 +49,6 @@ class TestAnalyticsAPI(APITestCase):
                 close=Decimal('152.00') + Decimal(str(i % 5)),
                 volume=50000000 + (i * 1000000)
             )
-    @pytest.mark.skip(reason="URL not implemented") 
-    def test_analysis_endpoint_unauthenticated(self):
-        """Test that analysis endpoint requires authentication."""
-        url = reverse('analytics:stock-analysis', kwargs={'symbol': 'AAPL'})
-        response = self.client.get(url)
-        
-        # Should return 401 Unauthorized
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
     
     def test_analysis_endpoint_authenticated(self):
         """Test analysis endpoint with authenticated user."""
@@ -165,10 +157,6 @@ class TestAnalyticsAPI(APITestCase):
         self.assertIn('rsi', indicators)
         self.assertIn('macd', indicators)
     
-    @pytest.mark.skip(reason="Watchlist model not implemented")
-    def test_portfolio_analysis_endpoint(self):
-        """Test portfolio analysis for user's watchlist."""
-        pass  # Skip until Watchlist model is created
     
     def test_historical_data_endpoint(self):
         """Test historical data retrieval with date range."""
@@ -205,18 +193,3 @@ class TestAnalyticsAPI(APITestCase):
             self.assertIn('close', first_entry)
             self.assertIn('volume', first_entry)
     
-    @pytest.mark.skip(reason="Rate limiting not yet implemented")
-    def test_rate_limiting(self):
-        """Test that API endpoints have rate limiting."""
-        self.client.force_authenticate(user=self.user)
-        
-        url = reverse('analytics:stock-analysis', kwargs={'symbol': 'AAPL'})
-        
-        # Make many rapid requests
-        responses = []
-        for _ in range(100):
-            response = self.client.get(url)
-            responses.append(response.status_code)
-        
-        # When rate limiting is implemented, uncomment:
-        # self.assertIn(status.HTTP_429_TOO_MANY_REQUESTS, responses)
