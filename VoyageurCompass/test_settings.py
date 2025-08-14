@@ -81,9 +81,6 @@ DEBUG = False
 USE_TZ = False  # Faster datetime handling in tests
 SECRET_KEY = "test-secret-key-not-for-production"
 
-# Disable URL redirects to prevent 301 issues in tests
-APPEND_SLASH = False
-
 # Configure templates for tests - disable caching and fix loader conflict
 TEMPLATES = [
     {

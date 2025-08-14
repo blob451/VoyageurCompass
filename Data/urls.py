@@ -23,8 +23,8 @@ from Data.views import (
 
 app_name = "data"
 
-# Create router for ViewSets with trailing slashes enabled
-router = DefaultRouter(trailing_slash=True)
+# Create router for ViewSets
+router = DefaultRouter()
 router.register(r"stocks", StockViewSet, basename="stock")
 router.register(r"prices", StockPriceViewSet, basename="price")
 router.register(r"portfolios", PortfolioViewSet, basename="portfolio")
