@@ -1,234 +1,43 @@
-# Byte-compiled / optimized / DLL files
+# VoyageurCompass - School Project .gitignore
+
+# Environment variables (contains secrets)
+.env
+
+# Python cache and compiled files
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 
-# C extensions
-*.so
+# Virtual environments
+venv/
+env/
+.venv/
 
-# Claude
-prompts/
+# IDE and editor files
+.vscode/
 .claude/
-CLAUDE.md
-prompt-output.md
-code-review-output.md  # Backward compatibility for older tools
-codeReview.md
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py.cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# UV
-#uv.lock
-
-# poetry
-#poetry.lock
-#poetry.toml
-
-# pdm
-#pdm.lock
-#pdm.toml
-.pdm-python
-.pdm-build/
-
-# pixi
-#pixi.lock
-.pixi
-
-# PEP 582
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.envrc
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-VoyageurEnv/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# VS Code
-.vscode/
-*.code-workspace
-
-# PyCharm
 .idea/
-
-# Cursor
-.cursorignore
-.cursorindexingignore
-
-# Marimo
-marimo/_static/
-marimo/_lsp/
-__marimo__/
-
-# macOS
-.DS_Store
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# VoyageurCompass specific
-
-# Temp directory - keep directory but ignore contents
-Temp/*
-!Temp/.gitkeep
-
-# Media uploads
-Design/media/*
-!Design/media/.gitkeep
-
-# Static files collected for production
-staticfiles/
-
-# Log files
-logs/
-*.log
-
-# Database backups
-*.sql
-*.dump
-
-# Node modules (for React frontend)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# React build output
-Design/frontend/build/
-Design/frontend/dist/
-
-# Python virtual environments
-VoyageurEnv/
-venv/
-env/
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# IDE specific files
-.idea/
-.vscode/
 *.swp
 *.swo
 *~
+
+# Development cache and temporary files
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Temporary directory (contains development work)
+Temp/
+
+# Django development files
+db.sqlite3
+db.sqlite3-journal
+
+# Log files
+*.log
+logs/*.txt
 
 # OS generated files
 .DS_Store
@@ -239,31 +48,13 @@ env/
 ehthumbs.db
 Thumbs.db
 
-# Backup files
-*.bak
-*.backup
-*~
+# Node.js (frontend)
+Design/frontend/node_modules/
+Design/frontend/dist/
+Design/frontend/.env.local
+Design/frontend/.env.development.local
+Design/frontend/.env.test.local
+Design/frontend/.env.production.local
 
-# Cache files
-*.pyc
-*.pyo
-*.pyd
-.Python
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Test coverage
-htmlcov/
-.coverage
-.coverage.*
-.cache
-.pytest_cache/
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-
-# Documentation build files
-docs/_build/
-docs/_static/
-docs/_templates/
+# Optional: Django static files (uncomment if you want to regenerate)
+# staticfiles/

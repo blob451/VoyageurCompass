@@ -234,7 +234,7 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = BASE_DIR / 'Design' / 'staticfiles'
 # Only add static dir if it exists
 staticDir = BASE_DIR / 'Design' / 'static'
 STATICFILES_DIRS = [staticDir] if staticDir.exists() else []
