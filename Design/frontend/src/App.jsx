@@ -7,8 +7,16 @@ import Layout from './components/Layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Lazy load page components for code splitting
+const HomePage = lazy(() => import('./pages/HomePage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const StockSearchPage = lazy(() => import('./pages/StockSearchPage'));
+const ComparisonPage = lazy(() => import('./pages/ComparisonPage'));
+const SectorPage = lazy(() => import('./pages/SectorPage'));
+const StorePage = lazy(() => import('./pages/StorePage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const HelpPage = lazy(() => import('./pages/HelpPage'));
 
 // Loading component with accessibility support
 const PageLoader = () => (
@@ -115,11 +123,23 @@ function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Layout />}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route index element={<HomePage />} />
+              
+              {/* Public routes */}
               <Route path="login" element={<LoginPage />} />
+              <Route path="register" element={<RegisterPage />} />
+              <Route path="help" element={<HelpPage />} />
+              
+              {/* Protected routes */}
               <Route element={<ProtectedRoute />}>
                 <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="stocks" element={<StockSearchPage />} />
+                <Route path="compare" element={<ComparisonPage />} />
+                <Route path="sectors" element={<SectorPage />} />
+                <Route path="store" element={<StorePage />} />
+                <Route path="settings" element={<SettingsPage />} />
               </Route>
+              
               {/* Catch-all route for 404 */}
               <Route path="*" element={<NotFound />} />
             </Route>

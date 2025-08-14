@@ -27,6 +27,8 @@ vi.mock('recharts', () => ({
   Cell: () => <div data-testid="cell" />,
   BarChart: ({ children }) => <div data-testid="bar-chart">{children}</div>,
   Bar: () => <div data-testid="bar" />,
+  AreaChart: ({ children }) => <div data-testid="area-chart">{children}</div>,
+  Area: () => <div data-testid="area" />,
 }))
 
 // Create a mock store
