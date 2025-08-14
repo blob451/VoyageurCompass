@@ -25,7 +25,7 @@ class AuthenticationService:
     # =====================================================================
     
     @staticmethod
-    def validateUsername(username: str) -> str:
+    def validate_username(username: str) -> str:
         """Validate username input"""
         if not username or not isinstance(username, str):
             raise ValueError("Username must be a non-empty string")
@@ -38,7 +38,7 @@ class AuthenticationService:
         return username
     
     @staticmethod
-    def validateEmail(email: str) -> str:
+    def validate_email(email: str) -> str:
         """Validate email format"""
         if not email or not isinstance(email, str):
             raise ValueError("Email must be a non-empty string")
@@ -51,7 +51,7 @@ class AuthenticationService:
         return email
     
     @staticmethod
-    def validatePassword(password: str) -> str:
+    def validate_password(password: str) -> str:
         """Validate password strength"""
         if not password or not isinstance(password, str):
             raise ValueError("Password must be a non-empty string")
@@ -65,22 +65,14 @@ class AuthenticationService:
         return password
     
     @staticmethod
-    def sanitizeInput(value: str, maxLength: int = 255) -> str:
+    def sanitize_input(value: str, max_length: int = 255) -> str:
         """Sanitize and limit input string"""
         if not value:
             return ""
         # Remove control characters and limit length
         sanitized = ''.join(char for char in value if char.isprintable())
-        return sanitized[:maxLength].strip()
+        return sanitized[:max_length].strip()
     
-    # =====================================================================
-    # camelCase wrapper methods
-    # =====================================================================
-    
-    @staticmethod
-    def registerUser(username: str, email: str, password: str, **extraFields) -> Dict:
-        """camelCase wrapper for register_user"""
-        return AuthenticationService.register_user(username, email, password, **extraFields)
     
     @staticmethod
     def register_user(username: str, email: str, password: str, **extra_fields) -> Dict:
@@ -98,17 +90,17 @@ class AuthenticationService:
         """
         try:
             # Input validation
-            username = AuthenticationService.validateUsername(username)
-            email = AuthenticationService.validateEmail(email)
-            password = AuthenticationService.validatePassword(password)
+            username = AuthenticationService.validate_username(username)
+            email = AuthenticationService.validate_email(email)
+            password = AuthenticationService.validate_password(password)
             
             # Sanitize extra fields
-            sanitizedExtraFields = {}
+            sanitized_extra_fields = {}
             for key, value in extra_fields.items():
                 if key in ['first_name', 'last_name'] and isinstance(value, str):
-                    sanitizedExtraFields[key] = AuthenticationService.sanitizeInput(value, 30)
+                    sanitized_extra_fields[key] = AuthenticationService.sanitize_input(value, 30)
                 else:
-                    sanitizedExtraFields[key] = value
+                    sanitized_extra_fields[key] = value
             
             # Validate email
             if User.objects.filter(email=email).exists():
@@ -122,7 +114,7 @@ class AuthenticationService:
                 username=username,
                 email=email,
                 password=password,
-                **sanitizedExtraFields
+                **sanitized_extra_fields
             )
             
             logger.info(f"New user registered: {username}")
@@ -144,10 +136,6 @@ class AuthenticationService:
                 'error': str(e)
             }
     
-    @staticmethod
-    def authenticateUser(request, username: str, password: str) -> Dict:
-        """camelCase wrapper for authenticate_user"""
-        return AuthenticationService.authenticate_user(request, username, password)
     
     @staticmethod
     def authenticate_user(request, username: str, password: str) -> Dict:
@@ -172,9 +160,9 @@ class AuthenticationService:
             username = username.strip()
             
             # Determine if input is email or username
-            isEmail = '@' in username
+            is_email = '@' in username
             if '@' in username:
-                email = AuthenticationService.validateEmail(username)
+                email = AuthenticationService.validate_email(username)
                 # Try to get username from email
                 try:
                     userObj = User.objects.get(email=email)
@@ -184,12 +172,12 @@ class AuthenticationService:
                     user = None
             else:
                 # Regular username login
-                username = AuthenticationService.validateUsername(username)
+                username = AuthenticationService.validate_username(username)
                 user = authenticate(request, username=username, password=password)
             
             # If email login failed, try one more time with the email as username
             # (in case someone registered with email as their username)
-            if not user and isEmail:
+            if not user and is_email:
                 try:
                     # Try authenticating with email string as username
                     user = authenticate(request, username=email, password=password)
@@ -223,10 +211,6 @@ class AuthenticationService:
                 'error': str(e)
             }
     
-    @staticmethod
-    def logoutUser(request) -> Dict:
-        """camelCase wrapper for logout_user"""
-        return AuthenticationService.logout_user(request)
     
     @staticmethod
     def logout_user(request) -> Dict:
@@ -260,10 +244,6 @@ class AuthenticationService:
                 'error': str(e)
             }
     
-    @staticmethod
-    def changePassword(user: User, oldPassword: str, newPassword: str) -> Dict:
-        """camelCase wrapper for change_password"""
-        return AuthenticationService.change_password(user, oldPassword, newPassword)
     
     @staticmethod
     def change_password(user: User, old_password: str, new_password: str) -> Dict:
@@ -284,7 +264,7 @@ class AuthenticationService:
                 raise ValueError("Passwords must be strings")
             
             # Validate new password
-            new_password = AuthenticationService.validatePassword(new_password)
+            new_password = AuthenticationService.validate_password(new_password)
             
             if not user.check_password(old_password):
                 return {
@@ -308,10 +288,6 @@ class AuthenticationService:
                 'error': str(e)
             }
     
-    @staticmethod
-    def getUserProfile(user: User) -> Dict:
-        """camelCase wrapper for get_user_profile"""
-        return AuthenticationService.get_user_profile(user)
     
     @staticmethod
     def get_user_profile(user: User) -> Dict:

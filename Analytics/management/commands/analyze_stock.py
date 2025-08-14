@@ -1,9 +1,9 @@
 """
-Core Analytics Orchestration Command
+Analytics Orchestration Command
 Coordinates data validation, backfill, and technical analysis execution.
 
 Usage:
-    python manage.py core_run_analytics_one --symbol AAPL
+    python manage.py analyze_stock --symbol AAPL
 """
 
 import os
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     """
-    Core orchestration command for analytics pipeline.
+    Analytics orchestration command for technical analysis pipeline.
     Implements the complete workflow: validation → backfill → analytics → verification.
     """
     
