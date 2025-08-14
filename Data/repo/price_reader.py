@@ -5,7 +5,7 @@ Provides typed interfaces for accessing historical price data required by analyt
 
 from datetime import datetime, date, timedelta
 from decimal import Decimal
-from typing import List, Dict, Optional, Tuple, NamedTuple
+from typing import List, Dict, Optional, Tuple, NamedTuple, Any
 from django.db.models import QuerySet, Min, Max, Count
 from django.utils import timezone
 
@@ -203,21 +203,8 @@ class PriceReader:
         self,
         symbol: str,
         required_years: int = 2
---- a/Data/repo/price_reader.py
-+++ b/Data/repo/price_reader.py
-@@ -1,1 +1,1 @@
--from typing import List, Dict, Optional, Tuple, NamedTuple
-+from typing import List, Dict, Optional, Tuple, NamedTuple, Any
-@@ -203,7 +203,7 @@ class PriceReader:
-     def check_data_coverage(
-         self,
-         symbol: str,
-         required_years: int = 2
--    ) -> Dict[str, Dict[str, any]]:
-+    ) -> Dict[str, Dict[str, Any]]:
-         """
-         Verify that we have at least `required_years` of data for each frequency.
-         Returns a nested dict mapping frequency -> { "start": date, "end": date, "years": int }        """
+    ) -> Dict[str, Dict[str, Any]]:
+        """
         Check 2-year EOD data coverage for stock, sector, and industry.
         
         Args:
@@ -321,5 +308,3 @@ class PriceReader:
             return latest_price.date if latest_price else None
         except Stock.DoesNotExist:
             return None
-
-

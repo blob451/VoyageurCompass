@@ -120,9 +120,6 @@ def analyze_stock(request, symbol):
         # Format response for new TA engine
         response_data = {
             'success': True,
-            'symbol': analysis['symbol'],
-        response_data = {
-            'success': True,
             'symbol': analysis.get('symbol', symbol),
             'analysis_date': analysis.get('analysis_date', datetime.now()).isoformat(),
             'horizon': analysis.get('horizon', 'unknown'),
@@ -131,7 +128,7 @@ def analyze_stock(request, symbol):
             'indicators': analysis.get('components', {}),
             'weighted_scores': {k: float(v) for k, v in analysis.get('weighted_scores', {}).items()},
             'analytics_result_id': analysis.get('analytics_result_id')
-        }        }
+        }
         
         return Response(response_data)
         

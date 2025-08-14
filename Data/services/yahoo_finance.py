@@ -12,7 +12,8 @@ import os
 import hashlib
 import threading
 from typing import Dict, List, Optional, Tuple
-import yfinance as yfimport pandas as pd
+import yfinance as yf
+import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
