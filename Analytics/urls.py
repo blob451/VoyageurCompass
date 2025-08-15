@@ -11,6 +11,7 @@ from Analytics.views import (
     get_user_latest_analysis,
     get_analysis_by_id
 )
+from Analytics.sentiment_views import stock_sentiment
 
 app_name = 'analytics'
 
@@ -21,4 +22,5 @@ urlpatterns = [
     path('user/history/', get_user_analysis_history, name='user_analysis_history'),
     path('user/<str:symbol>/latest/', get_user_latest_analysis, name='user_latest_analysis'),
     path('analysis/<int:analysis_id>/', get_analysis_by_id, name='get_analysis_by_id'),
+    path('sentiment/<str:symbol>/', stock_sentiment, name='stock_sentiment'),
 ]

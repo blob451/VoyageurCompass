@@ -7,7 +7,7 @@ const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const baseQuery = fetchBaseQuery({
   baseUrl: apiUrl,
   // Remove credentials: 'include' since JWT doesn't need cookies and it causes CORS issues
-  timeout: 30000, // 30 second timeout for login operations that may take longer
+  timeout: 90000, // 90 second timeout for analysis operations that may take longer
   prepareHeaders: (headers, { getState }) => {
     const token = getState().auth.token;
     if (token) {

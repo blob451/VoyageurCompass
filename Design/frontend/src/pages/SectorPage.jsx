@@ -42,18 +42,27 @@ import {
   Home,
   FlightTakeoff,
   Phone,
-  ElectricBolt
+  ElectricBolt,
+  Sentiment,
+  SentimentSatisfied,
+  SentimentDissatisfied,
+  SentimentNeutral
 } from '@mui/icons-material';
-// import { useSelector } from 'react-redux'; // Not used currently
+import { useGetUserAnalysisHistoryQuery } from '../features/api/apiSlice';
 
 const SectorPage = () => {
-  // const { user } = useSelector((state) => state.auth); // Not used currently
   const [selectedSectors, setSelectedSectors] = useState(['technology', 'healthcare']);
   const [timeframe, setTimeframe] = useState('1M');
   const [loading, setLoading] = useState(false);
   const [sectorData, setSectorData] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(false);
   const [userCredits] = useState(25); // Mock credit balance
+  
+  // Fetch user analysis history to get real sentiment data
+  const { data: analysisHistoryData } = useGetUserAnalysisHistoryQuery({ 
+    limit: 100, 
+    fields: 'symbol,sector,components' 
+  });
 
   const sectorIcons = {
     technology: <Computer />,
@@ -139,7 +148,7 @@ const SectorPage = () => {
               momentum: Math.random() * 10,
               volatility: Math.random() * 10,
               volume: Math.random() * 10,
-              sentiment: Math.random() * 10
+              sentiment: calculateRealSentimentForSector(sectorId)
             }
           };
         }),
@@ -175,6 +184,47 @@ const SectorPage = () => {
     if (value >= 7) return 'success';
     if (value >= 4) return 'warning';
     return 'error';
+  };
+
+  const getSentimentIcon = (sentiment) => {
+    if (sentiment >= 6) return <SentimentSatisfied color="success" />;
+    if (sentiment >= 4) return <SentimentNeutral color="warning" />;
+    return <SentimentDissatisfied color="error" />;
+  };
+
+  const calculateRealSentimentForSector = (sectorId) => {
+    if (!analysisHistoryData?.analyses) {
+      return Math.random() * 10; // Fallback to random if no data
+    }
+
+    const sectorName = availableSectors.find(s => s.id === sectorId)?.name;
+    if (!sectorName) {
+      return Math.random() * 10;
+    }
+
+    // Filter analyses for this sector and extract sentiment scores
+    const sectorAnalyses = analysisHistoryData.analyses.filter(
+      analysis => analysis.sector?.toLowerCase() === sectorName.toLowerCase()
+    );
+
+    const sentimentScores = sectorAnalyses
+      .map(analysis => {
+        const sentimentData = analysis.components?.sentiment?.raw;
+        if (sentimentData?.sentiment) {
+          // Convert sentiment score (-1 to 1) to 0-10 scale
+          const normalizedScore = (parseFloat(sentimentData.sentiment) + 1) * 5;
+          return Math.max(0, Math.min(10, normalizedScore));
+        }
+        return null;
+      })
+      .filter(score => score !== null);
+
+    if (sentimentScores.length === 0) {
+      return Math.random() * 10; // Fallback if no sentiment data
+    }
+
+    // Return average sentiment score for the sector
+    return sentimentScores.reduce((sum, score) => sum + score, 0) / sentimentScores.length;
   };
 
   return (
@@ -435,7 +485,10 @@ const SectorPage = () => {
                       </TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <Typography variant="body2">{sector.metrics.sentiment.toFixed(1)}/10</Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                            {getSentimentIcon(sector.metrics.sentiment)}
+                            <Typography variant="body2">{sector.metrics.sentiment.toFixed(1)}/10</Typography>
+                          </Box>
                           <LinearProgress
                             variant="determinate"
                             value={sector.metrics.sentiment * 10}

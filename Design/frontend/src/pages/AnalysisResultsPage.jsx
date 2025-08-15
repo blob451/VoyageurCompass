@@ -16,9 +16,21 @@ import {
   CircularProgress,
   Alert,
   Button,
-  IconButton
+  IconButton,
+  Card,
+  CardContent,
+  Grid,
+  Divider
 } from '@mui/material';
-import { ArrowBack, TrendingUp } from '@mui/icons-material';
+import { 
+  ArrowBack, 
+  TrendingUp, 
+  Sentiment,
+  SentimentSatisfied,
+  SentimentDissatisfied,
+  SentimentNeutral,
+  NewspaperOutlined 
+} from '@mui/icons-material';
 import { useGetAnalysisByIdQuery } from '../features/api/apiSlice';
 
 const AnalysisResultsPage = () => {
@@ -42,6 +54,42 @@ const AnalysisResultsPage = () => {
     if (score >= 6) return 'Buy';
     if (score >= 4) return 'Hold';
     return 'Sell';
+  };
+
+  // Sentiment helper functions
+  const getSentimentIcon = (label) => {
+    switch (label?.toLowerCase()) {
+      case 'positive':
+        return <SentimentSatisfied color="success" />;
+      case 'negative':
+        return <SentimentDissatisfied color="error" />;
+      case 'neutral':
+      default:
+        return <SentimentNeutral color="warning" />;
+    }
+  };
+
+  const getSentimentColor = (label) => {
+    switch (label?.toLowerCase()) {
+      case 'positive':
+        return 'success';
+      case 'negative':
+        return 'error';
+      case 'neutral':
+      default:
+        return 'warning';
+    }
+  };
+
+  const formatSentimentScore = (score) => {
+    if (score === null || score === undefined || isNaN(score)) {
+      return 'N/A';
+    }
+    const numScore = parseFloat(score);
+    if (numScore > 0) {
+      return `+${numScore.toFixed(3)}`;
+    }
+    return numScore.toFixed(3);
   };
 
   if (isLoading) {
@@ -166,11 +214,29 @@ const AnalysisResultsPage = () => {
                 
                 const displayScore = score * 10;
                 const isValidScore = !isNaN(displayScore) && isFinite(displayScore);
+                const isSentiment = key.toLowerCase() === 'sentiment';
+                
+                // Special handling for sentiment indicator
+                let indicatorName = key.toUpperCase();
+                let description = indicator.description || indicator.desc || 'Technical indicator';
+                let sentimentIcon = null;
+                
+                if (isSentiment) {
+                  const sentimentLabel = indicator.raw?.label;
+                  const sentimentScore = indicator.raw?.sentiment;
+                  const newsCount = indicator.raw?.newsCount;
+                  sentimentIcon = getSentimentIcon(sentimentLabel);
+                  indicatorName = 'NEWS SENTIMENT';
+                  description = `${sentimentLabel?.toUpperCase() || 'NEUTRAL'} sentiment from ${newsCount || 0} news articles`;
+                }
                 
                 return (
-                  <TableRow key={key}>
+                  <TableRow key={key} sx={isSentiment ? { backgroundColor: 'rgba(25, 118, 210, 0.04)' } : {}}>
                     <TableCell sx={{ fontWeight: 500 }}>
-                      {key.toUpperCase()}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {sentimentIcon}
+                        {indicatorName}
+                      </Box>
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -178,16 +244,29 @@ const AnalysisResultsPage = () => {
                           variant="determinate"
                           value={Math.max(0, Math.min(100, score * 100))}
                           sx={{ width: 60, height: 8, borderRadius: 4 }}
-                          color={score >= 0.7 ? 'success' : score >= 0.4 ? 'warning' : 'error'}
+                          color={isSentiment ? 
+                            getSentimentColor(indicator.raw?.label) : 
+                            (score >= 0.7 ? 'success' : score >= 0.4 ? 'warning' : 'error')
+                          }
                         />
                         <Typography variant="body2">
                           {isValidScore ? displayScore.toFixed(1) : 'N/A'}
+                          {isSentiment && indicator.raw?.sentiment && (
+                            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                              ({formatSentimentScore(indicator.raw.sentiment)})
+                            </Typography>
+                          )}
                         </Typography>
                       </Box>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
-                        {indicator.description || indicator.desc || 'Technical indicator'}
+                        {description}
+                        {isSentiment && indicator.raw?.confidence && (
+                          <Typography component="span" variant="caption" display="block" color="text.secondary">
+                            Confidence: {(indicator.raw.confidence * 100).toFixed(1)}%
+                          </Typography>
+                        )}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -269,6 +348,141 @@ const AnalysisResultsPage = () => {
                 Components are sorted by contribution from highest to lowest.
               </Typography>
             </Box>
+          </>
+        )}
+
+        {/* Sentiment Analysis Section */}
+        {analysisData.indicators?.sentiment && (
+          <>
+            <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+              News Sentiment Analysis
+            </Typography>
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              {/* Sentiment Overview Card */}
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      {getSentimentIcon(analysisData.indicators.sentiment.raw?.label)}
+                      <Typography variant="h6">
+                        Overall Sentiment
+                      </Typography>
+                    </Box>
+                    <Typography variant="h4" color={`${getSentimentColor(analysisData.indicators.sentiment.raw?.label)}.main`} gutterBottom>
+                      {analysisData.indicators.sentiment.raw?.label?.toUpperCase() || 'NEUTRAL'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Score: {formatSentimentScore(analysisData.indicators.sentiment.raw?.sentiment)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Confidence: {analysisData.indicators.sentiment.raw?.confidence ? 
+                        `${(analysisData.indicators.sentiment.raw.confidence * 100).toFixed(1)}%` : 'N/A'}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+                      <NewspaperOutlined fontSize="small" color="action" />
+                      <Typography variant="body2" color="text.secondary">
+                        Based on {analysisData.indicators.sentiment.raw?.newsCount || 0} news articles
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Sentiment Impact Card */}
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      Impact on Analysis
+                    </Typography>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Contribution to Final Score
+                      </Typography>
+                      <LinearProgress
+                        variant="determinate"
+                        value={10} // 10% weight
+                        sx={{ height: 8, borderRadius: 4, mb: 1 }}
+                        color={getSentimentColor(analysisData.indicators.sentiment.raw?.label)}
+                      />
+                      <Typography variant="body2">
+                        10% Weight in Composite Score
+                      </Typography>
+                    </Box>
+                    <Divider sx={{ my: 2 }} />
+                    <Typography variant="body2" color="text.secondary">
+                      Sentiment analysis uses FinBERT to evaluate financial news and incorporate 
+                      market sentiment into the technical analysis framework.
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* News Sources Breakdown */}
+              {analysisData.indicators.sentiment.raw?.sources && 
+               Object.keys(analysisData.indicators.sentiment.raw.sources).length > 0 && (
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        News Sources Analysis
+                      </Typography>
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Source</TableCell>
+                              <TableCell align="center">Articles</TableCell>
+                              <TableCell align="center">Average Sentiment</TableCell>
+                              <TableCell align="center">Impact</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {Object.entries(analysisData.indicators.sentiment.raw.sources).map(([source, data]) => {
+                              const avgScore = data.avg_score || 0;
+                              const sentimentLabel = avgScore > 0.1 ? 'positive' : avgScore < -0.1 ? 'negative' : 'neutral';
+                              return (
+                                <TableRow key={source}>
+                                  <TableCell sx={{ fontWeight: 500 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <NewspaperOutlined fontSize="small" color="action" />
+                                      {source}
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Chip 
+                                      label={data.count || 0} 
+                                      size="small" 
+                                      variant="outlined"
+                                    />
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                                      {getSentimentIcon(sentimentLabel)}
+                                      <Typography variant="body2">
+                                        {formatSentimentScore(avgScore)}
+                                      </Typography>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <LinearProgress
+                                      variant="determinate"
+                                      value={Math.max(0, Math.min(100, (Math.abs(avgScore) + 0.5) * 50))}
+                                      sx={{ width: 50, height: 6, borderRadius: 3 }}
+                                      color={getSentimentColor(sentimentLabel)}
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )}
+            </Grid>
           </>
         )}
 

@@ -64,6 +64,17 @@ class Command(BaseCommand):
             action='store_true',
             help='Skip data backfill and proceed with existing data'
         )
+        parser.add_argument(
+            '--include-sentiment',
+            action='store_true',
+            default=True,
+            help='Include sentiment analysis from news (default: True)'
+        )
+        parser.add_argument(
+            '--skip-sentiment',
+            action='store_true',
+            help='Skip sentiment analysis to speed up processing'
+        )
     
     def handle(self, *args, **options):
         """Main command handler implementing the orchestration workflow."""

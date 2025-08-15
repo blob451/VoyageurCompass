@@ -41,6 +41,10 @@ import {
   History,
   Star,
   ShoppingCart,
+  SentimentSatisfied,
+  SentimentDissatisfied,
+  SentimentNeutral,
+  NewspaperOutlined,
   // Add // Not used currently
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
@@ -77,6 +81,37 @@ const DashboardPage = () => {
     ? Object.keys(favoriteSector).reduce((a, b) => favoriteSector[a] > favoriteSector[b] ? a : b)
     : 'None';
 
+  // Calculate sentiment aggregations from recent analyses
+  const sentimentStats = recentAnalyses.reduce((acc, analysis) => {
+    if (analysis.components?.sentiment?.raw) {
+      const sentiment = analysis.components.sentiment.raw;
+      acc.total++;
+      if (sentiment.label === 'positive') acc.positive++;
+      else if (sentiment.label === 'negative') acc.negative++;
+      else acc.neutral++;
+      
+      if (sentiment.sentiment) {
+        acc.scores.push(parseFloat(sentiment.sentiment));
+      }
+      if (sentiment.newsCount) {
+        acc.totalNews += sentiment.newsCount;
+      }
+    }
+    return acc;
+  }, { total: 0, positive: 0, negative: 0, neutral: 0, scores: [], totalNews: 0 });
+
+  const avgSentimentScore = sentimentStats.scores.length > 0
+    ? (sentimentStats.scores.reduce((sum, score) => sum + score, 0) / sentimentStats.scores.length)
+    : 0;
+
+  const dominantSentiment = sentimentStats.total > 0
+    ? (sentimentStats.positive > sentimentStats.negative && sentimentStats.positive > sentimentStats.neutral
+       ? 'positive'
+       : sentimentStats.negative > sentimentStats.neutral
+       ? 'negative'
+       : 'neutral')
+    : 'neutral';
+
   // Sample data for the chart (replace with real data from API)
   const chartData = [
     { name: 'Jan', value: 4000, profit: 2400 },
@@ -111,6 +146,41 @@ const DashboardPage = () => {
     if (score >= 7) return 'success';
     if (score >= 4) return 'warning';
     return 'error';
+  };
+
+  const getSentimentIcon = (sentiment) => {
+    switch (sentiment) {
+      case 'positive':
+        return <SentimentSatisfied color="success" />;
+      case 'negative':
+        return <SentimentDissatisfied color="error" />;
+      case 'neutral':
+      default:
+        return <SentimentNeutral color="warning" />;
+    }
+  };
+
+  const getSentimentColor = (sentiment) => {
+    switch (sentiment) {
+      case 'positive':
+        return 'success';
+      case 'negative':
+        return 'error';
+      case 'neutral':
+      default:
+        return 'warning';
+    }
+  };
+
+  const formatSentimentScore = (score) => {
+    if (score === null || score === undefined || isNaN(score)) {
+      return 'N/A';
+    }
+    const numScore = parseFloat(score);
+    if (numScore > 0) {
+      return `+${numScore.toFixed(3)}`;
+    }
+    return numScore.toFixed(3);
   };
 
   return (
@@ -249,14 +319,100 @@ const DashboardPage = () => {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Success Rate
+                Market Sentiment
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                {getSentimentIcon(dominantSentiment)}
+                <Typography variant="h5" component="div" sx={{ ml: 1, textTransform: 'capitalize' }}>
+                  {dominantSentiment}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color={`${getSentimentColor(dominantSentiment)}.main`}>
+                {sentimentStats.total > 0 ? `From ${sentimentStats.total} analyses` : 'No data yet'}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Sentiment Score Card */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Avg Sentiment Score
               </Typography>
               <Typography variant="h5" component="div">
-                78%
+                {formatSentimentScore(avgSentimentScore)}
               </Typography>
-              <Typography variant="body2" color="success.main">
-                Profitable predictions
+              <Typography variant="body2" color="text.secondary">
+                {sentimentStats.totalNews > 0 ? `${sentimentStats.totalNews} news articles` : 'No news data'}
               </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* News Coverage Card */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <NewspaperOutlined color="action" sx={{ mr: 1 }} />
+                <Typography color="textSecondary">
+                  News Coverage
+                </Typography>
+              </Box>
+              <Typography variant="h5" component="div">
+                {sentimentStats.totalNews}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Articles analyzed
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Sentiment Distribution Card */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Sentiment Breakdown
+              </Typography>
+              {sentimentStats.total > 0 ? (
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <SentimentSatisfied color="success" fontSize="small" sx={{ mr: 0.5 }} />
+                      <Typography variant="body2">Positive</Typography>
+                    </Box>
+                    <Typography variant="body2" color="success.main">
+                      {Math.round((sentimentStats.positive / sentimentStats.total) * 100)}%
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <SentimentNeutral color="warning" fontSize="small" sx={{ mr: 0.5 }} />
+                      <Typography variant="body2">Neutral</Typography>
+                    </Box>
+                    <Typography variant="body2" color="warning.main">
+                      {Math.round((sentimentStats.neutral / sentimentStats.total) * 100)}%
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <SentimentDissatisfied color="error" fontSize="small" sx={{ mr: 0.5 }} />
+                      <Typography variant="body2">Negative</Typography>
+                    </Box>
+                    <Typography variant="body2" color="error.main">
+                      {Math.round((sentimentStats.negative / sentimentStats.total) * 100)}%
+                    </Typography>
+                  </Box>
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No sentiment data
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>

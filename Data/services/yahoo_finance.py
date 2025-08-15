@@ -2421,6 +2421,249 @@ class YahooFinanceService:
         except Exception as e:
             logger.error(f"Error upserting history bars: {str(e)}")
             return 0
+    
+    def fetchNewsForStock(
+        self,
+        symbol: str,
+        days: int = 90,
+        max_items: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch news articles for a stock symbol for sentiment analysis.
+        
+        Args:
+            symbol: Stock ticker symbol
+            days: Number of days of history to fetch (default 90)
+            max_items: Maximum number of news items to return
+            
+        Returns:
+            List of news articles with title, summary, published date, and source
+        """
+        try:
+            logger.info(f"Fetching news for {symbol} (last {days} days)")
+            
+            # Get stock ticker object - let yfinance handle session creation
+            ticker = yf.Ticker(symbol)
+            
+            # Fetch news from yfinance
+            news_items = []
+            logger.info(f"Attempting to fetch news from ticker for {symbol}")
+            raw_news = ticker.news
+            
+            logger.info(f"Raw news result for {symbol}: {type(raw_news)}, length: {len(raw_news) if raw_news else 'None'}")
+            
+            if not raw_news:
+                logger.warning(f"No news found for {symbol} - ticker.news returned: {raw_news}")
+                return []
+            
+            # Calculate date threshold
+            cutoff_date = datetime.now(dt_timezone.utc) - timedelta(days=days)
+            
+            for item in raw_news[:max_items]:
+                try:
+                    # Handle new yfinance structure where data is nested under 'content'
+                    content = item.get('content', item)  # Fallback to item if no content key
+                    
+                    # Extract and validate required fields
+                    title = content.get('title', '')
+                    summary = content.get('summary', content.get('description', ''))
+                    
+                    # Skip if no meaningful content
+                    if not title and not summary:
+                        continue
+                    
+                    # Parse published date - try multiple possible field names
+                    published_timestamp = content.get('providerPublishTime', 0)
+                    if not published_timestamp:
+                        # Try alternative timestamp fields
+                        pub_date = content.get('pubDate')
+                        if pub_date:
+                            try:
+                                # Handle different date formats
+                                if isinstance(pub_date, str):
+                                    from dateutil import parser
+                                    published_date = parser.parse(pub_date)
+                                    if published_date.tzinfo is None:
+                                        published_date = published_date.replace(tzinfo=dt_timezone.utc)
+                                else:
+                                    published_timestamp = pub_date
+                            except:
+                                published_date = datetime.now(dt_timezone.utc)
+                        else:
+                            published_date = datetime.now(dt_timezone.utc)
+                    
+                    if published_timestamp and not hasattr(published_date, 'isoformat'):
+                        published_date = datetime.fromtimestamp(published_timestamp, tz=dt_timezone.utc)
+                        
+                        # Skip if older than cutoff
+                        if published_date < cutoff_date:
+                            continue
+                    elif not hasattr(published_date, 'isoformat'):
+                        published_date = datetime.now(dt_timezone.utc)
+                    
+                    # Build clean news item
+                    news_item = {
+                        'title': title,
+                        'summary': summary or '',
+                        'publishedDate': published_date.isoformat(),
+                        'source': content.get('publisher', content.get('provider', {}).get('displayName', 'Unknown')),
+                        'link': content.get('link', content.get('canonicalUrl', '')),
+                        'uuid': content.get('uuid', content.get('id', '')),
+                        'type': content.get('type', content.get('contentType', 'STORY')),
+                        'relatedTickers': content.get('relatedTickers', []),
+                    }
+                    
+                    news_items.append(news_item)
+                    
+                except Exception as e:
+                    logger.debug(f"Error processing news item: {str(e)}")
+                    continue
+            
+            # Sort by date (newest first)
+            news_items.sort(key=lambda x: x['publishedDate'], reverse=True)
+            
+            logger.info(f"Fetched {len(news_items)} news items for {symbol}")
+            return news_items
+            
+        except Exception as e:
+            logger.error(f"Error fetching news for {symbol}: {str(e)}")
+            return []
+    
+    def fetchBatchNews(
+        self,
+        symbols: List[str],
+        days: int = 90,
+        max_items_per_symbol: int = 50
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Fetch news for multiple stock symbols.
+        
+        Args:
+            symbols: List of stock ticker symbols
+            days: Number of days of history to fetch
+            max_items_per_symbol: Maximum news items per symbol
+            
+        Returns:
+            Dictionary mapping symbols to their news articles
+        """
+        results = {}
+        
+        for symbol in symbols:
+            try:
+                news = self.fetchNewsForStock(symbol, days, max_items_per_symbol)
+                results[symbol] = news
+                
+                # Add small delay to avoid rate limiting
+                time.sleep(0.5)
+                
+            except Exception as e:
+                logger.error(f"Error fetching news for {symbol}: {str(e)}")
+                results[symbol] = []
+        
+        return results
+    
+    def preprocessNewsText(self, article: Dict[str, Any]) -> str:
+        """
+        Preprocess news article text for sentiment analysis.
+        
+        Args:
+            article: News article dictionary
+            
+        Returns:
+            Cleaned and combined text ready for analysis
+        """
+        try:
+            title = article.get('title', '')
+            summary = article.get('summary', '')
+            
+            # Combine title and summary
+            text = f"{title}. {summary}".strip()
+            
+            # Basic text cleaning
+            # Remove excessive whitespace
+            text = ' '.join(text.split())
+            
+            # Remove HTML tags if any
+            text = re.sub(r'<[^>]+>', '', text)
+            
+            # Remove URLs
+            text = re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', text)
+            
+            # Limit length for processing efficiency
+            if len(text) > 5000:
+                text = text[:5000]
+            
+            return text
+            
+        except Exception as e:
+            logger.error(f"Error preprocessing news text: {str(e)}")
+            return ""
+    
+    def aggregateNewsBySentiment(
+        self,
+        news_items: List[Dict[str, Any]],
+        sentiments: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Aggregate news articles by sentiment scores.
+        
+        Args:
+            news_items: List of news articles
+            sentiments: List of sentiment analysis results
+            
+        Returns:
+            Aggregated sentiment statistics and breakdown
+        """
+        try:
+            if not news_items or not sentiments:
+                return {
+                    'totalArticles': 0,
+                    'averageSentiment': 0.0,
+                    'sentimentBreakdown': {'positive': 0, 'negative': 0, 'neutral': 0},
+                    'sourceBreakdown': {}
+                }
+            
+            # Track sentiment by source
+            source_sentiments = defaultdict(list)
+            sentiment_counts = {'positive': 0, 'negative': 0, 'neutral': 0}
+            total_score = 0.0
+            
+            for article, sentiment in zip(news_items, sentiments):
+                if sentiment:
+                    score = sentiment.get('sentimentScore', 0)
+                    label = sentiment.get('sentimentLabel', 'neutral')
+                    source = article.get('source', 'Unknown')
+                    
+                    total_score += score
+                    sentiment_counts[label] += 1
+                    source_sentiments[source].append(score)
+            
+            # Calculate source averages
+            source_breakdown = {}
+            for source, scores in source_sentiments.items():
+                if scores:
+                    avg_score = sum(scores) / len(scores)
+                    source_breakdown[source] = {
+                        'count': len(scores),
+                        'avg_score': round(avg_score, 4)
+                    }
+            
+            return {
+                'totalArticles': len(news_items),
+                'averageSentiment': round(total_score / len(sentiments), 4) if sentiments else 0.0,
+                'sentimentBreakdown': sentiment_counts,
+                'sourceBreakdown': source_breakdown,
+                'lastNewsDate': news_items[0]['publishedDate'] if news_items else None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error aggregating news sentiment: {str(e)}")
+            return {
+                'totalArticles': 0,
+                'averageSentiment': 0.0,
+                'sentimentBreakdown': {'positive': 0, 'negative': 0, 'neutral': 0},
+                'sourceBreakdown': {}
+            }
 
 
 # Singleton instance

@@ -17,6 +17,8 @@ from django.utils import timezone
 
 from Data.repo.price_reader import PriceReader, PriceData, SectorPriceData, IndustryPriceData
 from Data.repo.analytics_writer import AnalyticsWriter
+from Analytics.services.sentiment_analyzer import get_sentiment_analyzer
+from Data.services.yahoo_finance import yahoo_finance_service
 
 logger = logging.getLogger(__name__)
 
@@ -49,20 +51,21 @@ class TechnicalAnalysisEngine:
     Total: 1.00
     """
     
-    # Indicator weights as specified
+    # Indicator weights adjusted for sentiment (90% TA, 10% sentiment)
     WEIGHTS = {
-        'sma50vs200': 0.15,
-        'pricevs50': 0.10,
-        'rsi14': 0.10,
-        'macd12269': 0.10,
-        'bbpos20': 0.10,
-        'bbwidth20': 0.05,
-        'volsurge': 0.10,
-        'obv20': 0.05,
-        'rel1y': 0.05,
-        'rel2y': 0.05,
-        'candlerev': 0.08,
-        'srcontext': 0.07
+        'sma50vs200': 0.135,  # 15% * 0.9
+        'pricevs50': 0.09,    # 10% * 0.9
+        'rsi14': 0.09,        # 10% * 0.9
+        'macd12269': 0.09,    # 10% * 0.9
+        'bbpos20': 0.09,      # 10% * 0.9
+        'bbwidth20': 0.045,   # 5% * 0.9
+        'volsurge': 0.09,     # 10% * 0.9
+        'obv20': 0.045,       # 5% * 0.9
+        'rel1y': 0.045,       # 5% * 0.9
+        'rel2y': 0.045,       # 5% * 0.9
+        'candlerev': 0.072,   # 8% * 0.9
+        'srcontext': 0.063,   # 7% * 0.9
+        'sentiment': 0.10     # 10% for sentiment
     }
     
     # Human-readable indicator names for logging and frontend display
@@ -78,7 +81,8 @@ class TechnicalAnalysisEngine:
         'rel1y': 'Relative Strength 1Y',
         'rel2y': 'Relative Strength 2Y',
         'candlerev': 'Candlestick Pattern',  # Special case: will be modified dynamically
-        'srcontext': 'Support/Resistance'
+        'srcontext': 'Support/Resistance',
+        'sentiment': 'News Sentiment Analysis'
     }
     
     def __init__(self):
@@ -222,6 +226,12 @@ class TechnicalAnalysisEngine:
             if logger_instance:
                 display_name = self.get_indicator_display_name('srcontext', indicators['srcontext'])
                 logger_instance.log_indicator_calculation(display_name, indicators['srcontext'])
+            
+            # Calculate sentiment analysis
+            indicators['sentiment'] = self._calculate_sentiment_analysis(symbol)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('sentiment', indicators['sentiment'])
+                logger_instance.log_indicator_calculation(display_name, indicators['sentiment'])
             
             # Calculate weighted scores and composite
             weighted_scores = {}
@@ -1241,3 +1251,77 @@ class TechnicalAnalysisEngine:
                 filtered_levels.append(level)
         
         return filtered_levels[-3:]  # Return bottom 3 levels
+    
+    def _calculate_sentiment_analysis(self, symbol: str) -> Optional[IndicatorResult]:
+        """
+        Calculate sentiment score from news analysis.
+        Score range: -1 (bearish) to 1 (bullish), normalized to 0-1 scale.
+        Weight: 0.10 (10% of composite score)
+        """
+        try:
+            from Analytics.services.sentiment_analyzer import sentiment_metrics
+            
+            logger.info(f"Calculating sentiment analysis for {symbol}")
+            
+            # Get sentiment analyzer instance
+            sentiment_analyzer = get_sentiment_analyzer()
+            
+            # Fetch news for the stock (90 days history)
+            news_items = yahoo_finance_service.fetchNewsForStock(symbol, days=90, max_items=50)
+            
+            # Log request metrics
+            sentiment_metrics.log_request(symbol, len(news_items))
+            
+            if not news_items:
+                logger.warning(f"No news found for {symbol}, using neutral sentiment")
+                return IndicatorResult(
+                    raw={'sentiment': 0.0, 'label': 'neutral', 'newsCount': 0},
+                    score=0.5,  # Neutral score
+                    weight=self.WEIGHTS['sentiment'],
+                    weighted_score=0.5 * self.WEIGHTS['sentiment']
+                )
+            
+            # Analyze sentiment using the news articles method with symbol
+            aggregated = sentiment_analyzer.analyzeNewsArticles(
+                news_items[:30], 
+                aggregate=True, 
+                symbol=symbol
+            )
+            
+            # Convert sentiment score (-1 to 1) to normalized score (0 to 1)
+            raw_sentiment = aggregated.get('sentimentScore', 0.0)
+            normalized_score = (raw_sentiment + 1.0) / 2.0  # Convert from [-1, 1] to [0, 1]
+            
+            # Apply confidence-based adjustment
+            confidence = aggregated.get('sentimentConfidence', 0.0)
+            if confidence < 0.6:  # Below 60% confidence threshold
+                # Pull score toward neutral based on low confidence
+                normalized_score = 0.5 + (normalized_score - 0.5) * (confidence / 0.6)
+            
+            news_count = aggregated.get('newsCount', 0)
+            logger.info(f"Sentiment for {symbol}: score={raw_sentiment:.3f}, normalized={normalized_score:.3f}, "
+                       f"label={aggregated.get('sentimentLabel')}, articles={news_count}")
+            
+            return IndicatorResult(
+                raw={
+                    'sentiment': raw_sentiment,
+                    'label': aggregated.get('sentimentLabel', 'neutral'),
+                    'confidence': confidence,
+                    'newsCount': news_count,
+                    'distribution': aggregated.get('distribution', {}),
+                    'fallback': aggregated.get('fallback', False)
+                },
+                score=normalized_score,
+                weight=self.WEIGHTS['sentiment'],
+                weighted_score=normalized_score * self.WEIGHTS['sentiment']
+            )
+            
+        except Exception as e:
+            logger.error(f"Error calculating sentiment for {symbol}: {str(e)}")
+            # Return neutral sentiment on error
+            return IndicatorResult(
+                raw={'sentiment': 0.0, 'label': 'neutral', 'error': str(e)},
+                score=0.5,
+                weight=self.WEIGHTS['sentiment'],
+                weighted_score=0.5 * self.WEIGHTS['sentiment']
+            )

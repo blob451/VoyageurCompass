@@ -1065,6 +1065,45 @@ class AnalyticsResults(models.Model):
         help_text="Weighted Support/Resistance Context score"
     )
     
+    # Sentiment analysis fields
+    sentimentScore = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Sentiment score (-1 to 1, where -1 is most negative, 1 is most positive)"
+    )
+    sentimentLabel = models.CharField(
+        max_length=20,
+        choices=[
+            ('positive', 'Positive'),
+            ('negative', 'Negative'),
+            ('neutral', 'Neutral'),
+        ],
+        null=True,
+        blank=True,
+        help_text="Sentiment classification label"
+    )
+    sentimentConfidence = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Sentiment analysis confidence score (0 to 1)"
+    )
+    newsCount = models.IntegerField(
+        null=True,
+        blank=True,
+        default=0,
+        help_text="Number of news articles analyzed for sentiment"
+    )
+    lastNewsDate = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date of most recent news article analyzed"
+    )
+    sentimentSources = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Breakdown of sentiment by source: {source: {count: n, avg_score: float}}"
+    )
+    
     # Composite results
     components = models.JSONField(
         default=dict,

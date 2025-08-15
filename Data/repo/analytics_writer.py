@@ -99,7 +99,13 @@ class AnalyticsWriter:
                     'components': components,
                     'composite_raw': composite_raw,
                     'score_0_10': score_0_10,
-                    'updated_at': timezone.now()
+                    'updated_at': timezone.now(),
+                    # Add sentiment fields if present in components
+                    'sentimentScore': components.get('sentiment', {}).get('raw', {}).get('sentiment'),
+                    'sentimentLabel': components.get('sentiment', {}).get('raw', {}).get('label'),
+                    'sentimentConfidence': components.get('sentiment', {}).get('raw', {}).get('confidence'),
+                    'newsCount': components.get('sentiment', {}).get('raw', {}).get('newsCount', 0),
+                    'sentimentSources': components.get('sentiment', {}).get('raw', {}).get('sources', {})
                 }
             )
         
