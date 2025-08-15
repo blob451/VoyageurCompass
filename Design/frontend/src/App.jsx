@@ -20,6 +20,8 @@ const SectorPage = lazy(() => import('./pages/SectorPage'));
 const StorePage = lazy(() => import('./pages/StorePage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const HelpPage = lazy(() => import('./pages/HelpPage'));
+const AnalysisResultsPage = lazy(() => import('./pages/AnalysisResultsPage'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 
 // Loading component with accessibility support
 const PageLoader = () => (
@@ -140,10 +142,12 @@ function App() {
               <Route element={<ProtectedRoute />}>
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="stocks" element={<StockSearchPage />} />
+                <Route path="reports" element={<ReportsPage />} />
                 <Route path="compare" element={<ComparisonPage />} />
                 <Route path="sectors" element={<SectorPage />} />
                 <Route path="store" element={<StorePage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="analysis/:analysisId" element={<AnalysisResultsPage />} />
               </Route>
               
               {/* Catch-all route for 404 */}

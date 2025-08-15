@@ -311,6 +311,12 @@ if DEBUG:
     corsOrigins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:3002",
+        "http://127.0.0.1:3002",
+        "http://localhost:3003",
+        "http://127.0.0.1:3003",
     ]
 else:
     # Production: require explicit origins from environment
@@ -403,43 +409,28 @@ SESSION_COOKIE_HTTPONLY = True
 LOG_LEVEL = env('LOG_LEVEL', default='INFO')
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'json': {
-            'format': '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "environment": ' + json.dumps(APP_ENV) + ', "message": "%(message)s"}',
-            'datefmt': '%Y-%m-%dT%H:%M:%S',
-        },
-        'structured': {
-            'format': 'timestamp=%(asctime)s level=%(levelname)s logger=%(name)s environment=' + json.dumps(APP_ENV) + ' message="%(message)s"',
-            'datefmt': '%Y-%m-%dT%H:%M:%S',
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'json' if env('LOG_FORMAT', default='') == 'json' else 'structured',
-            'level': LOG_LEVEL,
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': LOG_LEVEL,
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': LOG_LEVEL,
-            'propagate': False,
-        },
-        'VoyageurCompass': {
-            'handlers': ['console'],
-            'level': LOG_LEVEL,
-            'propagate': False,
-        },
-    },
-}
-
+      'version': 1,
+      'disable_existing_loggers': False,
+      'formatters': {
+          'verbose': {
+              'format': '{levelname} {asctime} {module} {message}',
+              'style': '{',
+          },
+      },
+      'handlers': {
+          'console': {
+              'class': 'logging.StreamHandler',
+              'formatter': 'verbose',
+          },
+      },
+      'loggers': {
+          'django.server': {
+              'handlers': ['console'],
+              'level': 'INFO',
+          },
+      },
+  }
+  
 # Logs directory creation removed - no file handlers configured
 # LOGS_DIR = BASE_DIR / 'logs'
 # if not LOGS_DIR.exists():

@@ -65,56 +65,163 @@ class TechnicalAnalysisEngine:
         'srcontext': 0.07
     }
     
+    # Human-readable indicator names for logging and frontend display
+    INDICATOR_NAMES = {
+        'sma50vs200': 'Moving Average Crossover',
+        'pricevs50': 'Price vs 50-Day Average',
+        'rsi14': 'Relative Strength Index',
+        'macd12269': 'MACD Histogram',
+        'bbpos20': 'Bollinger Position',
+        'bbwidth20': 'Bollinger Bandwidth',
+        'volsurge': 'Volume Surge',
+        'obv20': 'On-Balance Volume',
+        'rel1y': 'Relative Strength 1Y',
+        'rel2y': 'Relative Strength 2Y',
+        'candlerev': 'Candlestick Pattern',  # Special case: will be modified dynamically
+        'srcontext': 'Support/Resistance'
+    }
+    
     def __init__(self):
         """Initialize the TA engine."""
         self.price_reader = PriceReader()
         self.analytics_writer = AnalyticsWriter()
     
+    def get_indicator_display_name(self, indicator_code: str, indicator_result=None) -> str:
+        """
+        Get human-readable display name for an indicator.
+        
+        Args:
+            indicator_code: The internal indicator code (e.g., 'sma50vs200')
+            indicator_result: The indicator result object (needed for CANDLEREV pattern)
+            
+        Returns:
+            Human-readable indicator name
+        """
+        if indicator_code == 'candlerev' and indicator_result and hasattr(indicator_result, 'raw'):
+            # Special case for candlestick patterns
+            pattern = indicator_result.raw.get('pattern', 'unknown') if indicator_result.raw else 'unknown'
+            return f"Pattern: {pattern.replace('_', ' ').title()}"
+        
+        return self.INDICATOR_NAMES.get(indicator_code, indicator_code.upper())
+    
     def analyze_stock(
         self,
         symbol: str,
         analysis_date: Optional[datetime] = None,
-        horizon: str = 'blend'
+        horizon: str = 'blend',
+        user=None,
+        logger_instance=None
     ) -> Dict[str, Any]:
         """
         Perform complete technical analysis for a stock.
         
         Args:
             symbol: Stock ticker symbol
-            analysis_date: Date to analyze (defaults to latest trading day)
-            horizon: Analysis horizon (short/medium/long/blend)
+            analysis_date: Optional analysis date (defaults to now)
+            horizon: Analysis horizon ('short', 'medium', 'long', 'blend')
+            user: User instance who initiated this analysis
+            logger_instance: AnalysisLogger instance for web-based analysis logging
             
         Returns:
             Dict containing all analysis results and composite score
         """
         try:
+            print(f"[TA ENGINE] Starting technical analysis for {symbol}")
             logger.info(f"Starting technical analysis for {symbol}")
             
             if analysis_date is None:
                 analysis_date = timezone.now()
             
+            # Log analysis start if web logger is provided
+            if logger_instance:
+                logger_instance.log_analysis_start(analysis_date, horizon)
+            
+            print(f"[TA ENGINE] Getting stock data for {symbol}")
             # Get required data (3 years for comprehensive analysis)
-            stock_prices = self._get_stock_data(symbol, analysis_date)
+            stock_prices = self._get_stock_data(symbol, analysis_date, logger_instance)
+            print(f"[TA ENGINE] Stock data retrieved: {len(stock_prices)} records")
+            
+            print(f"[TA ENGINE] Getting sector/industry data for {symbol}")
             sector_prices, industry_prices = self._get_sector_industry_data(symbol, analysis_date)
+            print(f"[TA ENGINE] Sector data: {len(sector_prices)} records, Industry data: {len(industry_prices)} records")
             
             if not stock_prices:
-                raise ValueError(f"No price data available for {symbol}")
+                error_msg = f"No price data available for {symbol}"
+                if logger_instance:
+                    logger_instance.log_analysis_error(error_msg)
+                raise ValueError(error_msg)
             
+            # Log data retrieval
+            if logger_instance:
+                auto_sync = hasattr(self, '_last_auto_sync') and self._last_auto_sync
+                logger_instance.log_data_retrieval(len(stock_prices), auto_sync)
+                if hasattr(self, '_last_auto_sync'):
+                    delattr(self, '_last_auto_sync')
+            
+            print(f"[TA ENGINE] Starting calculation of 12 indicators")
             # Calculate all 12 indicators
             indicators = {}
             
+            print(f"[TA ENGINE] Calculating SMA50VS200 indicator")
             indicators['sma50vs200'] = self._calculate_sma_crossover(stock_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('sma50vs200', indicators['sma50vs200'])
+                logger_instance.log_indicator_calculation(display_name, indicators['sma50vs200'])
+                
             indicators['pricevs50'] = self._calculate_price_vs_50d(stock_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('pricevs50', indicators['pricevs50'])
+                logger_instance.log_indicator_calculation(display_name, indicators['pricevs50'])
+                
             indicators['rsi14'] = self._calculate_rsi14(stock_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('rsi14', indicators['rsi14'])
+                logger_instance.log_indicator_calculation(display_name, indicators['rsi14'])
+                
             indicators['macd12269'] = self._calculate_macd_histogram(stock_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('macd12269', indicators['macd12269'])
+                logger_instance.log_indicator_calculation(display_name, indicators['macd12269'])
+                
             indicators['bbpos20'] = self._calculate_bollinger_position(stock_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('bbpos20', indicators['bbpos20'])
+                logger_instance.log_indicator_calculation(display_name, indicators['bbpos20'])
+                
             indicators['bbwidth20'] = self._calculate_bollinger_bandwidth(stock_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('bbwidth20', indicators['bbwidth20'])
+                logger_instance.log_indicator_calculation(display_name, indicators['bbwidth20'])
+                
             indicators['volsurge'] = self._calculate_volume_surge(stock_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('volsurge', indicators['volsurge'])
+                logger_instance.log_indicator_calculation(display_name, indicators['volsurge'])
+                
             indicators['obv20'] = self._calculate_obv_trend(stock_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('obv20', indicators['obv20'])
+                logger_instance.log_indicator_calculation(display_name, indicators['obv20'])
+                
             indicators['rel1y'] = self._calculate_relative_strength_1y(stock_prices, sector_prices, industry_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('rel1y', indicators['rel1y'])
+                logger_instance.log_indicator_calculation(display_name, indicators['rel1y'])
+                
             indicators['rel2y'] = self._calculate_relative_strength_2y(stock_prices, sector_prices, industry_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('rel2y', indicators['rel2y'])
+                logger_instance.log_indicator_calculation(display_name, indicators['rel2y'])
+                
             indicators['candlerev'] = self._calculate_candlestick_reversal(stock_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('candlerev', indicators['candlerev'])
+                logger_instance.log_indicator_calculation(display_name, indicators['candlerev'])
+                
             indicators['srcontext'] = self._calculate_support_resistance(stock_prices)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('srcontext', indicators['srcontext'])
+                logger_instance.log_indicator_calculation(display_name, indicators['srcontext'])
             
             # Calculate weighted scores and composite
             weighted_scores = {}
@@ -134,15 +241,23 @@ class TechnicalAnalysisEngine:
                 weighted_score = Decimal(str(score)) * Decimal(str(weight))
                 
                 weighted_scores[f'w_{indicator_name}'] = weighted_score
+                # Get display name for API response
+                display_name = self.get_indicator_display_name(indicator_name, result)
+                
                 components[indicator_name] = {
                     'raw': raw_value,
-                    'score': score
+                    'score': score,
+                    'description': display_name
                 }
                 composite_raw += weighted_score
             
+            print(f"[TA ENGINE] All indicators calculated successfully")
+            
             # Final composite score (0-10, rounded)
             score_0_10 = round(float(composite_raw) * 10)
+            print(f"[TA ENGINE] Composite score calculated: {score_0_10}/10 (raw: {composite_raw})")
             
+            print(f"[TA ENGINE] Storing results to database")
             # Store results in database
             analytics_result = self.analytics_writer.upsert_analytics_result(
                 symbol=symbol,
@@ -151,8 +266,10 @@ class TechnicalAnalysisEngine:
                 components=components,
                 composite_raw=composite_raw,
                 score_0_10=score_0_10,
-                horizon=horizon
+                horizon=horizon,
+                user=user
             )
+            print(f"[TA ENGINE] Results stored to database successfully (ID: {analytics_result.id})")
             
             result = {
                 'symbol': symbol,
@@ -166,45 +283,162 @@ class TechnicalAnalysisEngine:
                 'analytics_result_id': analytics_result.id
             }
             
+            print(f"[TA ENGINE] Finalizing analysis for {symbol}")
+            
+            # Log analysis completion
+            if logger_instance:
+                logger_instance.log_analysis_complete(float(composite_raw), score_0_10)
+                logger_instance.finalize()
+            
+            print(f"[TA ENGINE] Analysis complete for {symbol}: {score_0_10}/10")
             logger.info(f"Analysis complete for {symbol}: {score_0_10}/10")
             return result
             
         except Exception as e:
-            logger.error(f"Error analyzing {symbol}: {str(e)}")
+            error_msg = f"Error analyzing {symbol}: {str(e)}"
+            print(f"[TA ENGINE] EXCEPTION in analysis: {error_msg}")
+            print(f"[TA ENGINE] Exception type: {type(e).__name__}")
+            import traceback
+            print(f"[TA ENGINE] Full traceback: {traceback.format_exc()}")
+            
+            logger.error(error_msg)
+            if logger_instance:
+                logger_instance.log_analysis_error(error_msg)
+                logger_instance.finalize()
             raise
     
-    def _get_stock_data(self, symbol: str, analysis_date: datetime) -> List[PriceData]:
+    def _get_stock_data(self, symbol: str, analysis_date: datetime, logger_instance=None) -> List[PriceData]:
         """Get 3 years of stock price data ending at analysis date."""
+        start_date = (analysis_date - timedelta(days=3*365+30)).date()
+        end_date = analysis_date.date()
+        stock_prices = []
+        
         try:
-            start_date = (analysis_date - timedelta(days=3*365+30)).date()
-            end_date = analysis_date.date()
-            
-            return self.price_reader.get_stock_prices(symbol, start_date, end_date)
+            # First attempt to get existing data
+            stock_prices = self.price_reader.get_stock_prices(symbol, start_date, end_date)
         except Exception as e:
             logger.error(f"Error getting stock data for {symbol}: {str(e)}")
-            return []
+            # Stock might not exist, continue to auto-sync attempt
+        
+        # If no data found, attempt to auto-sync
+        if not stock_prices:
+            logger.info(f"No existing data for {symbol}, attempting auto-sync")
+            if self._auto_sync_stock_data(symbol):
+                self._last_auto_sync = True  # Track that auto-sync was used
+                
+                # Retry after sync with multiple attempts
+                for attempt in range(3):
+                    try:
+                        import time
+                        if attempt > 0:
+                            time.sleep(2)  # Wait 2 seconds between retries
+                            
+                        stock_prices = self.price_reader.get_stock_prices(symbol, start_date, end_date)
+                        if stock_prices:
+                            logger.info(f"Successfully retrieved data for {symbol} after auto-sync (attempt {attempt + 1})")
+                            break
+                    except Exception as e:
+                        if attempt == 2:  # Last attempt
+                            logger.error(f"Error getting stock data after auto-sync for {symbol} (final attempt): {str(e)}")
+                        else:
+                            logger.warning(f"Error getting stock data after auto-sync for {symbol} (attempt {attempt + 1}): {str(e)}")
+                    
+        return stock_prices
     
     def _get_sector_industry_data(self, symbol: str, analysis_date: datetime) -> Tuple[List[SectorPriceData], List[IndustryPriceData]]:
         """Get sector and industry composite data."""
         try:
+            print(f"[TA ENGINE] DEBUG: Getting sector/industry data for {symbol}")
+            
+            # Step 1: Get sector/industry keys
             sector_key, industry_key = self.price_reader.get_stock_sector_industry_keys(symbol)
+            print(f"[TA ENGINE] DEBUG: Sector key: {sector_key}, Industry key: {industry_key}")
+            
             start_date = (analysis_date - timedelta(days=3*365+30)).date()
             end_date = analysis_date.date()
+            print(f"[TA ENGINE] DEBUG: Date range: {start_date} to {end_date}")
             
             sector_prices = []
             industry_prices = []
             
+            # Step 2: Get sector prices
             if sector_key:
+                print(f"[TA ENGINE] DEBUG: Fetching sector prices for key: {sector_key}")
                 sector_prices = self.price_reader.get_sector_prices(sector_key, start_date, end_date)
+                print(f"[TA ENGINE] DEBUG: Retrieved {len(sector_prices)} sector price records")
+            else:
+                print(f"[TA ENGINE] DEBUG: No sector key found for {symbol}")
             
+            # Step 3: Get industry prices  
             if industry_key:
+                print(f"[TA ENGINE] DEBUG: Fetching industry prices for key: {industry_key}")
                 industry_prices = self.price_reader.get_industry_prices(industry_key, start_date, end_date)
+                print(f"[TA ENGINE] DEBUG: Retrieved {len(industry_prices)} industry price records")
+            else:
+                print(f"[TA ENGINE] DEBUG: No industry key found for {symbol}")
             
             return sector_prices, industry_prices
             
         except Exception as e:
+            print(f"[TA ENGINE] ERROR: Exception in _get_sector_industry_data for {symbol}: {str(e)}")
+            import traceback
+            print(f"[TA ENGINE] ERROR: Full traceback: {traceback.format_exc()}")
             logger.warning(f"Error getting sector/industry data for {symbol}: {str(e)}")
             return [], []
+    
+    def _auto_sync_stock_data(self, symbol: str) -> bool:
+        """
+        Automatically sync stock data when it's missing from the database.
+        
+        Args:
+            symbol: Stock ticker symbol to sync
+            
+        Returns:
+            True if sync was successful, False otherwise
+        """
+        try:
+            logger.info(f"Auto-syncing data for {symbol}")
+            
+            # Import here to avoid circular imports
+            from Data.services.yahoo_finance import yahoo_finance_service
+            from Data.models import Stock
+            
+            # First, validate that Yahoo Finance has data for this symbol
+            # by doing a quick test fetch without sync
+            test_result = yahoo_finance_service.get_stock_data(
+                symbol, 
+                period="5d", 
+                sync_db=False
+            )
+            
+            if 'error' in test_result:
+                logger.error(f"Yahoo Finance validation failed for {symbol}: {test_result['error']}")
+                return False
+            
+            # If validation passes, proceed with full sync
+            sync_result = yahoo_finance_service.get_stock_data(
+                symbol, 
+                period="2y", 
+                sync_db=True
+            )
+            
+            if 'error' not in sync_result:
+                logger.info(f"Successfully auto-synced data for {symbol}")
+                
+                # Verify the stock was actually created
+                try:
+                    Stock.objects.get(symbol=symbol.upper())
+                    return True
+                except Stock.DoesNotExist:
+                    logger.error(f"Auto-sync appeared successful but stock {symbol} not found in database")
+                    return False
+            else:
+                logger.error(f"Failed to auto-sync {symbol}: {sync_result['error']}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error during auto-sync for {symbol}: {str(e)}")
+            return False
     
     def _calculate_sma_crossover(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
@@ -578,9 +812,12 @@ class TechnicalAnalysisEngine:
                 benchmark_returns.append(industry_1y_return)
             
             if not benchmark_returns:
-                return None
-                
-            avg_benchmark = statistics.mean(benchmark_returns)
+                # Fallback: When no sector/industry data available, use neutral baseline
+                # This prevents indicator failure and allows analysis to continue
+                logger.info(f"REL1Y: No sector/industry data available, using neutral baseline (0% relative strength)")
+                avg_benchmark = stock_1y_return  # This makes relative_strength = 0
+            else:
+                avg_benchmark = statistics.mean(benchmark_returns)
             relative_strength = stock_1y_return - avg_benchmark
             
             # Map -20pp → 0, 0 → 0.5, +20pp → 1
@@ -638,9 +875,12 @@ class TechnicalAnalysisEngine:
                 benchmark_returns.append(industry_2y_return)
             
             if not benchmark_returns:
-                return None
-                
-            avg_benchmark = statistics.mean(benchmark_returns)
+                # Fallback: When no sector/industry data available, use neutral baseline
+                # This prevents indicator failure and allows analysis to continue
+                logger.info(f"REL2Y: No sector/industry data available, using neutral baseline (0% relative strength)")
+                avg_benchmark = stock_2y_return  # This makes relative_strength = 0
+            else:
+                avg_benchmark = statistics.mean(benchmark_returns)
             relative_strength = stock_2y_return - avg_benchmark
             
             # Map -100pp → 0, 0 → 0.5, +100pp → 1

@@ -1072,12 +1072,15 @@ class YahooFinanceService:
                 continue
                 
             try:
+                sector_str = profile_data.get('sector', '')
+                industry_str = profile_data.get('industry', '')
+                
                 stock, created = Stock.objects.get_or_create(
                     symbol=symbol,
                     defaults={
                         'short_name': symbol,
-                        'sector': profile_data.get('sector', ''),
-                        'industry': profile_data.get('industry', ''),
+                        'sector': sector_str,
+                        'industry': industry_str,
                         'sectorUpdatedAt': profile_data.get('updatedAt'),
                         'data_source': 'yahoo'
                     }
@@ -1085,15 +1088,36 @@ class YahooFinanceService:
                 
                 if created:
                     created_count += 1
-                    logger.info(f"Created new stock record for {symbol}")
+                    # Set foreign keys for newly created stock
+                    sector_obj, industry_obj = self._mapSectorIndustryToForeignKeys(sector_str, industry_str)
+                    if sector_obj and industry_obj:
+                        stock.sector_id = sector_obj
+                        stock.industry_id = industry_obj
+                        stock.save(update_fields=['sector_id', 'industry_id'])
+                        logger.info(f"Created new stock record for {symbol} with foreign keys: {sector_obj.sectorKey}/{industry_obj.industryKey}")
+                    else:
+                        logger.info(f"Created new stock record for {symbol} (foreign key mapping failed)")
                 else:
-                    # Update existing record
-                    stock.sector = profile_data.get('sector', '')
-                    stock.industry = profile_data.get('industry', '')
+                    # Update existing record with both string fields and foreign keys
+                    sector_str = profile_data.get('sector', '')
+                    industry_str = profile_data.get('industry', '')
+                    
+                    stock.sector = sector_str
+                    stock.industry = industry_str
                     stock.sectorUpdatedAt = profile_data.get('updatedAt')
-                    stock.save(update_fields=['sector', 'industry', 'sectorUpdatedAt'])
+                    
+                    # Map to foreign keys
+                    sector_obj, industry_obj = self._mapSectorIndustryToForeignKeys(sector_str, industry_str)
+                    if sector_obj and industry_obj:
+                        stock.sector_id = sector_obj
+                        stock.industry_id = industry_obj
+                        stock.save(update_fields=['sector', 'industry', 'sector_id', 'industry_id', 'sectorUpdatedAt'])
+                        logger.info(f"Updated sector/industry with foreign keys for {symbol}: {sector_obj.sectorKey}/{industry_obj.industryKey}")
+                    else:
+                        stock.save(update_fields=['sector', 'industry', 'sectorUpdatedAt'])
+                        logger.warning(f"Updated sector/industry strings only for {symbol} (foreign key mapping failed)")
+                    
                     updated_count += 1
-                    logger.info(f"Updated sector/industry for {symbol}")
                     
             except Exception as e:
                 logger.error(f"Error upserting profile for {symbol}: {str(e)}")
@@ -1217,6 +1241,74 @@ class YahooFinanceService:
         # Collapse multiple underscores into single underscore
         normalized = re.sub(r'_+', '_', normalized)
         return normalized.strip('_')
+    
+    def _mapSectorIndustryToForeignKeys(self, sector_str: str, industry_str: str) -> Tuple[Optional['DataSector'], Optional['DataIndustry']]:
+        """
+        Map sector/industry string values to DataSector/DataIndustry foreign key objects.
+        Creates new records if they don't exist.
+        
+        Args:
+            sector_str: Sector name from Yahoo Finance
+            industry_str: Industry name from Yahoo Finance
+            
+        Returns:
+            Tuple of (DataSector object or None, DataIndustry object or None)
+        """
+        from Data.models import DataSector, DataIndustry
+        from django.db import transaction
+        
+        if not sector_str or not industry_str:
+            return None, None
+            
+        # Normalize the keys
+        sector_key = self._normalizeSectorKey(sector_str)
+        industry_key = self._normalizeIndustryKey(industry_str)
+        
+        if not sector_key or not industry_key:
+            return None, None
+        
+        try:
+            with transaction.atomic():
+                # Get or create DataSector
+                sector_obj, sector_created = DataSector.objects.get_or_create(
+                    sectorKey=sector_key,
+                    defaults={
+                        'sectorName': sector_str.strip(),
+                        'isActive': True,
+                        'data_source': 'yahoo',
+                        'last_sync': timezone.now()
+                    }
+                )
+                
+                if sector_created:
+                    logger.info(f"Created new DataSector: {sector_key} ({sector_str})")
+                
+                # Get or create DataIndustry
+                industry_obj, industry_created = DataIndustry.objects.get_or_create(
+                    industryKey=industry_key,
+                    defaults={
+                        'industryName': industry_str.strip(),
+                        'sector': sector_obj,
+                        'isActive': True,
+                        'data_source': 'yahoo',
+                        'last_sync': timezone.now()
+                    }
+                )
+                
+                if industry_created:
+                    logger.info(f"Created new DataIndustry: {industry_key} ({industry_str}) under sector {sector_key}")
+                elif industry_obj.sector != sector_obj:
+                    # Update industry's sector if it has changed
+                    industry_obj.sector = sector_obj
+                    industry_obj.last_sync = timezone.now()
+                    industry_obj.save(update_fields=['sector', 'last_sync'])
+                    logger.info(f"Updated DataIndustry {industry_key} sector mapping to {sector_key}")
+                
+                return sector_obj, industry_obj
+                
+        except Exception as e:
+            logger.error(f"Error mapping sector/industry to foreign keys: {sector_str}/{industry_str} -> {str(e)}")
+            return None, None
     
     def fetchStockEodHistory(self, symbol: str, startDate: datetime, endDate: datetime) -> List[Dict]:
         """

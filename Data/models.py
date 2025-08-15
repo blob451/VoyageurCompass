@@ -950,6 +950,14 @@ class AnalyticsResults(models.Model):
     Model to store technical analysis results for stocks.
     """
     
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='analysis_results',
+        null=True,
+        blank=True,
+        help_text="User who initiated this analysis"
+    )
     stock = models.ForeignKey(
         Stock,
         on_delete=models.CASCADE,
@@ -1084,10 +1092,12 @@ class AnalyticsResults(models.Model):
         ordering = ['-as_of']
         verbose_name = 'Analytics Result'
         verbose_name_plural = 'Analytics Results'
-        unique_together = [['stock', 'as_of']]
+        unique_together = [['user', 'stock', 'as_of']]
         indexes = [
+            models.Index(fields=['user', '-as_of']),
             models.Index(fields=['stock', '-as_of']),
             models.Index(fields=['as_of']),
+            models.Index(fields=['user', 'stock', '-as_of']),
             models.Index(fields=['stock', 'horizon', '-as_of']),
         ]
     

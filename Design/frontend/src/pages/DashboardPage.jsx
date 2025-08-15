@@ -46,23 +46,36 @@ import {
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { selectCurrentUser } from '../features/auth/authSlice';
-// import { useGetPortfoliosQuery, useGetStocksQuery } from '../features/api/apiSlice'; // Not used currently
+import { useGetUserAnalysisHistoryQuery } from '../features/api/apiSlice';
 
 const DashboardPage = () => {
   const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
-  // const { data: portfolios, isLoading: portfoliosLoading } = useGetPortfoliosQuery(); // Not used currently
-  // const { data: stocks, isLoading: stocksLoading } = useGetStocksQuery({ page_size: 5 }); // Not used currently
-  const stocksLoading = false; // Mock loading state
+  
+  // API queries
+  const { data: analysisHistoryData, isLoading: analysisLoading } = useGetUserAnalysisHistoryQuery({ limit: 5 });
   
   // Mock user credit balance and quick search
   const [userCredits] = useState(25);
   const [quickSearch, setQuickSearch] = useState('');
-  const [recentAnalyses] = useState([
-    { id: 1, symbol: 'AAPL', score: 7, date: '2025-01-14', sector: 'Technology' },
-    { id: 2, symbol: 'MSFT', score: 8, date: '2025-01-13', sector: 'Technology' },
-    { id: 3, symbol: 'GOOGL', score: 6, date: '2025-01-12', sector: 'Technology' }
-  ]);
+  
+  // Get analysis history from API
+  const recentAnalyses = analysisHistoryData?.analyses || [];
+  
+  // Calculate dashboard stats from real data
+  const totalAnalyses = analysisHistoryData?.count || 0;
+  const averageScore = recentAnalyses.length > 0 
+    ? (recentAnalyses.reduce((sum, analysis) => sum + analysis.score, 0) / recentAnalyses.length).toFixed(1)
+    : '0.0';
+  const favoriteSector = recentAnalyses.length > 0
+    ? recentAnalyses.reduce((acc, analysis) => {
+        acc[analysis.sector] = (acc[analysis.sector] || 0) + 1;
+        return acc;
+      }, {})
+    : {};
+  const topSector = Object.keys(favoriteSector).length > 0
+    ? Object.keys(favoriteSector).reduce((a, b) => favoriteSector[a] > favoriteSector[b] ? a : b)
+    : 'None';
 
   // Sample data for the chart (replace with real data from API)
   const chartData = [
@@ -85,7 +98,12 @@ const DashboardPage = () => {
 
   const handleQuickSearch = () => {
     if (quickSearch.trim()) {
-      navigate('/stocks', { state: { searchTicker: quickSearch.trim() } });
+      navigate('/stocks', { 
+        state: { 
+          searchTicker: quickSearch.trim(),
+          autoAnalyze: true  // Flag to trigger automatic analysis
+        } 
+      });
     }
   };
 
@@ -186,10 +204,10 @@ const DashboardPage = () => {
                 Analyses This Month
               </Typography>
               <Typography variant="h5" component="div">
-                12
+                {totalAnalyses}
               </Typography>
               <Typography variant="body2" color="success.main">
-                3 this week
+                {recentAnalyses.length} recent
               </Typography>
             </CardContent>
           </Card>
@@ -202,10 +220,10 @@ const DashboardPage = () => {
                 Average Score
               </Typography>
               <Typography variant="h5" component="div">
-                6.8/10
+                {averageScore}/10
               </Typography>
-              <Typography variant="body2" color="success.main">
-                Above market average
+              <Typography variant="body2" color={parseFloat(averageScore) >= 6 ? "success.main" : parseFloat(averageScore) >= 4 ? "warning.main" : "error.main"}>
+                {parseFloat(averageScore) >= 6 ? 'Above average' : parseFloat(averageScore) >= 4 ? 'Average' : 'Below average'}
               </Typography>
             </CardContent>
           </Card>
@@ -218,10 +236,10 @@ const DashboardPage = () => {
                 Favorite Sector
               </Typography>
               <Typography variant="h5" component="div">
-                Technology
+                {topSector}
               </Typography>
               <Typography variant="body2" color="textSecondary">
-                67% of analyses
+                Most analyzed
               </Typography>
             </CardContent>
           </Card>
@@ -254,13 +272,17 @@ const DashboardPage = () => {
               <Button 
                 variant="outlined" 
                 size="small"
-                onClick={() => navigate('/stocks')}
+                onClick={() => navigate('/reports')}
               >
                 View All
               </Button>
             </Box>
             
-            {recentAnalyses.length > 0 ? (
+            {analysisLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : recentAnalyses.length > 0 ? (
               <List>
                 {recentAnalyses.map((analysis, index) => (
                   <React.Fragment key={analysis.id}>
@@ -281,11 +303,12 @@ const DashboardPage = () => {
                             />
                           </Box>
                         }
-                        secondary={`${analysis.sector} • ${analysis.date}`}
+                        secondary={`${analysis.sector} • ${new Date(analysis.analysis_date).toLocaleDateString()}`}
                       />
                       <IconButton 
                         size="small"
-                        onClick={() => navigate('/stocks', { state: { searchTicker: analysis.symbol } })}
+                        onClick={() => navigate(`/analysis/${analysis.id}`)}
+                        title="View Analysis Results"
                       >
                         <TrendingUp />
                       </IconButton>
@@ -359,7 +382,7 @@ const DashboardPage = () => {
                   key={symbol}
                   variant="text"
                   size="small"
-                  onClick={() => navigate('/stocks', { state: { searchTicker: symbol } })}
+                  onClick={() => navigate('/stocks', { state: { searchTicker: symbol, autoAnalyze: true } })}
                   sx={{ justifyContent: 'flex-start' }}
                 >
                   <Star sx={{ mr: 1, fontSize: 16 }} />
@@ -376,7 +399,7 @@ const DashboardPage = () => {
             <Typography variant="h6" gutterBottom>
               Market Performance Overview
             </Typography>
-            {stocksLoading ? (
+            {analysisLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
               </Box>

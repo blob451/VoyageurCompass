@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -39,19 +40,29 @@ import {
   AccountBalance,
   Speed,
   Info,
-  Refresh
+  Refresh,
+  Visibility
 } from '@mui/icons-material';
-// import { useSelector } from 'react-redux'; // Not used currently
+import { useSelector } from 'react-redux';
+import { useAnalyzeStockMutation, useGetUserAnalysisHistoryQuery, useGetUserLatestAnalysisQuery } from '../features/api/apiSlice';
 
 const StockSearchPage = () => {
-  // const { user } = useSelector((state) => state.auth); // Not used currently
+  const { user } = useSelector((state) => state.auth);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchTicker, setSearchTicker] = useState('');
-  const [loading, setLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState(null);
   const [error, setError] = useState('');
   const [confirmDialog, setConfirmDialog] = useState(false);
-  const [analysisHistory, setAnalysisHistory] = useState([]);
   const [userCredits] = useState(25); // Mock credit balance
+  
+  // Proper state machine for analysis flow
+  const [analysisMode, setAnalysisMode] = useState('none'); // 'none' | 'manual' | 'auto'
+  const [analysisPhase, setAnalysisPhase] = useState('idle'); // 'idle' | 'confirming' | 'syncing' | 'analyzing' | 'completed' | 'failed'
+  
+  // RTK Query hooks
+  const [analyzeStock, { isLoading: analyzing }] = useAnalyzeStockMutation();
+  const { data: analysisHistoryData, refetch: refetchHistory } = useGetUserAnalysisHistoryQuery({ limit: 10 });
 
   // Mock recent searches for demonstration
   const recentSearches = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'AMZN'];
@@ -66,25 +77,159 @@ const StockSearchPage = () => {
     { symbol: 'META', name: 'Meta Platforms Inc.', sector: 'Technology' },
   ];
 
-  useEffect(() => {
-    // Load analysis history (mock data)
-    setAnalysisHistory([
-      {
-        id: 1,
-        symbol: 'AAPL',
-        score: 7,
-        date: '2025-01-14',
-        sector: 'Technology'
-      },
-      {
-        id: 2,
-        symbol: 'MSFT',
-        score: 8,
-        date: '2025-01-13',
-        sector: 'Technology'
+  // Get analysis history from API
+  const analysisHistory = analysisHistoryData?.analyses || [];
+  
+  // Check if we're coming from dashboard with a ticker to show
+  const dashboardTicker = location.state?.searchTicker;
+  const autoAnalyze = location.state?.autoAnalyze;
+  
+  // Query for latest analysis if coming from dashboard (but not auto-analyzing)
+  const { data: latestAnalysisData, isLoading: loadingLatestAnalysis } = useGetUserLatestAnalysisQuery(
+    dashboardTicker, 
+    { skip: !dashboardTicker || autoAnalyze }
+  );
+
+  // Function to perform analysis (handles both auto and manual modes)
+  const performAnalysis = useCallback(async (symbol, mode) => {
+    const targetSymbol = symbol || searchTicker;
+    
+    console.log(`[ANALYSIS] Analysis for ${targetSymbol} started.`);
+    console.log(`[ANALYSIS] Mode: ${mode}, Phase: analyzing`);
+    
+    if (!targetSymbol?.trim()) {
+      console.log(`[ANALYSIS] Error: No ticker symbol provided`);
+      setError('Please enter a stock ticker symbol');
+      setAnalysisPhase('failed');
+      return;
+    }
+    
+    if (userCredits < 1) {
+      console.log(`[ANALYSIS] Error: Insufficient credits (${userCredits})`);
+      setError('Insufficient credits. Please purchase more credits to continue.');
+      setAnalysisPhase('failed');
+      return;
+    }
+
+    console.log(`[ANALYSIS] Starting analysis for ${targetSymbol}`);
+    setError('');
+    setAnalysisPhase('analyzing');
+
+    try {
+      console.log(`[ANALYSIS] API request initiated for ${targetSymbol.toUpperCase()}`);
+      const result = await analyzeStock({ symbol: targetSymbol.toUpperCase() });
+      
+      if (result.error) {
+        console.log(`[ANALYSIS] API error received:`, result.error);
+        const errorMessage = result.error.data?.error || 'Analysis failed. Please try again.';
+        console.log(`[ANALYSIS] Error message: ${errorMessage}`);
+        setError(errorMessage);
+        setAnalysisPhase('failed');
+        
+        // Check if it's a "No price data" error that might need auto-sync
+        if (errorMessage.includes('No price data available')) {
+          console.log(`[ANALYSIS] Switching to syncing phase`);
+          setAnalysisPhase('syncing');
+          // The backend should handle auto-sync, but we show appropriate UI
+          setTimeout(() => {
+            console.log(`[ANALYSIS] Updating sync status message`);
+            setError('Stock data is being synchronized. This may take a few moments...');
+          }, 1000);
+          
+          // Set a longer timeout for sync completion
+          setTimeout(() => {
+            if (analysisPhase === 'syncing') {
+              console.log(`[ANALYSIS] Sync timeout reached`);
+              setError('Data synchronization is taking longer than expected. Please try again.');
+              setAnalysisPhase('failed');
+            }
+          }, 30000); // 30 seconds timeout
+        }
+        return;
       }
-    ]);
-  }, []);
+
+      console.log(`[ANALYSIS] API response received successfully:`, result.data);
+
+      const analysisResult = result.data;
+      
+      console.log(`[ANALYSIS] Processing analysis result for ${analysisResult.symbol}`);
+      
+      // Format the analysis data for display
+      const formattedData = {
+        symbol: analysisResult.symbol,
+        name: analysisResult.name || `${analysisResult.symbol} Corporation`,
+        sector: analysisResult.sector || 'Unknown',
+        industry: analysisResult.industry || 'Unknown',
+        score: analysisResult.composite_score,
+        indicators: analysisResult.indicators,
+        weighted_scores: analysisResult.weighted_scores,
+        timestamp: analysisResult.analysis_date,
+        creditsUsed: 1
+      };
+
+      console.log(`[ANALYSIS] Analysis data formatted:`, formattedData);
+      setAnalysisData(formattedData);
+      setAnalysisPhase('completed');
+      
+      // Refetch history to include the new analysis (only if the query was started)
+      if (analysisHistoryData !== undefined) {
+        console.log(`[ANALYSIS] Refetching analysis history`);
+        refetchHistory();
+      }
+
+      console.log(`[ANALYSIS] Analysis complete.`);
+
+    } catch (err) {
+      console.log(`[ANALYSIS] Analysis failed with exception:`, err);
+      setError('Analysis failed. Please try again.');
+      setAnalysisPhase('failed');
+      console.error('Analysis error:', err);
+    }
+  }, [searchTicker, userCredits, analyzeStock, refetchHistory, analysisHistoryData]);
+
+  // Handle navigation from dashboard
+  useEffect(() => {
+    if (dashboardTicker) {
+      setSearchTicker(dashboardTicker);
+      setAnalysisPhase('idle'); // Reset phase
+      
+      if (autoAnalyze) {
+        // Set auto-analysis mode and show confirmation dialog
+        console.log(`[ANALYSIS] Auto-analysis mode activated for ${dashboardTicker}`);
+        setAnalysisMode('auto');
+        setError('');
+        console.log(`[ANALYSIS] Showing confirmation dialog for auto-analysis`);
+        setConfirmDialog(true); // Show confirmation for auto-analysis too
+      } else if (latestAnalysisData) {
+        // Show existing analysis data
+        setAnalysisMode('none');
+        setAnalysisPhase('completed');
+        
+        const formattedData = {
+          symbol: latestAnalysisData.symbol,
+          name: latestAnalysisData.name || `${latestAnalysisData.symbol} Corporation`,
+          sector: latestAnalysisData.sector || 'Unknown',
+          industry: latestAnalysisData.industry || 'Unknown',
+          score: latestAnalysisData.score,
+          indicators: latestAnalysisData.indicators,
+          weighted_scores: latestAnalysisData.weighted_scores,
+          timestamp: latestAnalysisData.analysis_date,
+          creditsUsed: 0 // This is a saved analysis, not a new one
+        };
+
+        setAnalysisData(formattedData);
+        setError('');
+      } else {
+        // Fresh page load, manual mode
+        setAnalysisMode('manual');
+        setAnalysisPhase('idle');
+      }
+    } else {
+      // Direct navigation to page
+      setAnalysisMode('manual');
+      setAnalysisPhase('idle');
+    }
+  }, [dashboardTicker, autoAnalyze, latestAnalysisData]);
 
   const handleSearch = (ticker = searchTicker) => {
     if (!ticker.trim()) {
@@ -97,64 +242,22 @@ const StockSearchPage = () => {
       return;
     }
 
+    // Set manual analysis mode and show confirmation
+    setAnalysisMode('manual');
+    setAnalysisPhase('confirming');
     setError('');
     setConfirmDialog(true);
   };
 
   const handleConfirmAnalysis = async () => {
+    console.log(`[ANALYSIS] Confirmation dialog confirmed for ${searchTicker} (mode: ${analysisMode})`);
     setConfirmDialog(false);
-    setLoading(true);
-    setError('');
+    await performAnalysis(searchTicker, analysisMode);
+  };
 
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Mock analysis data - replace with actual API call
-      const mockAnalysisData = {
-        symbol: searchTicker.toUpperCase(),
-        name: `${searchTicker.toUpperCase()} Corporation`,
-        sector: 'Technology',
-        industry: 'Software',
-        score: Math.floor(Math.random() * 11), // 0-10
-        indicators: {
-          sma50vs200: { score: 1.0, description: 'SMA50 above SMA200 - Strong trend' },
-          pricevs50: { score: 0.813, description: 'Price 6.3% above 50-day average' }, // cSpell:ignore pricevs50
-          rsi14: { score: 0.599, description: 'RSI at 59.8 - Neutral momentum' },
-          macd12269: { score: 0.740, description: 'MACD bullish crossover' },
-          bbpos20: { score: 0.039, description: 'Near upper Bollinger Band' }, // cSpell:ignore bbpos20 Bollinger
-          bbwidth20: { score: 0.548, description: 'Average volatility' }, // cSpell:ignore bbwidth20
-          volsurge: { score: 0.600, description: 'Volume below average' }, // cSpell:ignore volsurge
-          obv20: { score: 0.594, description: 'OBV showing accumulation' },
-          rel1y: { score: 0.500, description: 'Neutral 1-year performance' },
-          rel2y: { score: 0.466, description: 'Underperforming 2-year' },
-          candlerev: { score: 0.500, description: 'Neutral candlestick pattern' }, // cSpell:ignore candlerev
-          srcontext: { score: 0.500, description: 'Between support and resistance' } // cSpell:ignore srcontext
-        },
-        timestamp: new Date().toISOString(),
-        creditsUsed: 1
-      };
-
-      setAnalysisData(mockAnalysisData);
-      
-      // Add to history
-      setAnalysisHistory(prev => [
-        {
-          id: Date.now(),
-          symbol: mockAnalysisData.symbol,
-          score: mockAnalysisData.score,
-          date: new Date().toISOString().split('T')[0],
-          sector: mockAnalysisData.sector
-        },
-        ...prev.slice(0, 9) // Keep only last 10
-      ]);
-
-    } catch (err) {
-      setError('Analysis failed. Please try again.');
-      console.error('Analysis error:', err);
-    } finally {
-      setLoading(false);
-    }
+  const handleCancelAnalysis = () => {
+    setConfirmDialog(false);
+    setAnalysisPhase('idle');
   };
 
   const getScoreColor = (score) => {
@@ -214,7 +317,7 @@ const StockSearchPage = () => {
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Search Stock
+              Create New Report
             </Typography>
             <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
               <TextField
@@ -226,6 +329,7 @@ const StockSearchPage = () => {
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 error={!!error}
                 helperText={error}
+                disabled={analysisPhase === 'analyzing' || analysisPhase === 'syncing'}
                 InputProps={{
                   startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />
                 }}
@@ -234,10 +338,19 @@ const StockSearchPage = () => {
                 variant="contained"
                 size="large"
                 onClick={() => handleSearch()}
-                disabled={loading || !searchTicker.trim()}
+                disabled={
+                  analysisPhase === 'analyzing' || 
+                  analysisPhase === 'syncing' || 
+                  analysisPhase === 'confirming' || 
+                  !searchTicker.trim()
+                }
                 sx={{ minWidth: 120 }}
               >
-                {loading ? <CircularProgress size={24} /> : 'Analyze'}
+                {analysisPhase === 'analyzing' || analysisPhase === 'syncing' ? (
+                  <CircularProgress size={24} />
+                ) : (
+                  'Analyze'
+                )}
               </Button>
             </Box>
             
@@ -263,22 +376,34 @@ const StockSearchPage = () => {
           </Paper>
 
           {/* Analysis Results */}
-          {loading && (
+          {(analysisPhase === 'analyzing' || analysisPhase === 'syncing') && (
             <Paper sx={{ p: 3, mb: 3 }}>
               <Box sx={{ textAlign: 'center' }}>
                 <CircularProgress size={60} sx={{ mb: 2 }} />
                 <Typography variant="h6" gutterBottom>
-                  Analyzing {searchTicker}...
+                  {analysisPhase === 'syncing' ? (
+                    `Fetching data for ${searchTicker}...`
+                  ) : analysisMode === 'auto' ? (
+                    `Auto-analyzing ${searchTicker}...`
+                  ) : (
+                    `Analyzing ${searchTicker}...`
+                  )}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Running 12 technical indicators
+                  {analysisPhase === 'syncing' ? (
+                    'Getting latest stock data from Yahoo Finance (this may take 10-30 seconds)'
+                  ) : analysisMode === 'auto' ? (
+                    'Analysis triggered from dashboard • Running 12 technical indicators • 1 credit will be used'
+                  ) : (
+                    'Running 12 technical indicators'
+                  )}
                 </Typography>
                 <LinearProgress sx={{ mt: 2 }} />
               </Box>
             </Paper>
           )}
 
-          {analysisData && !loading && (
+          {analysisData && analysisPhase === 'completed' && (
             <Paper sx={{ p: 3, mb: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
@@ -314,36 +439,128 @@ const StockSearchPage = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {Object.entries(analysisData.indicators).map(([key, indicator]) => (
-                      <TableRow key={key}>
-                        <TableCell sx={{ fontWeight: 500 }}>
-                          {key.toUpperCase()}
-                        </TableCell>
+                    {analysisData.indicators && Object.entries(analysisData.indicators).map(([key, indicator]) => {
+                      let score = indicator.score || (indicator.raw ? parseFloat(indicator.raw) / 10 : 0);
+                      
+                      // Handle NaN values
+                      if (isNaN(score) || !isFinite(score)) {
+                        score = 0;
+                      }
+                      
+                      const displayScore = score * 10;
+                      const isValidScore = !isNaN(displayScore) && isFinite(displayScore);
+                      
+                      return (
+                        <TableRow key={key}>
+                          <TableCell sx={{ fontWeight: 500 }}>
+                            {key.toUpperCase()}
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={Math.max(0, Math.min(100, score * 100))}
+                                sx={{ width: 60, height: 8, borderRadius: 4 }}
+                                color={score >= 0.7 ? 'success' : score >= 0.4 ? 'warning' : 'error'}
+                              />
+                              <Typography variant="body2">
+                                {isValidScore ? displayScore.toFixed(1) : 'N/A'}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" color="text.secondary">
+                              {indicator.description || indicator.desc || 'Technical indicator'}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          )}
+
+          {/* Browse Existing Reports Section */}
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Browse Existing Reports
+              </Typography>
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/reports')}
+                sx={{ minWidth: 120 }}
+              >
+                View All Reports
+              </Button>
+            </Box>
+            
+            {analysisHistory.length > 0 ? (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Stock</TableCell>
+                      <TableCell align="center">Score</TableCell>
+                      <TableCell>Date</TableCell>
+                      <TableCell align="center">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {analysisHistory.slice(0, 5).map((analysis) => (
+                      <TableRow key={analysis.id} hover>
                         <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={indicator.score * 100}
-                              sx={{ width: 60, height: 8, borderRadius: 4 }}
-                              color={indicator.score >= 0.7 ? 'success' : indicator.score >= 0.4 ? 'warning' : 'error'}
-                            />
-                            <Typography variant="body2">
-                              {(indicator.score * 10).toFixed(1)}
+                          <Box>
+                            <Typography variant="subtitle2">
+                              {analysis.symbol}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {analysis.name || 'N/A'}
                             </Typography>
                           </Box>
                         </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={`${analysis.score}/10`}
+                            size="small"
+                            color={analysis.score >= 7 ? 'success' : analysis.score >= 4 ? 'warning' : 'error'}
+                            variant="outlined"
+                          />
+                        </TableCell>
                         <TableCell>
-                          <Typography variant="body2" color="text.secondary">
-                            {indicator.description}
+                          <Typography variant="body2">
+                            {new Date(analysis.analysis_date).toLocaleDateString()}
                           </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="View Analysis Results">
+                            <IconButton
+                              size="small"
+                              onClick={() => navigate(`/analysis/${analysis.id}`)}
+                              color="primary"
+                            >
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </TableContainer>
-            </Paper>
-          )}
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  No analysis reports yet
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Create your first report using the form above
+                </Typography>
+              </Box>
+            )}
+          </Paper>
         </Grid>
 
         {/* Sidebar */}
@@ -357,11 +574,12 @@ const StockSearchPage = () => {
               {popularStocks.map((stock, index) => (
                 <React.Fragment key={stock.symbol}>
                   <ListItem
-                    button
+                    component="button"
                     onClick={() => {
                       setSearchTicker(stock.symbol);
                       handleSearch(stock.symbol);
                     }}
+                    sx={{ cursor: 'pointer' }}
                   >
                     <ListItemText
                       primary={`${stock.symbol} - ${stock.name}`}
@@ -401,7 +619,7 @@ const StockSearchPage = () => {
                             />
                           </Box>
                         }
-                        secondary={`${analysis.sector} • ${analysis.date}`}
+                        secondary={`${analysis.sector} • ${new Date(analysis.analysis_date).toLocaleDateString()}`}
                       />
                     </ListItem>
                     {index < analysisHistory.length - 1 && <Divider />}
@@ -419,19 +637,29 @@ const StockSearchPage = () => {
 
       {/* Confirmation Dialog */}
       <Dialog open={confirmDialog} onClose={() => setConfirmDialog(false)}>
-        <DialogTitle>Confirm Analysis</DialogTitle>
+        <DialogTitle>
+          {analysisMode === 'auto' ? 'Auto-Analysis from Dashboard' : 'Confirm Analysis'}
+        </DialogTitle>
         <DialogContent>
           <Typography gutterBottom>
-            Analyze <strong>{searchTicker}</strong> for 1 credit?
+            {analysisMode === 'auto' 
+              ? `Auto-analyze ${searchTicker} (triggered from dashboard quick search)`
+              : `Analyze ${searchTicker} for 1 credit?`
+            }
           </Typography>
           <Alert severity="info" sx={{ mt: 2 }}>
             This will use 1 credit from your balance ({userCredits} remaining)
           </Alert>
+          {analysisMode === 'auto' && (
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              Analysis will start automatically after confirmation
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDialog(false)}>Cancel</Button>
+          <Button onClick={handleCancelAnalysis}>Cancel</Button>
           <Button onClick={handleConfirmAnalysis} variant="contained">
-            Confirm Analysis
+            {analysisMode === 'auto' ? 'Start Auto-Analysis' : 'Confirm Analysis'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -31,7 +31,8 @@ class AnalyticsWriter:
         components: Dict[str, Dict[str, Any]],
         composite_raw: Decimal,
         score_0_10: int,
-        horizon: str = 'blend'
+        horizon: str = 'blend',
+        user=None
     ) -> AnalyticsResults:
         """
         Upsert analytics result for a stock at specific timestamp.
@@ -44,6 +45,7 @@ class AnalyticsWriter:
             composite_raw: Sum of all weighted scores
             score_0_10: Final composite score (0-10)
             horizon: Analysis time horizon
+            user: User instance who initiated the analysis
             
         Returns:
             AnalyticsResults instance (created or updated)
@@ -68,10 +70,19 @@ class AnalyticsWriter:
         
         # Use Django's update_or_create for atomic upsert
         with transaction.atomic():
+            lookup_fields = {
+                'stock': stock,
+                'as_of': as_of,
+            }
+            
+            # Include user in lookup if provided
+            if user:
+                lookup_fields['user'] = user
+                
             result, created = AnalyticsResults.objects.update_or_create(
-                stock=stock,
-                as_of=as_of,
+                **lookup_fields,
                 defaults={
+                    'user': user,
                     'horizon': horizon,
                     'w_sma50vs200': weighted_scores.get('w_sma50vs200'),
                     'w_pricevs50': weighted_scores.get('w_pricevs50'),
@@ -96,7 +107,8 @@ class AnalyticsWriter:
     
     def batch_upsert_analytics_results(
         self,
-        results_data: list[Dict[str, Any]]
+        results_data: list[Dict[str, Any]],
+        user=None
     ) -> list[AnalyticsResults]:
         """
         Batch upsert multiple analytics results for performance.
@@ -128,7 +140,8 @@ class AnalyticsWriter:
                     components=data['components'],
                     composite_raw=data['composite_raw'],
                     score_0_10=data['score_0_10'],
-                    horizon=data.get('horizon', 'blend')
+                    horizon=data.get('horizon', 'blend'),
+                    user=user or data.get('user')
                 )
                 results.append(result)
         

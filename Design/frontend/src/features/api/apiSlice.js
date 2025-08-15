@@ -7,6 +7,7 @@ const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const baseQuery = fetchBaseQuery({
   baseUrl: apiUrl,
   // Remove credentials: 'include' since JWT doesn't need cookies and it causes CORS issues
+  timeout: 30000, // 30 second timeout for login operations that may take longer
   prepareHeaders: (headers, { getState }) => {
     const token = getState().auth.token;
     if (token) {
@@ -20,7 +21,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
 
   if (result?.error?.status === 401) {
-    console.log('Sending refresh token');
+    console.log('Token expired, attempting refresh...');
     // Try to get a new token
     const refreshResult = await baseQuery('/auth/refresh/', api, extraOptions);
     
@@ -29,8 +30,10 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       // Store the new token
       api.dispatch(setCredentials({ ...refreshResult.data, user }));
       // Retry the original query with new access token
+      console.log('Token refreshed, retrying original request...');
       result = await baseQuery(args, api, extraOptions);
     } else {
+      console.log('Token refresh failed, logging out...');
       api.dispatch(logout());
     }
   }
@@ -40,7 +43,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
 export const apiSlice = createApi({
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['User', 'Stock', 'Portfolio'],
+  tagTypes: ['User', 'Stock', 'Portfolio', 'Analysis'],
   endpoints: (builder) => ({
     login: builder.mutation({
       query: (credentials) => ({
@@ -108,11 +111,13 @@ export const apiSlice = createApi({
       query: (symbol) => `/stocks/${symbol}/`,
       providesTags: (result, error, symbol) => [{ type: 'Stock', id: symbol }],
     }),
-    analyzeStock: builder.query({
+    analyzeStock: builder.mutation({
       query: ({ symbol, months = 6 }) => ({
-        url: `/analyze/${symbol}/`,
+        url: `/analytics/analyze/${symbol}/`,
+        method: 'GET',
         params: { months },
       }),
+      invalidatesTags: ['Analysis'],
     }),
     getUserProfile: builder.query({
       query: () => '/user/profile/',
@@ -130,6 +135,27 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['Portfolio'],
     }),
+    getUserAnalysisHistory: builder.query({
+      query: (params = {}) => ({
+        url: '/analytics/user/history/',
+        params,
+      }),
+      providesTags: ['Analysis'],
+      // Cache results for 5 minutes to avoid unnecessary re-fetches
+      keepUnusedDataFor: 300,
+      // Don't refetch on focus/reconnect for better perceived performance
+      refetchOnMountOrArgChange: 60,
+      refetchOnFocus: false,
+      refetchOnReconnect: false,
+    }),
+    getUserLatestAnalysis: builder.query({
+      query: (symbol) => `/analytics/user/${symbol}/latest/`,
+      providesTags: (result, error, symbol) => [{ type: 'Analysis', id: symbol }],
+    }),
+    getAnalysisById: builder.query({
+      query: (analysisId) => `/analytics/analysis/${analysisId}/`,
+      providesTags: (result, error, analysisId) => [{ type: 'Analysis', id: analysisId }],
+    }),
   }),
 });
 
@@ -140,8 +166,11 @@ export const {
   useValidateTokenQuery,
   useGetStocksQuery,
   useGetStockQuery,
-  useAnalyzeStockQuery,
+  useAnalyzeStockMutation,
   useGetUserProfileQuery,
   useGetPortfoliosQuery,
   useCreatePortfolioMutation,
+  useGetUserAnalysisHistoryQuery,
+  useGetUserLatestAnalysisQuery,
+  useGetAnalysisByIdQuery,
 } = apiSlice;

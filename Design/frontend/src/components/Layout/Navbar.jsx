@@ -22,7 +22,8 @@ import {
   AccountBalance,
   ShoppingCart,
   Settings,
-  Help
+  Help,
+  Assessment
 } from '@mui/icons-material';
 
 const Navbar = () => {
@@ -139,6 +140,10 @@ const Navbar = () => {
                 <MenuItem onClick={() => handleNavigation('/stocks')}>
                   <Analytics sx={{ mr: 1 }} />
                   Stock Analysis
+                </MenuItem>
+                <MenuItem onClick={() => handleNavigation('/reports')}>
+                  <Assessment sx={{ mr: 1 }} />
+                  Analysis Reports
                 </MenuItem>
                 <MenuItem onClick={() => handleNavigation('/compare')}>
                   <Compare sx={{ mr: 1 }} />

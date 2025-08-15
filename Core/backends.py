@@ -88,13 +88,21 @@ class BlacklistCheckMiddleware:
         if auth_header and auth_header.startswith('Bearer '):
             token = auth_header.split(' ')[1]
             
-            from Core.models import BlacklistedToken
-            if BlacklistedToken.is_token_blacklisted(token):
-                from django.http import JsonResponse
-                return JsonResponse(
-                    {'detail': 'Token has been blacklisted'}, 
-                    status=401
-                )
+            try:
+                from Core.models import BlacklistedToken
+                if BlacklistedToken.is_token_blacklisted(token):
+                    from django.http import JsonResponse
+                    return JsonResponse(
+                        {'detail': 'Token has been blacklisted'}, 
+                        status=401
+                    )
+            except Exception as e:
+                # Log the error but don't block the request if blacklist check fails
+                print(f"[MIDDLEWARE ERROR] BlacklistCheckMiddleware error: {e}")
+                print(f"[MIDDLEWARE ERROR] Request path: {request.path}")
+                logger.error(f"Error checking blacklisted token: {e}")
+                # Allow request to continue if blacklist check fails (graceful degradation)
+                pass
         
         response = self.get_response(request)
         return response
