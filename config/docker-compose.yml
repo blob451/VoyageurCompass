@@ -228,7 +228,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://host.docker.internal:8000/api/v1
+      - VITE_API_URL=http://localhost:8000/api/v1
       - WATCHPACK_POLLING=true  # For file watching on Windows
       - CHOKIDAR_USEPOLLING=true  # For hot reload on Windows
     depends_on:

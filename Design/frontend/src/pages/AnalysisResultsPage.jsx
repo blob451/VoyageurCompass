@@ -25,11 +25,11 @@ import {
 import { 
   ArrowBack, 
   TrendingUp, 
-  Sentiment,
   SentimentSatisfied,
   SentimentDissatisfied,
   SentimentNeutral,
-  NewspaperOutlined 
+  NewspaperOutlined,
+  Psychology
 } from '@mui/icons-material';
 import { useGetAnalysisByIdQuery } from '../features/api/apiSlice';
 
