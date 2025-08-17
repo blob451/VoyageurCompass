@@ -1122,6 +1122,45 @@ class AnalyticsResults(models.Model):
         help_text="Final composite score (0-10, rounded)"
     )
     
+    # LSTM Price Predictions
+    prediction_1d = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text="1-day price prediction from LSTM model"
+    )
+    prediction_7d = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text="7-day price prediction from LSTM model"
+    )
+    prediction_30d = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text="30-day price prediction from LSTM model"
+    )
+    prediction_confidence = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Confidence score for LSTM predictions (0.0-1.0)"
+    )
+    model_version = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        help_text="Version of LSTM model used for predictions"
+    )
+    prediction_timestamp = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when predictions were generated"
+    )
+    
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

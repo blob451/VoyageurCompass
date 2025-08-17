@@ -193,6 +193,53 @@ def analyze_stock(request, symbol):
                 print(f"[BACKEND] Error converting weighted_score {k}={v}: {e}")
                 safe_weighted_scores[k] = 0.0
             
+        # CRITICAL FIX: Verify database transaction was successful before responding
+        analytics_result_id = analysis.get('analytics_result_id')
+        if analytics_result_id:
+            try:
+                # Verify the analysis was actually saved to the database
+                from Data.models import AnalyticsResults
+                saved_analysis = AnalyticsResults.objects.filter(
+                    id=analytics_result_id,
+                    user=request.user,
+                    stock__symbol=symbol
+                ).first()
+                
+                if not saved_analysis:
+                    # Database save failed silently - this is the critical bug we're fixing
+                    print(f"[BACKEND] CRITICAL ERROR: Analysis {analytics_result_id} not found in database for {symbol}")
+                    logger.error(f"Analysis result ID {analytics_result_id} not found in database for {symbol} user {request.user.id}")
+                    
+                    # Instead of returning fake success, report the actual error
+                    return Response(
+                        {'error': f'Analysis completed but failed to save to database. Please try again.'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+                else:
+                    print(f"[BACKEND] Verified analysis {analytics_result_id} saved successfully for {symbol}")
+                    
+                    # Double-check the analysis data matches what we're returning
+                    if saved_analysis.stock.symbol != symbol:
+                        print(f"[BACKEND] CRITICAL ERROR: Analysis ID {analytics_result_id} belongs to {saved_analysis.stock.symbol}, not {symbol}")
+                        logger.error(f"Analysis result ID mismatch: expected {symbol}, found {saved_analysis.stock.symbol}")
+                        
+                        return Response(
+                            {'error': f'Analysis result ID mismatch detected. Please try again.'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
+                        
+            except Exception as db_error:
+                print(f"[BACKEND] Database verification error for {symbol}: {str(db_error)}")
+                logger.error(f"Database verification failed for {symbol}: {str(db_error)}", exc_info=True)
+                
+                return Response(
+                    {'error': f'Failed to verify analysis save: {str(db_error)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        else:
+            print(f"[BACKEND] WARNING: No analytics_result_id returned for {symbol}")
+            logger.warning(f"No analytics_result_id returned for {symbol} analysis")
+
         response_data = {
             'success': True,
             'symbol': analysis.get('symbol', symbol),
@@ -202,12 +249,12 @@ def analyze_stock(request, symbol):
             'composite_raw': analysis.get('composite_raw'),
             'indicators': analysis.get('components', {}),
             'weighted_scores': safe_weighted_scores,
-            'analytics_result_id': analysis.get('analytics_result_id')
+            'analytics_result_id': analytics_result_id
         }
         
         print(f"[BACKEND] Response formatted successfully")
         print(f"[BACKEND] Response data keys: {list(response_data.keys())}")
-        print(f"[BACKEND] Returning response for {symbol}")
+        print(f"[BACKEND] Database transaction verified, returning response for {symbol}")
         
         # Invalidate analysis history cache for this user since we just created a new analysis
         user_cache_pattern = f"analysis_history:{request.user.id}:*"

@@ -14,10 +14,12 @@ import math
 import statistics
 
 from django.utils import timezone
+from django.conf import settings
 
 from Data.repo.price_reader import PriceReader, PriceData, SectorPriceData, IndustryPriceData
 from Data.repo.analytics_writer import AnalyticsWriter
 from Analytics.services.sentiment_analyzer import get_sentiment_analyzer
+from Analytics.services.universal_predictor import get_universal_lstm_service
 from Data.services.yahoo_finance import yahoo_finance_service
 
 logger = logging.getLogger(__name__)
@@ -51,21 +53,22 @@ class TechnicalAnalysisEngine:
     Total: 1.00
     """
     
-    # Indicator weights adjusted for sentiment (90% TA, 10% sentiment)
+    # Indicator weights adjusted for sentiment and ML predictions (80% TA, 10% sentiment, 10% LSTM)
     WEIGHTS = {
-        'sma50vs200': 0.135,  # 15% * 0.9
-        'pricevs50': 0.09,    # 10% * 0.9
-        'rsi14': 0.09,        # 10% * 0.9
-        'macd12269': 0.09,    # 10% * 0.9
-        'bbpos20': 0.09,      # 10% * 0.9
-        'bbwidth20': 0.045,   # 5% * 0.9
-        'volsurge': 0.09,     # 10% * 0.9
-        'obv20': 0.045,       # 5% * 0.9
-        'rel1y': 0.045,       # 5% * 0.9
-        'rel2y': 0.045,       # 5% * 0.9
-        'candlerev': 0.072,   # 8% * 0.9
-        'srcontext': 0.063,   # 7% * 0.9
-        'sentiment': 0.10     # 10% for sentiment
+        'sma50vs200': 0.12,   # 15% * 0.8
+        'pricevs50': 0.08,    # 10% * 0.8
+        'rsi14': 0.08,        # 10% * 0.8
+        'macd12269': 0.08,    # 10% * 0.8
+        'bbpos20': 0.08,      # 10% * 0.8
+        'bbwidth20': 0.04,    # 5% * 0.8
+        'volsurge': 0.08,     # 10% * 0.8
+        'obv20': 0.04,        # 5% * 0.8
+        'rel1y': 0.04,        # 5% * 0.8
+        'rel2y': 0.04,        # 5% * 0.8
+        'candlerev': 0.064,   # 8% * 0.8
+        'srcontext': 0.056,   # 7% * 0.8
+        'sentiment': 0.10,    # 10% for sentiment
+        'prediction': 0.10    # 10% for LSTM predictions
     }
     
     # Human-readable indicator names for logging and frontend display
@@ -82,7 +85,8 @@ class TechnicalAnalysisEngine:
         'rel2y': 'Relative Strength 2Y',
         'candlerev': 'Candlestick Pattern',  # Special case: will be modified dynamically
         'srcontext': 'Support/Resistance',
-        'sentiment': 'News Sentiment Analysis'
+        'sentiment': 'News Sentiment Analysis',
+        'prediction': 'LSTM Price Prediction'
     }
     
     def __init__(self):
@@ -233,21 +237,60 @@ class TechnicalAnalysisEngine:
                 display_name = self.get_indicator_display_name('sentiment', indicators['sentiment'])
                 logger_instance.log_indicator_calculation(display_name, indicators['sentiment'])
             
-            # Calculate weighted scores and composite
+            # Calculate LSTM price prediction
+            indicators['prediction'] = self._calculate_prediction_score(symbol)
+            if logger_instance:
+                display_name = self.get_indicator_display_name('prediction', indicators['prediction'])
+                logger_instance.log_indicator_calculation(display_name, indicators['prediction'])
+            
+            # Calculate weighted scores and composite with dynamic weight reallocation
             weighted_scores = {}
             components = {}
             composite_raw = Decimal('0')
             
+            # CRITICAL FIX: Dynamic weight reallocation when indicators are missing
+            available_indicators = {k: v for k, v in indicators.items() if v is not None}
+            missing_indicators = [k for k, v in indicators.items() if v is None]
+            
+            # Calculate total weight of missing indicators
+            missing_weight = sum(self.WEIGHTS[indicator] for indicator in missing_indicators)
+            available_weight = sum(self.WEIGHTS[indicator] for indicator in available_indicators.keys())
+            
+            print(f"[TA ENGINE] Weight allocation - Available: {len(available_indicators)}/{len(indicators)} indicators")
+            if missing_indicators:
+                print(f"[TA ENGINE] Missing indicators: {missing_indicators} (total weight: {missing_weight:.3f})")
+                print(f"[TA ENGINE] Redistributing {missing_weight:.3f} weight to available indicators")
+            
+            # Create adjusted weights for available indicators
+            adjusted_weights = {}
+            for indicator_name in indicators.keys():
+                if indicator_name in available_indicators:
+                    # Redistribute missing weight proportionally to available indicators
+                    base_weight = self.WEIGHTS[indicator_name]
+                    if available_weight > 0 and missing_weight > 0:
+                        weight_boost = (base_weight / available_weight) * missing_weight
+                        adjusted_weights[indicator_name] = base_weight + weight_boost
+                    else:
+                        adjusted_weights[indicator_name] = base_weight
+                else:
+                    # Missing indicators get zero weight instead of default 0.5 score
+                    adjusted_weights[indicator_name] = 0.0
+            
+            # Verify total weight is still 1.0 (with some tolerance for floating point)
+            total_weight = sum(adjusted_weights.values())
+            print(f"[TA ENGINE] Total adjusted weight: {total_weight:.6f} (should be 1.0)")
+            
             for indicator_name, result in indicators.items():
                 if result is None:
-                    # Use default score of 0.5 for missing indicators
-                    score = 0.5
+                    # Missing indicators contribute nothing to the composite score
+                    score = 0.0  # Changed from 0.5 to 0.0
                     raw_value = None
+                    weight = 0.0  # No weight for missing indicators
                 else:
                     score = result.score
                     raw_value = result.raw
+                    weight = adjusted_weights[indicator_name]
                 
-                weight = self.WEIGHTS[indicator_name]
                 weighted_score = Decimal(str(score)) * Decimal(str(weight))
                 
                 weighted_scores[f'w_{indicator_name}'] = weighted_score
@@ -257,7 +300,9 @@ class TechnicalAnalysisEngine:
                 components[indicator_name] = {
                     'raw': raw_value,
                     'score': score,
-                    'description': display_name
+                    'description': display_name,
+                    'weight_used': float(weight),  # Add weight used for transparency
+                    'original_weight': self.WEIGHTS[indicator_name]
                 }
                 composite_raw += weighted_score
             
@@ -1324,4 +1369,76 @@ class TechnicalAnalysisEngine:
                 score=0.5,
                 weight=self.WEIGHTS['sentiment'],
                 weighted_score=0.5 * self.WEIGHTS['sentiment']
+            )
+    
+    def _calculate_prediction_score(self, symbol: str) -> Optional[IndicatorResult]:
+        """
+        Calculate LSTM price prediction score.
+        Score range: 0 (bearish) to 1 (bullish) based on predicted price movement.
+        Weight: 0.10 (10% of composite score)
+        """
+        try:
+            # Use Universal LSTM service instead of stock-specific predictor
+            universal_lstm_service = get_universal_lstm_service()
+            
+            logger.info(f"Calculating Universal LSTM prediction for {symbol}")
+            
+            # Get 1-day prediction using universal model
+            prediction_result = universal_lstm_service.predict_stock_price(symbol, horizon='1d')
+            
+            if not prediction_result:
+                logger.warning(f"No Universal LSTM prediction available for {symbol}, using neutral score")
+                return IndicatorResult(
+                    raw={'prediction': None, 'error': 'Universal LSTM model did not produce prediction'},
+                    score=0.5,  # Neutral score
+                    weight=self.WEIGHTS['prediction'],
+                    weighted_score=0.5 * self.WEIGHTS['prediction']
+                )
+            
+            # Sanity check: reject unrealistic predictions
+            price_change_pct = prediction_result.get('price_change_pct', 0)
+            if abs(price_change_pct) > 50:  # More than 50% change is unrealistic for 1-day prediction
+                logger.warning(f"Unrealistic LSTM prediction for {symbol}: {price_change_pct:.2f}% change, using neutral score")
+                return IndicatorResult(
+                    raw={'prediction': None, 'error': f'Unrealistic prediction: {price_change_pct:.2f}% change'},
+                    score=0.5,  # Neutral score
+                    weight=self.WEIGHTS['prediction'],
+                    weighted_score=0.5 * self.WEIGHTS['prediction']
+                )
+            
+            # Normalize prediction to score using the Universal service's method
+            normalized_score = universal_lstm_service.normalize_prediction_score(prediction_result)
+            
+            logger.info(f"Universal LSTM prediction for {symbol} ({prediction_result.get('sector_name', 'Unknown')}): "
+                       f"price=${prediction_result['predicted_price']:.2f}, "
+                       f"change={prediction_result['price_change_pct']:+.2f}%, "
+                       f"score={normalized_score:.3f}, "
+                       f"confidence={prediction_result['confidence']:.3f}")
+            
+            return IndicatorResult(
+                raw={
+                    'predicted_price': prediction_result['predicted_price'],
+                    'current_price': prediction_result['current_price'],
+                    'price_change': prediction_result['price_change'],
+                    'price_change_pct': prediction_result['price_change_pct'],
+                    'confidence': prediction_result['confidence'],
+                    'model_version': prediction_result['model_version'],
+                    'model_type': prediction_result.get('model_type', 'UniversalLSTM'),
+                    'sector_name': prediction_result.get('sector_name', 'Unknown'),
+                    'sector_id': prediction_result.get('sector_id', 10),
+                    'horizon': prediction_result['horizon']
+                },
+                score=normalized_score,
+                weight=self.WEIGHTS['prediction'],
+                weighted_score=normalized_score * self.WEIGHTS['prediction']
+            )
+            
+        except Exception as e:
+            logger.error(f"Error calculating LSTM prediction for {symbol}: {str(e)}")
+            # Return neutral score on error
+            return IndicatorResult(
+                raw={'prediction': None, 'error': str(e)},
+                score=0.5,
+                weight=self.WEIGHTS['prediction'],
+                weighted_score=0.5 * self.WEIGHTS['prediction']
             )

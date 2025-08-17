@@ -35,7 +35,7 @@ class AnalysisLogger:
             self.log_dir = log_dir
         else:
             base_dir = getattr(settings, 'BASE_DIR', os.getcwd())
-            self.log_dir = os.path.join(base_dir, 'Temp', 'logs', 'web_analysis')
+            self.log_dir = os.path.join(base_dir, 'Temp', 'logs', 'web_analysis', 'current')
         
         # Ensure log directory exists
         os.makedirs(self.log_dir, exist_ok=True)

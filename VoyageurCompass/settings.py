@@ -123,11 +123,11 @@ WSGI_APPLICATION = 'VoyageurCompass.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('DB_NAME', default='voyageur_compass_db'),
-        'USER': env('DB_USER', default='voyageur_user'),
-        'PASSWORD': env('DB_PASSWORD', default='your_password_here'),
-        'HOST': env('DB_HOST', default='localhost'),
-        'PORT': env('DB_PORT', default='5432'),
+        'NAME': 'voyageur_compass_db',
+        'USER': 'voyageur_user',
+        'PASSWORD': 'ab727492Z',
+        'HOST': 'localhost',
+        'PORT': '5433',
         
         # Connection Management Settings
         'CONN_MAX_AGE': 600,
@@ -408,30 +408,206 @@ SESSION_COOKIE_HTTPONLY = True
 # Structured Logging Configuration
 LOG_LEVEL = env('LOG_LEVEL', default='INFO')
 
+# Create all logging directories
+LOGS_BASE_DIR = BASE_DIR / 'Temp' / 'logs'
+LOG_DIRS = {
+    'web_analysis': LOGS_BASE_DIR / 'web_analysis' / 'current',
+    'web_analysis_archived': LOGS_BASE_DIR / 'web_analysis' / 'archived',
+    'model_training_universal': LOGS_BASE_DIR / 'model_training' / 'universal_lstm',
+    'model_training_individual': LOGS_BASE_DIR / 'model_training' / 'individual_lstm',
+    'model_training_sentiment': LOGS_BASE_DIR / 'model_training' / 'sentiment',
+    'data_collection_stock': LOGS_BASE_DIR / 'data_collection' / 'stock_data',
+    'data_collection_sector': LOGS_BASE_DIR / 'data_collection' / 'sector_data',
+    'data_collection_errors': LOGS_BASE_DIR / 'data_collection' / 'errors',
+    'system_django': LOGS_BASE_DIR / 'system' / 'django',
+    'system_celery': LOGS_BASE_DIR / 'system' / 'celery',
+    'system_api': LOGS_BASE_DIR / 'system' / 'api',
+    'analytics_technical': LOGS_BASE_DIR / 'analytics' / 'technical',
+    'analytics_sentiment': LOGS_BASE_DIR / 'analytics' / 'sentiment',
+    'analytics_portfolio': LOGS_BASE_DIR / 'analytics' / 'portfolio',
+    'security_auth': LOGS_BASE_DIR / 'security' / 'auth',
+    'security_failed': LOGS_BASE_DIR / 'security' / 'failed_attempts',
+    'security_api': LOGS_BASE_DIR / 'security' / 'api_security',
+}
+
+# Ensure all log directories exist
+for log_dir in LOG_DIRS.values():
+    log_dir.mkdir(parents=True, exist_ok=True)
+
 LOGGING = {
-      'version': 1,
-      'disable_existing_loggers': False,
-      'formatters': {
-          'verbose': {
-              'format': '{levelname} {asctime} {module} {message}',
-              'style': '{',
-          },
-      },
-      'handlers': {
-          'console': {
-              'class': 'logging.StreamHandler',
-              'formatter': 'verbose',
-          },
-      },
-      'loggers': {
-          'django.server': {
-              'handlers': ['console'],
-              'level': 'INFO',
-          },
-      },
-  }
-  
-# Logs directory creation removed - no file handlers configured
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {asctime} {message}',
+            'style': '{',
+        },
+        'security': {
+            'format': '{levelname} {asctime} {module} {funcName} {lineno} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        # Django system logs
+        'django_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIRS['system_django'] / 'django.log',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        # Celery logs
+        'celery_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIRS['system_celery'] / 'celery.log',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        # API logs
+        'api_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIRS['system_api'] / 'api.log',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        # Data collection logs
+        'data_collection_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIRS['data_collection_stock'] / 'stock_data.log',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'data_errors_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIRS['data_collection_errors'] / 'errors.log',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        # Analytics logs
+        'analytics_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIRS['analytics_technical'] / 'technical_analysis.log',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'sentiment_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIRS['analytics_sentiment'] / 'sentiment_analysis.log',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        # Security logs
+        'security_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIRS['security_auth'] / 'auth.log',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 10,
+            'formatter': 'security',
+        },
+        'security_failed_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIRS['security_failed'] / 'failed_attempts.log',
+            'maxBytes': 10485760,  # 10MB
+            'backupCount': 10,
+            'formatter': 'security',
+        },
+        # Model training logs
+        'model_training_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIRS['model_training_universal'] / 'universal_lstm.log',
+            'maxBytes': 52428800,  # 50MB for training logs
+            'backupCount': 3,
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'django_file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['console', 'api_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console', 'api_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.security': {
+            'handlers': ['console', 'security_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'celery': {
+            'handlers': ['console', 'celery_file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'celery.task': {
+            'handlers': ['console', 'celery_file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'Data': {
+            'handlers': ['console', 'data_collection_file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'Analytics': {
+            'handlers': ['console', 'analytics_file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'Analytics.engine.sentiment': {
+            'handlers': ['console', 'sentiment_file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'Analytics.ml': {
+            'handlers': ['console', 'model_training_file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'Core.auth': {
+            'handlers': ['console', 'security_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'Core.failed_attempts': {
+            'handlers': ['console', 'security_failed_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'data_collection_errors': {
+            'handlers': ['console', 'data_errors_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': LOG_LEVEL,
+    },
+}
+
+# Archive old log directories - previously removed
 # LOGS_DIR = BASE_DIR / 'logs'
 # if not LOGS_DIR.exists():
 #     LOGS_DIR.mkdir(parents=True, exist_ok=True)

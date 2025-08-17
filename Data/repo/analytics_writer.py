@@ -105,7 +105,14 @@ class AnalyticsWriter:
                     'sentimentLabel': components.get('sentiment', {}).get('raw', {}).get('label'),
                     'sentimentConfidence': components.get('sentiment', {}).get('raw', {}).get('confidence'),
                     'newsCount': components.get('sentiment', {}).get('raw', {}).get('newsCount', 0),
-                    'sentimentSources': components.get('sentiment', {}).get('raw', {}).get('sources', {})
+                    'sentimentSources': components.get('sentiment', {}).get('raw', {}).get('sources', {}),
+                    # Add LSTM prediction fields if present in components
+                    'prediction_1d': components.get('prediction', {}).get('raw', {}).get('predicted_price'),
+                    'prediction_7d': None,  # Not implemented yet
+                    'prediction_30d': None,  # Not implemented yet
+                    'prediction_confidence': components.get('prediction', {}).get('raw', {}).get('confidence'),
+                    'model_version': components.get('prediction', {}).get('raw', {}).get('model_version'),
+                    'prediction_timestamp': timezone.now() if components.get('prediction', {}).get('raw') else None
                 }
             )
         
