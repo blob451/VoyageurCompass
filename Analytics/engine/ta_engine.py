@@ -7,6 +7,7 @@ cSpell:ignore Bollinger bollinger pricevs bbpos bbwidth volsurge candlerev srcon
 """
 
 import logging
+import time
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional, Any, Tuple, NamedTuple
@@ -135,7 +136,8 @@ class TechnicalAnalysisEngine:
         """
         try:
             print(f"[TA ENGINE] Starting technical analysis for {symbol}")
-            logger.info(f"Starting technical analysis for {symbol}")
+            logger.info(f"[TA ENGINE] Starting technical analysis for {symbol}")
+            analysis_start_time = time.time()
             
             if analysis_date is None:
                 analysis_date = timezone.now()
@@ -345,8 +347,9 @@ class TechnicalAnalysisEngine:
                 logger_instance.log_analysis_complete(float(composite_raw), score_0_10)
                 logger_instance.finalize()
             
+            analysis_duration = time.time() - analysis_start_time
             print(f"[TA ENGINE] Analysis complete for {symbol}: {score_0_10}/10")
-            logger.info(f"Analysis complete for {symbol}: {score_0_10}/10")
+            logger.info(f"[TA ENGINE] Analysis complete for {symbol}: {score_0_10}/10 in {analysis_duration:.2f}s")
             return result
             
         except Exception as e:

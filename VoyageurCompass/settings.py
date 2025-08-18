@@ -660,6 +660,24 @@ DATA_REFRESH_INTERVAL = int(env('DATA_REFRESH_INTERVAL', default=3600))
 # Stock synchronization settings
 STOCK_DATA_SYNC_THRESHOLD_SECONDS = int(env('STOCK_DATA_SYNC_THRESHOLD_SECONDS', default=3600))
 
+# Local LLM Configuration
+OLLAMA_HOST = env('OLLAMA_HOST', default='localhost')
+OLLAMA_PORT = int(env('OLLAMA_PORT', default=11434))
+OLLAMA_MODEL = env('OLLAMA_MODEL', default='llama3.1:70b')
+
+# LLM Performance Optimization
+OLLAMA_PRIMARY_MODEL = env('OLLAMA_PRIMARY_MODEL', default='llama3.1:8b')
+OLLAMA_DETAILED_MODEL = env('OLLAMA_DETAILED_MODEL', default='llama3.1:70b')
+OLLAMA_PERFORMANCE_MODE = env.bool('OLLAMA_PERFORMANCE_MODE', default=True)
+OLLAMA_GENERATION_TIMEOUT = int(env('OLLAMA_GENERATION_TIMEOUT', default=45))
+OLLAMA_GPU_LAYERS = int(env('OLLAMA_GPU_LAYERS', default=-1))  # -1 = use all available
+
+# Explainability Settings
+EXPLAINABILITY_ENABLED = env.bool('EXPLAINABILITY_ENABLED', default=True)
+EXPLANATION_CACHE_TTL = int(env('EXPLANATION_CACHE_TTL', default=300))  # 5 minutes
+EXPLANATION_TIMEOUT = int(env('EXPLANATION_TIMEOUT', default=60))  # 60 seconds
+EXPLANATION_MAX_RETRIES = int(env('EXPLANATION_MAX_RETRIES', default=2))
+
 # Stock Market Settings
 TRENDING_STOCKS = env.list('TRENDING_STOCKS', default=[
     'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM',

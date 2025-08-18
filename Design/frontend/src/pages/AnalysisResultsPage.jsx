@@ -31,7 +31,9 @@ import {
   NewspaperOutlined,
   Psychology
 } from '@mui/icons-material';
-import { useGetAnalysisByIdQuery } from '../features/api/apiSlice';
+import { useGetAnalysisByIdQuery, useGetExplanationStatusQuery } from '../features/api/apiSlice';
+import SentimentExplanation from '../components/SentimentExplanation';
+import TechnicalExplanation from '../components/TechnicalExplanation';
 
 const AnalysisResultsPage = () => {
   const { analysisId } = useParams();
@@ -42,6 +44,11 @@ const AnalysisResultsPage = () => {
     error,
     isLoading
   } = useGetAnalysisByIdQuery(analysisId);
+
+  const {
+    data: explanationStatus,
+    error: statusError
+  } = useGetExplanationStatusQuery();
 
   const getScoreColor = (score) => {
     if (score >= 7) return 'success';
@@ -508,6 +515,69 @@ const AnalysisResultsPage = () => {
           </Typography>
         </Box>
       </Paper>
+
+      {/* AI-Powered Explanations Section */}
+      <Box sx={{ mt: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Psychology color="primary" />
+            <Typography variant="h5">
+              AI-Powered Analysis Explanations
+            </Typography>
+          </Box>
+          
+          {/* Service Status Indicator */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {explanationStatus?.llm_available ? (
+              <Chip 
+                label="LLaMA 3.1 70B Online" 
+                color="success" 
+                size="small"
+                variant="outlined"
+              />
+            ) : statusError ? (
+              <Chip 
+                label="Service Unavailable" 
+                color="error" 
+                size="small"
+                variant="outlined"
+              />
+            ) : (
+              <Chip 
+                label="Template Mode" 
+                color="warning" 
+                size="small"
+                variant="outlined"
+              />
+            )}
+          </Box>
+        </Box>
+        
+        <Typography variant="body2" color="text.secondary" paragraph>
+          Get natural language explanations powered by LLaMA 3.1 70B to better understand your analysis results.
+          {!explanationStatus?.llm_available && (
+            <Typography component="span" color="warning.main" sx={{ ml: 1 }}>
+              LLM service unavailable - using template explanations.
+            </Typography>
+          )}
+        </Typography>
+
+        {/* Technical Analysis Explanation */}
+        <TechnicalExplanation
+          analysisId={analysisId}
+          analysisData={analysisData}
+          defaultExpanded={true}
+        />
+
+        {/* Sentiment Analysis Explanation (only if sentiment data exists) */}
+        {analysisData.indicators?.sentiment && (
+          <SentimentExplanation
+            analysisId={analysisId}
+            sentimentData={analysisData.indicators.sentiment}
+            defaultExpanded={false}
+          />
+        )}
+      </Box>
     </Container>
   );
 };

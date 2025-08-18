@@ -29,7 +29,13 @@ import {
   TableHead,
   TableRow,
   IconButton,
-  Tooltip
+  Tooltip,
+  FormControlLabel,
+  Switch,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 import {
   Search,
@@ -41,10 +47,12 @@ import {
   Speed,
   Info,
   Refresh,
-  Visibility
+  Visibility,
+  Psychology
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
 import { useAnalyzeStockMutation, useGetUserAnalysisHistoryQuery, useGetUserLatestAnalysisQuery } from '../features/api/apiSlice';
+import { analysisLogger, performanceUtils } from '../utils/logger';
 
 const StockSearchPage = () => {
   const { user } = useSelector((state) => state.auth);
@@ -55,6 +63,10 @@ const StockSearchPage = () => {
   const [error, setError] = useState('');
   const [confirmDialog, setConfirmDialog] = useState(false);
   const [userCredits] = useState(25); // Mock credit balance
+  
+  // AI Explanation controls
+  const [includeExplanation, setIncludeExplanation] = useState(false);
+  const [explanationDetail, setExplanationDetail] = useState('standard');
   
   // Proper state machine for analysis flow
   const [analysisMode, setAnalysisMode] = useState('none'); // 'none' | 'manual' | 'auto'
@@ -94,8 +106,7 @@ const StockSearchPage = () => {
   const performAnalysis = useCallback(async (symbol, mode) => {
     const targetSymbol = symbol || searchTicker;
     
-    console.log(`[ANALYSIS] Analysis for ${targetSymbol} started.`);
-    console.log(`[ANALYSIS] Mode: ${mode}, Phase: analyzing`);
+    analysisLogger.stage(targetSymbol, 'Analysis Started', { mode, phase: 'analyzing' });
     
     if (!targetSymbol?.trim()) {
       console.log(`[ANALYSIS] Error: No ticker symbol provided`);
@@ -111,13 +122,18 @@ const StockSearchPage = () => {
       return;
     }
 
-    console.log(`[ANALYSIS] Starting analysis for ${targetSymbol}`);
+    analysisLogger.stage(targetSymbol, 'API Request Starting', { userCredits });
     setError('');
     setAnalysisPhase('analyzing');
 
+    const analysisStartTime = performance.now();
     try {
-      console.log(`[ANALYSIS] API request initiated for ${targetSymbol.toUpperCase()}`);
-      const result = await analyzeStock({ symbol: targetSymbol.toUpperCase() });
+      analysisLogger.stage(targetSymbol, 'API Request Initiated');
+      const result = await analyzeStock({ 
+        symbol: targetSymbol.toUpperCase(),
+        includeExplanation,
+        explanationDetail
+      });
       
       if (result.error) {
         console.log(`[ANALYSIS] API error received:`, result.error);
@@ -148,11 +164,18 @@ const StockSearchPage = () => {
         return;
       }
 
-      console.log(`[ANALYSIS] API response received successfully:`, result.data);
-
       const analysisResult = result.data;
+      const analysisDuration = performance.now() - analysisStartTime;
+      analysisLogger.performance('API Response Received', analysisDuration, {
+        symbol: analysisResult.symbol,
+        score: analysisResult.composite_score,
+        analysisId: analysisResult.analytics_result_id
+      });
       
-      console.log(`[ANALYSIS] Processing analysis result for ${analysisResult.symbol}`);
+      analysisLogger.stage(analysisResult.symbol, 'Processing Analysis Result', {
+        score: analysisResult.composite_score,
+        creditsUsed: 1
+      });
       
       // Format the analysis data for display
       const formattedData = {
@@ -352,6 +375,55 @@ const StockSearchPage = () => {
                   'Analyze'
                 )}
               </Button>
+            </Box>
+
+            {/* AI Explanation Controls */}
+            <Box sx={{ mt: 2, p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Psychology color="primary" />
+                <Typography variant="subtitle2">
+                  AI-Powered Explanations
+                </Typography>
+                <Chip 
+                  label="LLaMA 3.1 70B" 
+                  size="small" 
+                  color="primary" 
+                  variant="outlined" 
+                />
+              </Box>
+              
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={includeExplanation}
+                      onChange={(e) => setIncludeExplanation(e.target.checked)}
+                      disabled={analysisPhase === 'analyzing' || analysisPhase === 'syncing'}
+                    />
+                  }
+                  label="Generate AI explanations"
+                />
+                
+                {includeExplanation && (
+                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                    <InputLabel>Detail Level</InputLabel>
+                    <Select
+                      value={explanationDetail}
+                      label="Detail Level"
+                      onChange={(e) => setExplanationDetail(e.target.value)}
+                      disabled={analysisPhase === 'analyzing' || analysisPhase === 'syncing'}
+                    >
+                      <MenuItem value="summary">Summary</MenuItem>
+                      <MenuItem value="standard">Standard</MenuItem>
+                      <MenuItem value="detailed">Detailed</MenuItem>
+                    </Select>
+                  </FormControl>
+                )}
+              </Box>
+              
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Get natural language explanations of technical analysis and sentiment results
+              </Typography>
             </Box>
             
             {/* Recent Searches */}

@@ -1161,6 +1161,50 @@ class AnalyticsResults(models.Model):
         help_text="Timestamp when predictions were generated"
     )
     
+    # Explanation and Narrative Fields
+    explanations_json = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Structured explanation data: {indicators: {}, risks: [], recommendations: {}}"
+    )
+    explanation_method = models.CharField(
+        max_length=20,
+        choices=[
+            ('llm', 'LLM Generated'),
+            ('template', 'Template Based'),
+            ('hybrid', 'Hybrid Approach'),
+        ],
+        null=True,
+        blank=True,
+        help_text="Method used to generate explanations"
+    )
+    explanation_version = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        help_text="Version of explanation system used"
+    )
+    narrative_text = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Natural language explanation text"
+    )
+    narrative_language = models.CharField(
+        max_length=5,
+        default='en',
+        help_text="Language code for narrative text"
+    )
+    explained_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when explanation was generated"
+    )
+    explanation_confidence = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Confidence score for generated explanation (0.0-1.0)"
+    )
+    
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1177,6 +1221,8 @@ class AnalyticsResults(models.Model):
             models.Index(fields=['as_of']),
             models.Index(fields=['user', 'stock', '-as_of']),
             models.Index(fields=['stock', 'horizon', '-as_of']),
+            models.Index(fields=['explained_at']),
+            models.Index(fields=['explanation_method']),
         ]
     
     def __str__(self):

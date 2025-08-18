@@ -112,10 +112,14 @@ export const apiSlice = createApi({
       providesTags: (result, error, symbol) => [{ type: 'Stock', id: symbol }],
     }),
     analyzeStock: builder.mutation({
-      query: ({ symbol, months = 6 }) => ({
+      query: ({ symbol, months = 6, includeExplanation = false, explanationDetail = 'standard' }) => ({
         url: `/analytics/analyze/${symbol}/`,
         method: 'GET',
-        params: { months },
+        params: { 
+          months,
+          include_explanation: includeExplanation,
+          explanation_detail: explanationDetail
+        },
       }),
       invalidatesTags: ['Analysis'],
     }),
@@ -156,6 +160,23 @@ export const apiSlice = createApi({
       query: (analysisId) => `/analytics/analysis/${analysisId}/`,
       providesTags: (result, error, analysisId) => [{ type: 'Analysis', id: analysisId }],
     }),
+    // LLaMA 3.1 70B Explanation Endpoints
+    generateExplanation: builder.mutation({
+      query: ({ analysisId, detailLevel = 'standard' }) => ({
+        url: `/analytics/explain/${analysisId}/`,
+        method: 'POST',
+        params: { detail_level: detailLevel },
+      }),
+      invalidatesTags: (result, error, { analysisId }) => [{ type: 'Analysis', id: analysisId }],
+    }),
+    getExplanation: builder.query({
+      query: (analysisId) => `/analytics/explanation/${analysisId}/`,
+      providesTags: (result, error, analysisId) => [{ type: 'Analysis', id: `explanation-${analysisId}` }],
+    }),
+    getExplanationStatus: builder.query({
+      query: () => `/analytics/explanation-status/`,
+      keepUnusedDataFor: 60, // Cache status for 1 minute
+    }),
   }),
 });
 
@@ -173,4 +194,8 @@ export const {
   useGetUserAnalysisHistoryQuery,
   useGetUserLatestAnalysisQuery,
   useGetAnalysisByIdQuery,
+  // LLaMA 3.1 70B Explanation Hooks
+  useGenerateExplanationMutation,
+  useGetExplanationQuery,
+  useGetExplanationStatusQuery,
 } = apiSlice;

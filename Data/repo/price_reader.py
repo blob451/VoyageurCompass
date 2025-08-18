@@ -70,30 +70,53 @@ class PriceReader:
             List of PriceData tuples ordered by date ascending
             
         Raises:
-            Stock.DoesNotExist: If stock symbol not found
+            Stock.DoesNotExist: If stock symbol not found after retries
         """
         if end_date is None:
             end_date = timezone.now().date()
-            
-        stock = Stock.objects.get(symbol=symbol.upper())
         
-        prices_qs = stock.prices.filter(
-            date__gte=start_date,
-            date__lte=end_date
-        ).order_by('date').select_related('stock')
+        symbol_upper = symbol.upper()
         
-        return [
-            PriceData(
-                date=price.date,
-                open=price.open,
-                high=price.high,
-                low=price.low,
-                close=price.close,
-                adjusted_close=price.adjusted_close,
-                volume=price.volume
-            )
-            for price in prices_qs
-        ]
+        # Retry logic to handle race conditions and transaction issues
+        for attempt in range(3):
+            try:
+                # Robust stock lookup with retry logic
+                stock = Stock.objects.get(symbol=symbol_upper)
+                
+                prices_qs = stock.prices.filter(
+                    date__gte=start_date,
+                    date__lte=end_date
+                ).order_by('date').select_related('stock')
+                
+                return [
+                    PriceData(
+                        date=price.date,
+                        open=price.open,
+                        high=price.high,
+                        low=price.low,
+                        close=price.close,
+                        adjusted_close=price.adjusted_close,
+                        volume=price.volume
+                    )
+                    for price in prices_qs
+                ]
+                
+            except Stock.DoesNotExist:
+                if attempt < 2:  # Retry for first 2 attempts
+                    import time
+                    time.sleep(0.5)  # Brief pause before retry
+                    # Try again - might be a transient database issue
+                    continue
+                else:
+                    # Final attempt failed, re-raise the exception
+                    raise
+            except Exception as e:
+                if attempt < 2:
+                    import time
+                    time.sleep(0.5)
+                    continue
+                else:
+                    raise
     
     def get_sector_prices(
         self,

@@ -101,10 +101,15 @@ services:
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-}
       - SECURE_HSTS_SECONDS=${SECURE_HSTS_SECONDS:-0}
+      # LLM Configuration
+      - OLLAMA_HOST=ollama
+      - OLLAMA_PORT=11434
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     command: >
       sh -c "
@@ -213,6 +218,41 @@ services:
     networks:
       - voyageur-network
 
+  # LLaMA 3.1 70B Local LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: voyageur-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_MODELS=/root/.ollama/models
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_MAX_LOADED_MODELS=2
+      - OLLAMA_GPU_MEMORY_FRACTION=0.8
+      - CUDA_VISIBLE_DEVICES=0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - voyageur-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+          memory: 16G
+        limits:
+          memory: 64G
+
   # React Frontend Service (Vite)
   frontend:
     build:
@@ -250,6 +290,8 @@ volumes:
     name: voyageur_media
   celerybeat_schedule:
     name: voyageur_celerybeat_schedule
+  ollama_data:
+    name: voyageur_ollama_data
 
 # Custom network for service communication
 networks:

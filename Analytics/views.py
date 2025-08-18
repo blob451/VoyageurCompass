@@ -18,6 +18,7 @@ from drf_spectacular.types import OpenApiTypes
 
 from Analytics.engine.ta_engine import TechnicalAnalysisEngine
 from Analytics.utils.analysis_logger import AnalysisLogger
+from Analytics.services.explanation_service import get_explanation_service
 from Data.services.yahoo_finance import yahoo_finance_service
 from Data.models import Portfolio, AnalyticsResults, Stock
 
@@ -53,6 +54,20 @@ class AnalysisThrottle(UserRateThrottle):
             required=False,
             description='Sync latest data before analysis (default: false)'
         ),
+        OpenApiParameter(
+            name='include_explanation',
+            type=OpenApiTypes.BOOL,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description='Generate explanation using local LLaMA model (default: false)'
+        ),
+        OpenApiParameter(
+            name='explanation_detail',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description='Explanation detail level: summary, standard, detailed (default: standard)'
+        ),
     ],
     responses={
         200: {
@@ -82,9 +97,11 @@ def analyze_stock(request, symbol):
     Query Parameters:
         months: Number of months to analyze (default: 6)
         sync: Whether to sync data before analysis (default: false)
+        include_explanation: Generate explanation using local LLaMA model (default: false)
+        explanation_detail: Explanation detail level (summary/standard/detailed, default: standard)
     
     Returns:
-        Comprehensive analysis with trading signals
+        Comprehensive analysis with trading signals and optional explanations
     """
     # IMMEDIATE DEBUG OUTPUT - This should appear first
     import sys
@@ -112,15 +129,24 @@ def analyze_stock(request, symbol):
     symbol = symbol.upper()
     months = int(request.query_params.get('months', 6))
     sync = request.query_params.get('sync', 'false').lower() == 'true'
+    include_explanation = request.query_params.get('include_explanation', 'false').lower() == 'true'
+    explanation_detail = request.query_params.get('explanation_detail', 'standard')
     
     print(f"[BACKEND] Analysis request received for {symbol}")
     print(f"[BACKEND] Request from user: {request.user.username if hasattr(request.user, 'username') else 'Unknown'}")
-    print(f"[BACKEND] Parameters - months: {months}, sync: {sync}")
+    print(f"[BACKEND] Parameters - months: {months}, sync: {sync}, explanation: {include_explanation}, detail: {explanation_detail}")
     
-    # Validate months parameter
+    # Validate parameters
     if months < 1 or months > 24:
         return Response(
             {'error': 'Months parameter must be between 1 and 24'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validate explanation detail level
+    if explanation_detail not in ['summary', 'standard', 'detailed']:
+        return Response(
+            {'error': 'explanation_detail must be one of: summary, standard, detailed'},
             status=status.HTTP_400_BAD_REQUEST
         )
     
@@ -240,6 +266,76 @@ def analyze_stock(request, symbol):
             print(f"[BACKEND] WARNING: No analytics_result_id returned for {symbol}")
             logger.warning(f"No analytics_result_id returned for {symbol} analysis")
 
+        # Generate explanation if requested
+        explanation_data = None
+        if include_explanation and analytics_result_id:
+            try:
+                print(f"[BACKEND] Generating explanation for {symbol} (detail: {explanation_detail})")
+                explanation_service = get_explanation_service()
+                
+                if explanation_service.is_enabled():
+                    # Get the saved analysis result for explanation
+                    saved_analysis = AnalyticsResults.objects.filter(
+                        id=analytics_result_id,
+                        user=request.user,
+                        stock__symbol=symbol
+                    ).first()
+                    
+                    if saved_analysis:
+                        explanation_result = explanation_service.explain_prediction_single(
+                            saved_analysis, 
+                            detail_level=explanation_detail,
+                            user=request.user
+                        )
+                        
+                        if explanation_result:
+                            # Update the database with explanation
+                            saved_analysis.explanations_json = {
+                                'indicators_explained': explanation_result.get('indicators_explained', []),
+                                'risk_factors': explanation_result.get('risk_factors', []),
+                                'recommendation': explanation_result.get('recommendation', 'HOLD')
+                            }
+                            saved_analysis.explanation_method = explanation_result.get('method', 'unknown')
+                            saved_analysis.explanation_version = '1.0'
+                            saved_analysis.narrative_text = explanation_result.get('content', '')
+                            saved_analysis.explanation_confidence = explanation_result.get('confidence_score', 0.0)
+                            saved_analysis.explained_at = datetime.now()
+                            saved_analysis.save()
+                            
+                            explanation_data = {
+                                'content': explanation_result.get('content', ''),
+                                'confidence_score': explanation_result.get('confidence_score', 0.0),
+                                'detail_level': explanation_detail,
+                                'method': explanation_result.get('method', 'unknown'),
+                                'generation_time': explanation_result.get('generation_time', 0.0),
+                                'word_count': explanation_result.get('word_count', 0),
+                                'indicators_explained': explanation_result.get('indicators_explained', []),
+                                'risk_factors': explanation_result.get('risk_factors', []),
+                                'recommendation': explanation_result.get('recommendation', 'HOLD')
+                            }
+                            
+                            print(f"[BACKEND] Explanation generated successfully for {symbol}")
+                        else:
+                            print(f"[BACKEND] Failed to generate explanation for {symbol}")
+                    else:
+                        print(f"[BACKEND] Could not find saved analysis for explanation")
+                else:
+                    print(f"[BACKEND] Explanation service not available")
+                    explanation_data = {
+                        'error': 'Explanation service not available',
+                        'detail_level': explanation_detail,
+                        'method': 'unavailable'
+                    }
+                    
+            except Exception as e:
+                print(f"[BACKEND] Error generating explanation: {str(e)}")
+                logger.error(f"Explanation generation failed for {symbol}: {str(e)}")
+                explanation_data = {
+                    'error': f'Explanation generation failed: {str(e)}',
+                    'detail_level': explanation_detail,
+                    'method': 'error'
+                }
+
         response_data = {
             'success': True,
             'symbol': analysis.get('symbol', symbol),
@@ -251,6 +347,10 @@ def analyze_stock(request, symbol):
             'weighted_scores': safe_weighted_scores,
             'analytics_result_id': analytics_result_id
         }
+        
+        # Add explanation to response if generated
+        if explanation_data:
+            response_data['explanation'] = explanation_data
         
         print(f"[BACKEND] Response formatted successfully")
         print(f"[BACKEND] Response data keys: {list(response_data.keys())}")
