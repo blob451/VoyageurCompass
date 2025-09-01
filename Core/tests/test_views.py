@@ -3,7 +3,7 @@ Simplified tests for Core app API views.
 Tests only implemented functionality.
 """
 
-import pytest
+# import pytest  # Not needed for Django TestCase
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
@@ -135,7 +135,7 @@ class AuthenticationTestCase(APITestCase):
             'last_name': 'Name',
             'email': 'updated@example.com'
         }
-        response = self.client.patch(url, data, format='json')
+        response = self.client.put(url, data, format='json')
         
         # Should either update successfully or handle validation errors
         self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_400_BAD_REQUEST])

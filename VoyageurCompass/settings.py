@@ -123,11 +123,11 @@ WSGI_APPLICATION = 'VoyageurCompass.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'voyageur_compass_db',
-        'USER': 'voyageur_user',
-        'PASSWORD': 'ab727492Z',
-        'HOST': 'localhost',
-        'PORT': '5433',
+        'NAME': env('DB_NAME', default='voyageur_compass_db'),
+        'USER': env('DB_USER', default='voyageur_user'),
+        'PASSWORD': env('DB_PASSWORD', default='ab727492Z'),
+        'HOST': env('DB_HOST', default='localhost'),
+        'PORT': env('DB_PORT', default='5433'),
         
         # Connection Management Settings
         'CONN_MAX_AGE': 600,
@@ -157,12 +157,22 @@ def checkDatabaseEngine():
         )
 checkDatabaseEngine()
 
-# Override database for testing
+# Override database for testing - Use PostgreSQL consistently
 if 'test' in sys.argv or 'pytest' in sys.modules:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:',
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': env('TEST_DB_NAME', default='test_voyageur_compass_db'),
+            'USER': env('TEST_DB_USER', default='voyageur_user'),
+            'PASSWORD': env('TEST_DB_PASSWORD', default='ab727492Z'),
+            'HOST': env('TEST_DB_HOST', default='localhost'),
+            'PORT': env('TEST_DB_PORT', default='5433'),
+            'OPTIONS': {
+                'connect_timeout': 10,
+            },
+            'TEST': {
+                'NAME': 'test_voyageur_compass_db',
+            }
         }
     }
 

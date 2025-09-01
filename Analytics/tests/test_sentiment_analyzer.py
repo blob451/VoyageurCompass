@@ -3,7 +3,7 @@ Tests for sentiment analysis functionality.
 Validates FinBERT integration, caching, and accuracy targets.
 """
 
-import pytest
+# import pytest  # Unused - using Django TestCase
 import time
 from unittest.mock import Mock, patch, MagicMock
 from django.test import TestCase
@@ -473,4 +473,5 @@ class SentimentIntegrationTestCase(TestCase):
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    import unittest
+    unittest.main()

@@ -2,7 +2,8 @@
 Comprehensive tests for Data app models.
 """
 
-import pytest
+# import pytest  # Not needed for Django TestCase
+from django.test import TestCase
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
@@ -13,8 +14,7 @@ from django.utils import timezone
 from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding
 
 
-@pytest.mark.django_db
-class TestStockModel:
+class TestStockModel(TestCase):
     """Test cases for Stock model."""
     
     def test_create_stock(self):
@@ -35,17 +35,17 @@ class TestStockModel:
             is_active=True
         )
         
-        assert stock.symbol == 'AAPL'
-        assert stock.short_name == 'Apple Inc.'
-        assert stock.sector == 'Technology'
-        assert stock.is_active
-        assert str(stock) == 'AAPL - Apple Inc.'
+        self.assertEqual(stock.symbol, 'AAPL')
+        self.assertEqual(stock.short_name, 'Apple Inc.')
+        self.assertEqual(stock.sector, 'Technology')
+        self.assertTrue(stock.is_active)
+        self.assertEqual(str(stock), 'AAPL - Apple Inc.')
     
     def test_stock_unique_symbol(self):
         """Test that stock symbols must be unique."""
         Stock.objects.create(symbol='AAPL', short_name='Apple')
         
-        with pytest.raises(IntegrityError):
+        with self.assertRaises(IntegrityError):
             Stock.objects.create(symbol='AAPL', short_name='Another Apple')
     
     def test_get_latest_price(self):
@@ -74,8 +74,8 @@ class TestStockModel:
         )
         
         result = stock.get_latest_price()
-        assert result == latest_price
-        assert result.close == Decimal('159.00')
+        self.assertEqual(result, latest_price)
+        self.assertEqual(result.close, Decimal('159.00'))
     
     def test_get_price_history(self):
         """Test getting price history for a stock."""
@@ -93,34 +93,33 @@ class TestStockModel:
                 volume=50000000
             )
         
-        # Get last 7 days (includes today + 7 previous days = 8 total)
+        # Get last 7 days (cutoff is 7 days ago, includes today + 7 previous days = 8 total)
         history = stock.get_price_history(days=7)
-        assert history.count() == 8
+        self.assertEqual(history.count(), 8)
         
         # Get last 30 days (should return all 10)
         history = stock.get_price_history(days=30)
-        assert history.count() == 10
+        self.assertEqual(history.count(), 10)
     
     def test_needs_sync_property(self):
         """Test the needs_sync property."""
         stock = Stock.objects.create(symbol='AAPL', short_name='Apple')
         
         # No last_sync, should need sync
-        assert stock.needs_sync is True
+        self.assertTrue(stock.needs_sync)
         
         # Recent sync, should not need sync
         stock.last_sync = timezone.now()
         stock.save()
-        assert stock.needs_sync is False
+        self.assertFalse(stock.needs_sync)
         
         # Old sync (2 hours ago), should need sync
         stock.last_sync = timezone.now() - timedelta(hours=2)
         stock.save()
-        assert stock.needs_sync is True
+        self.assertTrue(stock.needs_sync)
 
 
-@pytest.mark.django_db
-class TestStockPriceModel:
+class TestStockPriceModel(TestCase):
     """Test cases for StockPrice model."""
     
     def test_create_stock_price(self):
@@ -137,10 +136,10 @@ class TestStockPriceModel:
             volume=50000000
         )
         
-        assert price.stock == stock
-        assert price.open == Decimal('150.00')
-        assert price.close == Decimal('154.00')
-        assert str(price) == f'AAPL - {date.today()}: $154.00'
+        self.assertEqual(price.stock, stock)
+        self.assertEqual(price.open, Decimal('150.00'))
+        self.assertEqual(price.close, Decimal('154.00'))
+        self.assertEqual(str(price), f'AAPL - {date.today()}: $154.00')
     
     def test_unique_stock_date_constraint(self):
         """Test that stock-date combination must be unique."""
@@ -156,7 +155,7 @@ class TestStockPriceModel:
         )
         
         # Try to create another price for the same stock and date
-        with pytest.raises(IntegrityError):
+        with self.assertRaises(IntegrityError):
             StockPrice.objects.create(
                 stock=stock,
                 date=date.today(),
@@ -180,7 +179,7 @@ class TestStockPriceModel:
             volume=50000000
         )
         
-        assert price.daily_change == Decimal('4.00')
+        self.assertEqual(price.daily_change, Decimal('4.00'))
     
     def test_daily_change_percent_property(self):
         """Test the daily_change_percent property."""
@@ -196,7 +195,7 @@ class TestStockPriceModel:
         )
         
         expected_percent = (Decimal('4.00') / Decimal('150.00')) * Decimal('100')
-        assert abs(price.daily_change_percent - expected_percent) < Decimal('0.01')
+        self.assertLess(abs(price.daily_change_percent - expected_percent), Decimal('0.01'))
     
     def test_daily_range_property(self):
         """Test the daily_range property."""
@@ -211,7 +210,7 @@ class TestStockPriceModel:
             volume=50000000
         )
         
-        assert price.daily_range == '149.00 - 155.00'
+        self.assertEqual(price.daily_range, '149.00 - 155.00')
     
     def test_is_gain_property(self):
         """Test the is_gain property."""
@@ -227,7 +226,7 @@ class TestStockPriceModel:
             close=Decimal('154.00'),
             volume=50000000
         )
-        assert gain_price.is_gain is True
+        self.assertTrue(gain_price.is_gain)
         
         # Loss day
         loss_price = StockPrice.objects.create(
@@ -239,11 +238,10 @@ class TestStockPriceModel:
             close=Decimal('150.00'),
             volume=50000000
         )
-        assert loss_price.is_gain is False
+        self.assertFalse(loss_price.is_gain)
 
 
-@pytest.mark.django_db
-class TestPortfolioModel:
+class TestPortfolioModel(TestCase):
     """Test cases for Portfolio model."""
     
     def test_create_portfolio(self):
@@ -258,11 +256,11 @@ class TestPortfolioModel:
             risk_tolerance='moderate'
         )
         
-        assert portfolio.user == user
-        assert portfolio.name == 'My Portfolio'
-        assert portfolio.initial_value == Decimal('10000.00')
-        assert portfolio.risk_tolerance == 'moderate'
-        assert str(portfolio) == 'My Portfolio'
+        self.assertEqual(portfolio.user, user)
+        self.assertEqual(portfolio.name, 'My Portfolio')
+        self.assertEqual(portfolio.initial_value, Decimal('10000.00'))
+        self.assertEqual(portfolio.risk_tolerance, 'moderate')
+        self.assertEqual(str(portfolio), 'My Portfolio')
     
     def test_calculate_returns(self):
         """Test calculating portfolio returns."""
@@ -275,7 +273,7 @@ class TestPortfolioModel:
         )
         
         returns = portfolio.calculate_returns()
-        assert returns == Decimal('20.00')  # 20% return
+        self.assertEqual(returns, Decimal('20.00'))  # 20% return
     
     def test_update_value(self):
         """Test updating portfolio value based on holdings."""
@@ -312,11 +310,10 @@ class TestPortfolioModel:
         portfolio.refresh_from_db()
         
         # 10 * 160 + 5 * 320 = 1600 + 1600 = 3200
-        assert portfolio.current_value == Decimal('3200.00')
+        self.assertEqual(portfolio.current_value, Decimal('3200.00'))
 
 
-@pytest.mark.django_db
-class TestPortfolioHoldingModel:
+class TestPortfolioHoldingModel(TestCase):
     """Test cases for PortfolioHolding model."""
     
     def test_create_holding(self):
@@ -337,10 +334,10 @@ class TestPortfolioHoldingModel:
             purchase_date=date.today()
         )
         
-        assert holding.portfolio == portfolio
-        assert holding.stock == stock
-        assert holding.quantity == Decimal('10')
-        assert str(holding) == 'My Portfolio - AAPL: 10 shares'
+        self.assertEqual(holding.portfolio, portfolio)
+        self.assertEqual(holding.stock, stock)
+        self.assertEqual(holding.quantity, Decimal('10'))
+        self.assertEqual(str(holding), 'My Portfolio - AAPL: 10 shares')
     
     def test_automatic_calculations_on_save(self):
         """Test that derived fields are calculated automatically."""
@@ -361,10 +358,10 @@ class TestPortfolioHoldingModel:
         )
         
         # Check calculated fields
-        assert holding.cost_basis == Decimal('1500.00')  # 10 * 150
-        assert holding.current_value == Decimal('1600.00')  # 10 * 160
-        assert holding.unrealized_gain_loss == Decimal('100.00')  # 1600 - 1500
-        assert abs(holding.unrealized_gain_loss_percent - Decimal('6.67')) < Decimal('0.01')
+        self.assertEqual(holding.cost_basis, Decimal('1500.00'))  # 10 * 150
+        self.assertEqual(holding.current_value, Decimal('1600.00'))  # 10 * 160
+        self.assertEqual(holding.unrealized_gain_loss, Decimal('100.00'))  # 1600 - 1500
+        self.assertLess(abs(holding.unrealized_gain_loss_percent - Decimal('6.67')), Decimal('0.01'))
     
     def test_unique_portfolio_stock_constraint(self):
         """Test that portfolio-stock combination must be unique."""
@@ -384,7 +381,7 @@ class TestPortfolioHoldingModel:
         )
         
         # Try to create another holding for the same stock in the same portfolio
-        with pytest.raises(IntegrityError):
+        with self.assertRaises(IntegrityError):
             PortfolioHolding.objects.create(
                 portfolio=portfolio,
                 stock=stock,

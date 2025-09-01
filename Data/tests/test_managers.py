@@ -5,7 +5,7 @@ Tests StockQuerySet methods (real, mock, active) and StockManager/RealDataManage
 to ensure proper filtering, chaining, and handling of edge cases.
 """
 
-import pytest
+# import pytest  # Not needed for Django TestCase
 from django.test import TestCase
 from django.db import models
 from Data.models import Stock, DataSourceChoices
@@ -56,9 +56,9 @@ class TestStockQuerySet(TestCase):
         )
         
         cls.stock_other = Stock.objects.create(
-            symbol='OTHER1',
+            symbol='OTHER',
             short_name='Other Source Stock',
-            data_source='other_source',
+            data_source='other',
             is_active=True
         )
     

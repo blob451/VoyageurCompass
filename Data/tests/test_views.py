@@ -2,7 +2,7 @@
 Comprehensive tests for Data app API views.
 """
 
-import pytest
+# import pytest  # Not needed for Django TestCase
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status

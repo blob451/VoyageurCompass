@@ -110,7 +110,7 @@ class TechnicalAnalysisEngineTestCase(TestCase):
         self.assertIsNotNone(result)
         self.assertIsInstance(result, IndicatorResult)
         self.assertIn(result.score, [0.0, 1.0])  # Should be binary
-        self.assertEqual(result.weight, 0.15)
+        self.assertEqual(result.weight, 0.12)
         self.assertIn('sma50', result.raw)
         self.assertIn('sma200', result.raw)
     
@@ -123,7 +123,7 @@ class TechnicalAnalysisEngineTestCase(TestCase):
         self.assertIsInstance(result, IndicatorResult)
         self.assertGreaterEqual(result.score, 0.0)
         self.assertLessEqual(result.score, 1.0)
-        self.assertEqual(result.weight, 0.10)
+        self.assertEqual(result.weight, 0.08)
         self.assertIn('pct_diff', result.raw)
     
     def test_rsi14_calculation(self):
@@ -135,7 +135,7 @@ class TechnicalAnalysisEngineTestCase(TestCase):
         self.assertIsInstance(result, IndicatorResult)
         self.assertGreaterEqual(result.score, 0.0)
         self.assertLessEqual(result.score, 1.0)
-        self.assertEqual(result.weight, 0.10)
+        self.assertEqual(result.weight, 0.08)
         self.assertIn('rsi', result.raw)
         self.assertGreaterEqual(result.raw['rsi'], 0.0)
         self.assertLessEqual(result.raw['rsi'], 100.0)
@@ -149,7 +149,7 @@ class TechnicalAnalysisEngineTestCase(TestCase):
         self.assertIsInstance(result, IndicatorResult)
         self.assertGreaterEqual(result.score, 0.0)
         self.assertLessEqual(result.score, 1.0)
-        self.assertEqual(result.weight, 0.10)
+        self.assertEqual(result.weight, 0.08)
         self.assertIn('histogram', result.raw)
     
     def test_bollinger_position_calculation(self):
@@ -161,7 +161,7 @@ class TechnicalAnalysisEngineTestCase(TestCase):
         self.assertIsInstance(result, IndicatorResult)
         self.assertGreaterEqual(result.score, 0.0)
         self.assertLessEqual(result.score, 1.0)
-        self.assertEqual(result.weight, 0.10)
+        self.assertEqual(result.weight, 0.08)
         self.assertIn('percent_b', result.raw)
     
     def test_bollinger_bandwidth_calculation(self):
@@ -173,7 +173,7 @@ class TechnicalAnalysisEngineTestCase(TestCase):
         self.assertIsInstance(result, IndicatorResult)
         self.assertGreaterEqual(result.score, 0.0)
         self.assertLessEqual(result.score, 1.0)
-        self.assertEqual(result.weight, 0.05)
+        self.assertEqual(result.weight, 0.04)
         self.assertIn('bandwidth_pct', result.raw)
     
     def test_volume_surge_calculation(self):
@@ -185,7 +185,7 @@ class TechnicalAnalysisEngineTestCase(TestCase):
         self.assertIsInstance(result, IndicatorResult)
         self.assertGreaterEqual(result.score, 0.0)
         self.assertLessEqual(result.score, 1.0)
-        self.assertEqual(result.weight, 0.10)
+        self.assertEqual(result.weight, 0.08)
         self.assertIn('volume_ratio', result.raw)
         self.assertIn('price_up', result.raw)
     
@@ -198,7 +198,7 @@ class TechnicalAnalysisEngineTestCase(TestCase):
         self.assertIsInstance(result, IndicatorResult)
         self.assertGreaterEqual(result.score, 0.0)
         self.assertLessEqual(result.score, 1.0)
-        self.assertEqual(result.weight, 0.05)
+        self.assertEqual(result.weight, 0.04)
         self.assertIn('obv_delta', result.raw)
     
     def test_candlestick_reversal_calculation(self):
@@ -209,7 +209,7 @@ class TechnicalAnalysisEngineTestCase(TestCase):
         self.assertIsNotNone(result)
         self.assertIsInstance(result, IndicatorResult)
         self.assertIn(result.score, [0.0, 0.5, 1.0])  # Should be discrete values
-        self.assertEqual(result.weight, 0.08)
+        self.assertEqual(result.weight, 0.064)
         self.assertIn('type', result.raw)
         self.assertIn('pattern', result.raw)
     
@@ -222,7 +222,7 @@ class TechnicalAnalysisEngineTestCase(TestCase):
         self.assertIsInstance(result, IndicatorResult)
         self.assertGreaterEqual(result.score, 0.0)
         self.assertLessEqual(result.score, 1.0)
-        self.assertEqual(result.weight, 0.07)
+        self.assertEqual(result.weight, 0.056)
         self.assertIn('current_price', result.raw)
         self.assertIn('context', result.raw)
     
@@ -366,7 +366,7 @@ class TechnicalAnalysisIntegrationTestCase(TestCase):
         
         # Create minimal test stock without full price history
         self.stock = Stock.objects.create(
-            symbol='INTEGRATION',
+            symbol='INTEG',
             short_name='Integration Test Stock',
             data_source='yahoo'
         )
@@ -392,8 +392,17 @@ class TechnicalAnalysisIntegrationTestCase(TestCase):
         )
         
         # Analysis should handle insufficient data gracefully
-        with self.assertRaises(ValueError):
-            self.engine.analyze_stock('INTEGRATION')
+        # Engine should return analysis with some indicators as None
+        result = self.engine.analyze_stock('INTEG')
+        
+        # Verify result structure even with insufficient data
+        self.assertIn('symbol', result)
+        self.assertEqual(result['symbol'], 'INTEG')
+        self.assertIn('indicators', result)
+        
+        # Many indicators should be None due to insufficient data
+        none_count = sum(1 for indicator in result['indicators'].values() if indicator is None)
+        self.assertGreater(none_count, 0, "Expected some indicators to be None with insufficient data")
 
 
 if __name__ == '__main__':

@@ -716,8 +716,9 @@ class PortfolioViewSet(viewsets.ModelViewSet):
             'by_industry': {}
         }
         
+        total_value_float = float(total_value)
         for holding in holdings:
-            percentage = float((holding.current_value / total_value * 100) if total_value > 0 else 0)
+            percentage = float((float(holding.current_value) / total_value_float * 100) if total_value_float > 0 else 0)
             
             # Stock allocation
             allocation['by_stock'].append({
@@ -741,10 +742,10 @@ class PortfolioViewSet(viewsets.ModelViewSet):
         
         # Calculate percentages after aggregating all values to avoid rounding drift
         for sector_data in allocation['by_sector'].values():
-            sector_data['percentage'] = float((sector_data['value'] / total_value * 100) if total_value > 0 else 0)
+            sector_data['percentage'] = float((sector_data['value'] / total_value_float * 100) if total_value_float > 0 else 0)
         
         for industry_data in allocation['by_industry'].values():
-            industry_data['percentage'] = float((industry_data['value'] / total_value * 100) if total_value > 0 else 0)
+            industry_data['percentage'] = float((industry_data['value'] / total_value_float * 100) if total_value_float > 0 else 0)
         
         # Sort by value
         allocation['by_stock'].sort(key=lambda x: x['value'], reverse=True)
