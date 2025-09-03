@@ -8,11 +8,11 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import datetime, timedelta
 from decimal import Decimal
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 import numpy as np
 import pandas as pd
 
-from Analytics.engine.dynamic_predictor import DynamicPredictor
+from Analytics.engine.dynamic_predictor import DynamicTAPredictor
 from Data.models import Stock, StockPrice, DataSector, DataIndustry
 
 User = get_user_model()
@@ -23,7 +23,7 @@ class DynamicPredictorTestCase(TestCase):
     
     def setUp(self):
         """Set up test data."""
-        self.predictor = DynamicPredictor()
+        self.predictor = DynamicTAPredictor()
         
         # Create test data
         self.sector = DataSector.objects.create(
@@ -241,32 +241,27 @@ class DynamicPredictorTestCase(TestCase):
             self.assertGreater(high_vol_range, low_vol_range)
     
     def test_prediction_caching_and_invalidation(self):
-        """Test prediction caching and cache invalidation mechanisms."""
-        # Mock cache operations
-        with patch('django.core.cache.cache') as mock_cache:
-            mock_cache.get.return_value = None  # Cache miss
-            mock_cache.set.return_value = True
-            
-            # First prediction should hit the model
-            first_prediction = self.predictor.get_cached_prediction('DYN_TEST')
-            
-            # Cache should be set
-            mock_cache.set.assert_called()
-            
-            # Mock cache hit
-            cached_prediction = {
-                'predicted_price': 105.5,
-                'confidence': 0.78,
-                'timestamp': timezone.now(),
-                'model_used': 'lstm'
-            }
-            mock_cache.get.return_value = cached_prediction
-            
-            # Second call should use cache
-            second_prediction = self.predictor.get_cached_prediction('DYN_TEST')
-            
-            # Should return cached result
-            self.assertEqual(second_prediction, cached_prediction)
+        """Test prediction caching and cache invalidation mechanisms using real cache."""
+        from django.core.cache import cache
+        
+        # Clear cache before test
+        cache.clear()
+        
+        # First prediction should hit the model and cache result
+        first_prediction = self.predictor.get_cached_prediction('DYN_TEST')
+        
+        # Should get a valid prediction
+        self.assertIsNotNone(first_prediction)
+        self.assertIn('predicted_price', first_prediction)
+        self.assertIn('confidence', first_prediction)
+        self.assertIn('model_used', first_prediction)
+        
+        # Second call should use cache and return same result
+        second_prediction = self.predictor.get_cached_prediction('DYN_TEST')
+        
+        # Should return same cached result
+        self.assertEqual(first_prediction['predicted_price'], second_prediction['predicted_price'])
+        self.assertEqual(first_prediction['confidence'], second_prediction['confidence'])
     
     def test_model_drift_detection(self):
         """Test detection of model performance drift over time."""
@@ -299,7 +294,7 @@ class DynamicPredictorIntegrationTestCase(TransactionTestCase):
     
     def setUp(self):
         """Set up integration test data."""
-        self.predictor = DynamicPredictor()
+        self.predictor = DynamicTAPredictor()
         
         self.sector = DataSector.objects.create(
             sectorKey='tech_integration',

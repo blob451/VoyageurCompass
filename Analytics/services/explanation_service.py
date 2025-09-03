@@ -1,6 +1,5 @@
 """
-Explanation Generation Service for VoyageurCompass Financial Analysis.
-Generates detailed explanations for technical analysis results using local LLaMA 3.1 70B model.
+Financial analysis explanation generation service using LLaMA 3.1 model.
 """
 
 import json
@@ -18,14 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 class ExplanationService:
-    """Service for generating explanations of financial analysis results."""
+    """Financial analysis explanation generation service with LLM integration."""
     
     def __init__(self):
         self.llm_service = get_local_llm_service()
         self.enabled = getattr(settings, 'EXPLAINABILITY_ENABLED', True)
         self.cache_ttl = getattr(settings, 'EXPLANATION_CACHE_TTL', 300)
         
-        # Template explanations for fallback when LLM unavailable
+        # Template explanations for LLM fallback scenarios
         self.indicator_templates = {
             'sma50vs200': 'Simple Moving Average crossover analysis comparing 50-day vs 200-day periods',
             'pricevs50': 'Current price position relative to 50-day Simple Moving Average',
@@ -42,47 +41,31 @@ class ExplanationService:
         }
     
     def is_enabled(self) -> bool:
-        """Check if explanation service is enabled."""
+        """Verify explanation service availability status."""
         return self.enabled and self.llm_service.is_available()
     
     def explain_prediction_single(self, 
                                 analysis_result: Union[Dict[str, Any], 'AnalyticsResults'], 
                                 detail_level: str = 'standard',
                                 user=None) -> Optional[Dict[str, Any]]:
-        """
-        Generate explanation for a single stock analysis result.
-        
-        Args:
-            analysis_result: Analysis result dict or AnalyticsResults model instance
-            detail_level: 'summary', 'standard', or 'detailed'
-            user: User instance for personalization (optional)
-            
-        Returns:
-            Dictionary with explanation content or None if failed
-        """
+        """Generate detailed explanation for individual stock analysis result."""
         if not self.enabled:
             logger.info("Explanation service disabled")
             return None
         
         try:
-            # Convert model instance to dict if needed
             analysis_data = self._prepare_analysis_data(analysis_result)
-            
-            # Check cache first
             cache_key = self._create_cache_key(analysis_data, detail_level, user)
             cached_explanation = cache.get(cache_key)
             if cached_explanation:
                 logger.info(f"Retrieved cached explanation for {analysis_data.get('symbol', 'unknown')}")
                 return cached_explanation
             
-            # Generate explanation
             start_time = time.time()
             
             if self.llm_service.is_available():
-                # Use LLM for explanation generation
                 explanation = self._generate_llm_explanation(analysis_data, detail_level)
             else:
-                # Fallback to template-based explanation
                 logger.warning("LLM service unavailable, using template fallback")
                 explanation = self._generate_template_explanation(analysis_data, detail_level)
             
@@ -92,7 +75,6 @@ class ExplanationService:
                 explanation['detail_level'] = detail_level
                 explanation['generated_at'] = datetime.now().isoformat()
                 
-                # Cache the result
                 cache.set(cache_key, explanation, self.cache_ttl)
                 
                 logger.info(f"Generated explanation for {analysis_data.get('symbol', 'unknown')} "

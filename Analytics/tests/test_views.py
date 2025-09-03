@@ -2,7 +2,6 @@
 Basic functional tests for Analytics app API views.
 """
 
-# import pytest  # Unused - using Django TestCase
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status

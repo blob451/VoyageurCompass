@@ -1,5 +1,4 @@
 services:
-  # Nginx Reverse Proxy with SSL/TLS
   nginx:
     build:
       context: ./nginx
@@ -21,14 +20,13 @@ services:
     environment:
       - NGINX_HOST=${NGINX_HOST:-localhost}
       - NGINX_PORT=443
-  # PostgreSQL Database Service
   db:
     image: postgres:15-alpine
     container_name: voyageur-db
     restart: unless-stopped
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backups:/backups  # Optional: for database backups
+      - ./backups:/backups
     environment:
       - POSTGRES_DB=${DB_NAME:-voyageur_compass_db}
       - POSTGRES_USER=${DB_USER:-voyageur_user}
@@ -43,7 +41,6 @@ services:
     networks:
       - voyageur-network
 
-  # Redis Cache Service
   redis:
     image: redis:alpine
     container_name: voyageur-redis
@@ -61,7 +58,6 @@ services:
     networks:
       - voyageur-network
 
-  # Django Backend Service
   backend:
     build:
       context: ..
@@ -69,11 +65,8 @@ services:
     container_name: voyageur-backend
     restart: unless-stopped
     volumes:
-      # Mount entire project for hot-reloading
       - ..:/app:delegated
-      # Prevent node_modules from frontend being copied
       - /app/Design/frontend/node_modules
-      # Use named volume for static files
       - static_volume:/app/staticfiles
       - media_volume:/app/Design/media
     ports:
@@ -88,20 +81,17 @@ services:
       - REDIS_PORT=6379
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
-      # Logging and monitoring
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-json}
       - APP_ENV=${APP_ENV:-development}
       - SENTRY_DSN=${SENTRY_DSN:-}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
-      # Security settings
       - SECURE_SSL_REDIRECT=${SECURE_SSL_REDIRECT:-False}
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-False}
       - CSRF_COOKIE_SECURE=${CSRF_COOKIE_SECURE:-False}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-}
       - SECURE_HSTS_SECONDS=${SECURE_HSTS_SECONDS:-0}
-      # LLM Configuration
       - OLLAMA_HOST=ollama
       - OLLAMA_PORT=11434
     depends_on:
@@ -129,7 +119,6 @@ services:
     networks:
       - voyageur-network
 
-  # Celery Worker Service
   celery_worker:
     build:
       context: ..
@@ -137,11 +126,8 @@ services:
     container_name: voyageur-celery-worker
     restart: unless-stopped
     volumes:
-      # Mount entire project
       - ..:/app:delegated
-      # Prevent node_modules from frontend being copied
       - /app/Design/frontend/node_modules
-      # Share media volume with backend
       - media_volume:/app/Design/media
     env_file:
       - .env
@@ -153,7 +139,7 @@ services:
       - REDIS_PORT=6379
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
-      - C_FORCE_ROOT=true  # Allow celery to run as root in container
+      - C_FORCE_ROOT=true
     depends_on:
       db:
         condition: service_healthy
@@ -179,7 +165,6 @@ services:
     networks:
       - voyageur-network
 
-  # Celery Beat Scheduler Service
   celery_beat:
     build:
       context: ..
@@ -187,11 +172,8 @@ services:
     container_name: voyageur-celery-beat
     restart: unless-stopped
     volumes:
-      # Mount entire project
       - ..:/app:delegated
-      # Prevent node_modules from frontend being copied
       - /app/Design/frontend/node_modules
-      # Celery beat schedule file
       - celerybeat_schedule:/app/celerybeat-schedule
     env_file:
       - .env
@@ -228,7 +210,6 @@ services:
     networks:
       - voyageur-network
 
-  # LLaMA 3.1 70B Local LLM Service
   ollama:
     image: ollama/ollama:latest
     container_name: voyageur-ollama
@@ -263,7 +244,6 @@ services:
         limits:
           memory: 64G
 
-  # React Frontend Service (Vite)
   frontend:
     build:
       context: ../Design/frontend
@@ -271,24 +251,21 @@ services:
     container_name: voyageur-frontend
     restart: unless-stopped
     volumes:
-      # Mount frontend source for hot-reloading
       - ../Design/frontend:/app:delegated
-      # Use anonymous volume for node_modules to prevent conflicts
       - /app/node_modules
     ports:
       - "3000:3000"
     environment:
       - VITE_API_URL=http://localhost:8000/api/v1
-      - WATCHPACK_POLLING=true  # For file watching on Windows
-      - CHOKIDAR_USEPOLLING=true  # For hot reload on Windows
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
     depends_on:
       - backend
-    stdin_open: true  # Keep STDIN open
-    tty: true  # Allocate a pseudo-TTY
+    stdin_open: true
+    tty: true
     networks:
       - voyageur-network
 
-# Named volumes for data persistence
 volumes:
   postgres_data:
     name: voyageur_postgres_data
@@ -303,7 +280,6 @@ volumes:
   ollama_data:
     name: voyageur_ollama_data
 
-# Custom network for service communication
 networks:
   voyageur-network:
     name: voyageur-network

@@ -9,10 +9,7 @@ import uuid
 
 
 class UserSecurityProfile(models.Model):
-    """
-    Extended user profile for security features like secret questions.
-    Used for password recovery when user is not logged in.
-    """
+    """Extended security profile with password recovery functionality."""
     
     user = models.OneToOneField(
         User,
@@ -62,19 +59,17 @@ class UserSecurityProfile(models.Model):
         verbose_name_plural = 'User Security Profiles'
     
     def set_secret_answer(self, answer):
-        """Hash and store the secret answer."""
-        # Normalize answer: lowercase and strip whitespace
-        normalized_answer = answer.lower().strip()
-        self.secret_answer_hash = make_password(normalized_answer)
+        """Hash and store security question answer."""
+        normalised_answer = answer.lower().strip()
+        self.secret_answer_hash = make_password(normalised_answer)
     
     def check_secret_answer(self, answer):
-        """Verify if the provided answer matches the stored one."""
-        # Normalize answer before checking
-        normalized_answer = answer.lower().strip()
-        return check_password(normalized_answer, self.secret_answer_hash)
+        """Verify security question answer."""
+        normalised_answer = answer.lower().strip()
+        return check_password(normalised_answer, self.secret_answer_hash)
     
     def generate_reset_token(self):
-        """Generate a new password reset token."""
+        """Generate timestamped password reset token."""
         from django.utils import timezone
         self.reset_token = uuid.uuid4()
         self.reset_token_created = timezone.now()
@@ -82,7 +77,7 @@ class UserSecurityProfile(models.Model):
         return self.reset_token
     
     def is_reset_token_valid(self, hours=1):
-        """Check if the reset token is still valid."""
+        """Validate reset token expiration status."""
         if not self.reset_token or not self.reset_token_created:
             return False
         
@@ -93,7 +88,7 @@ class UserSecurityProfile(models.Model):
         return timezone.now() <= expiry_time
     
     def clear_reset_token(self):
-        """Clear the reset token after successful use."""
+        """Clear reset token after successful password reset."""
         self.reset_token = None
         self.reset_token_created = None
         self.save()
@@ -103,10 +98,7 @@ class UserSecurityProfile(models.Model):
 
 
 class PasswordResetRequest(models.Model):
-    """
-    Track password reset requests that require admin intervention.
-    Used when user doesn't remember their secret answer.
-    """
+    """Administrative password reset requests for forgotten security answers."""
     
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -150,10 +142,7 @@ class PasswordResetRequest(models.Model):
 
 
 class BlacklistedToken(models.Model):
-    """
-    Model to store blacklisted JWT tokens for logout functionality.
-    Tokens in this table are considered invalid.
-    """
+    """Blacklisted JWT tokens for secure logout functionality."""
     token = models.TextField(unique=True, db_index=True)
     user = models.ForeignKey(
         User, 
@@ -188,19 +177,18 @@ class BlacklistedToken(models.Model):
     
     @classmethod
     def is_token_blacklisted(cls, token):
-        """Check if a token is blacklisted."""
+        """Verify token blacklist status."""
         return cls.objects.filter(token=token).exists()
     
     @classmethod
     def blacklist_token(cls, token, user, reason='logout'):
-        """Add a token to the blacklist."""
+        """Add JWT token to blacklist with decoded expiration."""
         try:
             from rest_framework_simplejwt.tokens import UntypedToken
             from django.utils import timezone
             import jwt
             from django.conf import settings
             
-            # Decode token to get expiration time
             decoded_token = jwt.decode(
                 token, 
                 settings.SECRET_KEY, 
@@ -211,7 +199,6 @@ class BlacklistedToken(models.Model):
                 tz=timezone.utc
             )
             
-            # Create blacklist entry
             cls.objects.create(
                 token=token,
                 user=user,
@@ -224,7 +211,7 @@ class BlacklistedToken(models.Model):
     
     @classmethod
     def cleanup_expired_tokens(cls):
-        """Remove expired tokens from blacklist."""
+        """Purge expired tokens from blacklist."""
         from django.utils import timezone
         expired_count = cls.objects.filter(
             expires_at__lt=timezone.now()

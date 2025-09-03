@@ -5,7 +5,7 @@ Tests PriceReader repository functions for EOD data access.
 
 from datetime import date, timedelta
 from decimal import Decimal
-from unittest.mock import Mock, patch
+# All tests use real database operations - no mocks required
 from django.test import TestCase
 from django.utils import timezone
 
@@ -38,7 +38,8 @@ class PriceReaderTestCase(TestCase):
         
         self.industry = DataIndustry.objects.create(
             industryKey='software',
-            industryName='Software'
+            industryName='Software',
+            sector=self.sector
         )
         
         # Link stock to sector and industry

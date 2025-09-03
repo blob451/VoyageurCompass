@@ -8,7 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import SessionProvider from './components/SessionProvider';
 import AuthInitializer from './components/AuthInitializer';
 
-// Lazy load page components for code splitting
+// Lazy-loaded page components for code splitting optimisation
 const HomePage = lazy(() => import('./pages/HomePage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
@@ -23,7 +23,7 @@ const HelpPage = lazy(() => import('./pages/HelpPage'));
 const AnalysisResultsPage = lazy(() => import('./pages/AnalysisResultsPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 
-// Loading component with accessibility support
+// Accessible loading component for page transitions
 const PageLoader = () => (
   <Box
     role="status"
@@ -52,7 +52,7 @@ const PageLoader = () => (
   </Box>
 );
 
-// 404 Not Found component
+// HTTP 404 error page component
 const NotFound = () => (
   <Box
     sx={{
@@ -77,7 +77,7 @@ const NotFound = () => (
   </Box>
 );
 
-// Theme configuration
+// Material-UI theme configuration
 const theme = createTheme({
   palette: {
     mode: 'light',
@@ -138,7 +138,7 @@ function App() {
               <Route path="logout" element={<LogoutPage />} />
               <Route path="help" element={<HelpPage />} />
               
-              {/* Protected routes */}
+              {/* Authentication-protected routes */}
               <Route element={<ProtectedRoute />}>
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="stocks" element={<StockSearchPage />} />

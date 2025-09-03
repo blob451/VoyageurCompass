@@ -1,0 +1,3 @@
+"""
+Design module test suite.
+"""

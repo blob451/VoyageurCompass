@@ -1,9 +1,5 @@
 """
-Technical Analysis Engine for VoyageurCompass
-Implements 12 technical indicators with exact specifications from requirements.
-All indicators normalized to [0,1] bullishness scale with defined weights.
-
-cSpell:ignore Bollinger bollinger pricevs bbpos bbwidth volsurge candlerev srcontext Doji doji
+Technical analysis engine with 12-indicator framework and normalised scoring.
 """
 
 import logging
@@ -27,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class IndicatorResult(NamedTuple):
-    """Structure for individual indicator results."""
+    """Structured container for individual indicator analysis results."""
     raw: Any
     score: float
     weight: float
@@ -35,26 +31,9 @@ class IndicatorResult(NamedTuple):
 
 
 class TechnicalAnalysisEngine:
-    """
-    Technical Analysis Engine implementing 12 indicators with exact normalization.
+    """Comprehensive technical analysis engine with weighted 12-indicator framework."""
     
-    Indicators with weights:
-    - SMA 50/200 Crossover: 0.15
-    - Price vs 50d: 0.10  
-    - RSI(14): 0.10
-    - MACD(12,26,9) histogram: 0.10
-    - Bollinger %B (20,2): 0.10
-    - Bollinger Bandwidth: 0.05
-    - Volume Surge: 0.10
-    - OBV 20-day trend: 0.05
-    - Relative Strength 1Y: 0.05
-    - Relative Strength 2Y: 0.05
-    - Candlestick Reversal: 0.08
-    - Support/Resistance: 0.07
-    Total: 1.00
-    """
-    
-    # Indicator weights adjusted for sentiment and ML predictions (80% TA, 10% sentiment, 10% LSTM)
+    # Indicator weights with sentiment and LSTM integration
     WEIGHTS = {
         'sma50vs200': 0.12,   # 15% * 0.8
         'pricevs50': 0.08,    # 10% * 0.8
@@ -72,7 +51,7 @@ class TechnicalAnalysisEngine:
         'prediction': 0.10    # 10% for LSTM predictions
     }
     
-    # Human-readable indicator names for logging and frontend display
+    # Human-readable indicator display names
     INDICATOR_NAMES = {
         'sma50vs200': 'Moving Average Crossover',
         'pricevs50': 'Price vs 50-Day Average',
@@ -91,13 +70,12 @@ class TechnicalAnalysisEngine:
     }
     
     def __init__(self):
-        """Initialize the TA engine."""
+        """Initialise technical analysis engine with data repositories."""
         self.price_reader = PriceReader()
         self.analytics_writer = AnalyticsWriter()
     
     def get_indicator_display_name(self, indicator_code: str, indicator_result=None) -> str:
-        """
-        Get human-readable display name for an indicator.
+        """Retrieve human-readable display name for indicator code.
         
         Args:
             indicator_code: The internal indicator code (e.g., 'sma50vs200')
@@ -404,43 +382,51 @@ class TechnicalAnalysisEngine:
         return stock_prices
     
     def _get_sector_industry_data(self, symbol: str, analysis_date: datetime) -> Tuple[List[SectorPriceData], List[IndustryPriceData]]:
-        """Get sector and industry composite data."""
+        """Get sector and industry composite data with optimized availability checks."""
         try:
-            print(f"[TA ENGINE] DEBUG: Getting sector/industry data for {symbol}")
-            
-            # Step 1: Get sector/industry keys
+            # Step 1: Get sector/industry keys with early validation
             sector_key, industry_key = self.price_reader.get_stock_sector_industry_keys(symbol)
-            print(f"[TA ENGINE] DEBUG: Sector key: {sector_key}, Industry key: {industry_key}")
+            
+            # Early exit if no keys available - avoid unnecessary logging and processing
+            if not sector_key and not industry_key:
+                if symbol not in ['TEST', 'INTEGRATION', 'EMPTY_RESILIENCE']:  # Skip test symbols
+                    logger.debug(f"No sector/industry keys found for {symbol}")
+                return [], []
             
             start_date = (analysis_date - timedelta(days=3*365+30)).date()
             end_date = analysis_date.date()
-            print(f"[TA ENGINE] DEBUG: Date range: {start_date} to {end_date}")
             
             sector_prices = []
             industry_prices = []
             
-            # Step 2: Get sector prices
+            # Step 2: Get sector prices with availability check
             if sector_key:
-                print(f"[TA ENGINE] DEBUG: Fetching sector prices for key: {sector_key}")
-                sector_prices = self.price_reader.get_sector_prices(sector_key, start_date, end_date)
-                print(f"[TA ENGINE] DEBUG: Retrieved {len(sector_prices)} sector price records")
-            else:
-                print(f"[TA ENGINE] DEBUG: No sector key found for {symbol}")
+                try:
+                    sector_prices = self.price_reader.get_sector_prices(sector_key, start_date, end_date)
+                    if not sector_prices and symbol not in ['TEST', 'INTEGRATION', 'EMPTY_RESILIENCE']:
+                        logger.debug(f"No sector price data available for {symbol} (sector: {sector_key})")
+                except Exception as e:
+                    logger.warning(f"Error retrieving sector prices for {symbol}: {str(e)}")
             
-            # Step 3: Get industry prices  
+            # Step 3: Get industry prices with availability check
             if industry_key:
-                print(f"[TA ENGINE] DEBUG: Fetching industry prices for key: {industry_key}")
-                industry_prices = self.price_reader.get_industry_prices(industry_key, start_date, end_date)
-                print(f"[TA ENGINE] DEBUG: Retrieved {len(industry_prices)} industry price records")
-            else:
-                print(f"[TA ENGINE] DEBUG: No industry key found for {symbol}")
+                try:
+                    industry_prices = self.price_reader.get_industry_prices(industry_key, start_date, end_date)
+                    if not industry_prices and symbol not in ['TEST', 'INTEGRATION', 'EMPTY_RESILIENCE']:
+                        logger.debug(f"No industry price data available for {symbol} (industry: {industry_key})")
+                except Exception as e:
+                    logger.warning(f"Error retrieving industry prices for {symbol}: {str(e)}")
+            
+            # Log summary only for real stocks with missing data
+            if symbol not in ['TEST', 'INTEGRATION', 'EMPTY_RESILIENCE']:
+                if not sector_prices and not industry_prices and (sector_key or industry_key):
+                    logger.info(f"No sector/industry comparative data available for {symbol} - using stock-only analysis")
+                elif sector_prices or industry_prices:
+                    logger.debug(f"Retrieved sector/industry data for {symbol}: {len(sector_prices)} sector, {len(industry_prices)} industry records")
             
             return sector_prices, industry_prices
             
         except Exception as e:
-            print(f"[TA ENGINE] ERROR: Exception in _get_sector_industry_data for {symbol}: {str(e)}")
-            import traceback
-            print(f"[TA ENGINE] ERROR: Full traceback: {traceback.format_exc()}")
             logger.warning(f"Error getting sector/industry data for {symbol}: {str(e)}")
             return [], []
     

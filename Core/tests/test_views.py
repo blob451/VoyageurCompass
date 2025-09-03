@@ -1,9 +1,8 @@
 """
-Simplified tests for Core app API views.
-Tests only implemented functionality.
+Core application API view test suite.
+Comprehensive testing of implemented authentication and utility endpoints.
 """
 
-# import pytest  # Not needed for Django TestCase
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
@@ -15,7 +14,7 @@ class AuthenticationTestCase(APITestCase):
     """Test cases for authentication endpoints."""
     
     def setUp(self):
-        """Set up test data."""
+        """Initialise test environment and user data."""
         self.user_data = {
             'username': 'testuser',
             'email': 'test@example.com',
@@ -26,7 +25,7 @@ class AuthenticationTestCase(APITestCase):
         self.user = User.objects.create_user(**self.user_data)
     
     def test_user_registration(self):
-        """Test user registration endpoint."""
+        """Test user account creation endpoint functionality."""
         url = reverse('core:register')
         data = {
             'username': 'newuser',
@@ -48,7 +47,7 @@ class AuthenticationTestCase(APITestCase):
             self.assertTrue(User.objects.filter(username='newuser').exists())
     
     def test_user_registration_password_mismatch(self):
-        """Test registration with password mismatch."""
+        """Test registration failure with mismatched password fields."""
         url = reverse('core:register')
         data = {
             'username': 'newuser',
@@ -63,7 +62,7 @@ class AuthenticationTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
     
     def test_user_login(self):
-        """Test user login endpoint."""
+        """Test JWT authentication endpoint functionality."""
         url = reverse('core:token_obtain_pair')
         data = {
             'username': 'testuser',
@@ -79,7 +78,7 @@ class AuthenticationTestCase(APITestCase):
             self.assertEqual(response.data['user']['username'], 'testuser')
     
     def test_user_login_invalid_credentials(self):
-        """Test login with invalid credentials."""
+        """Test authentication failure with invalid credentials."""
         url = reverse('core:token_obtain_pair')
         data = {
             'username': 'testuser',
@@ -90,7 +89,7 @@ class AuthenticationTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
     
     def test_token_refresh(self):
-        """Test JWT token refresh endpoint."""
+        """Test JWT token refresh functionality."""
         # Get initial tokens
         refresh = RefreshToken.for_user(self.user)
         
@@ -149,7 +148,7 @@ class HealthCheckTestCase(APITestCase):
     """Test cases for health check endpoints."""
     
     def test_health_check(self):
-        """Test basic health check endpoint."""
+        """Test API health status endpoint functionality."""
         url = reverse('core:health_check')
         response = self.client.get(url)
         
@@ -180,7 +179,7 @@ class SecurityTestCase(APITestCase):
     """Basic security tests."""
     
     def test_password_requirements(self):
-        """Test basic password validation."""
+        """Test password validation enforcement during registration."""
         url = reverse('core:register')
         
         # Test too short password

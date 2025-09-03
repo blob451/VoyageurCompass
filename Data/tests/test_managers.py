@@ -1,11 +1,7 @@
 """
-Unit tests for Data app custom managers and querysets.
-
-Tests StockQuerySet methods (real, mock, active) and StockManager/RealDataManager
-to ensure proper filtering, chaining, and handling of edge cases.
+Unit tests for custom database managers and querysets with data source filtering.
 """
 
-# import pytest  # Not needed for Django TestCase
 from django.test import TestCase
 from django.db import models
 from Data.models import Stock, DataSourceChoices
@@ -13,12 +9,11 @@ from Data.managers import DATA_SOURCE_MOCK, DATA_SOURCE_YAHOO
 
 
 class TestStockQuerySet(TestCase):
-    """Test the custom StockQuerySet methods."""
+    """Test custom StockQuerySet filtering methods."""
     
     @classmethod
     def setUpTestData(cls):
-        """Create test stocks with various data_source and is_active values."""
-        # Create stocks with different data sources
+        """Create test stocks with various data source and activity states."""
         cls.stock_yahoo = Stock.objects.create(
             symbol='AAPL',
             short_name='Apple Inc.',
@@ -47,7 +42,6 @@ class TestStockQuerySet(TestCase):
             is_active=False
         )
         
-        # Create stock with NULL data_source (if field allows it)
         cls.stock_null = Stock.objects.create(
             symbol='NULL1',
             short_name='Null Source Stock',

@@ -1,5 +1,6 @@
 /**
- * Tests for Layout component
+ * Layout component test suite.
+ * Comprehensive testing for layout structure, accessibility, and responsive behaviour.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -11,7 +12,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles'
 import Layout from './Layout'
 import authSlice from '../../features/auth/authSlice'
 
-// Create a mock store
+// Mock Redux store configuration
 const createMockStore = (initialState = {}) => {
   return configureStore({
     reducer: {
@@ -21,10 +22,10 @@ const createMockStore = (initialState = {}) => {
   })
 }
 
-// Create a test theme
+// Material-UI test theme
 const theme = createTheme()
 
-// Test wrapper component
+// Test wrapper with providers
 const TestWrapper = ({ children, store = createMockStore() }) => (
   <Provider store={store}>
     <MemoryRouter>
@@ -55,10 +56,10 @@ describe('Layout', () => {
       </TestWrapper>
     )
 
-    // Check that navbar is rendered
+    // Verify navigation bar renders correctly
     expect(screen.getByRole('navigation')).toBeInTheDocument()
     
-    // Check that children are rendered
+    // Verify child components render properly
     expect(screen.getByTestId('test-content')).toBeInTheDocument()
     expect(screen.getByText('Test Content')).toBeInTheDocument()
   })
@@ -82,7 +83,7 @@ describe('Layout', () => {
       </TestWrapper>
     )
 
-    // Navbar should still render (might show different content for unauthenticated users)
+    // Navigation bar should render with unauthenticated user interface
     expect(screen.getByRole('navigation')).toBeInTheDocument()
     
     // Content should still render

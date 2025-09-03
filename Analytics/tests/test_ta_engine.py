@@ -1,6 +1,5 @@
 """
-Unit tests for Technical Analysis Engine.
-Tests all 12 indicators with Django test database only - no external API calls.
+Technical Analysis Engine unit tests with isolated database testing.
 """
 
 import unittest
@@ -15,13 +14,11 @@ from Analytics.engine.ta_engine import TechnicalAnalysisEngine, IndicatorResult
 
 
 class TechnicalAnalysisEngineTestCase(TestCase):
-    """Test cases for the Technical Analysis Engine."""
+    """Comprehensive test suite for Technical Analysis Engine functionality."""
     
     def setUp(self):
-        """Set up test data."""
+        """Initialise test environment with synthetic market data."""
         self.engine = TechnicalAnalysisEngine()
-        
-        # Create test sector and industry
         self.sector = DataSector.objects.create(
             sectorKey='test_sector',
             sectorName='Test Sector',
@@ -35,7 +32,6 @@ class TechnicalAnalysisEngineTestCase(TestCase):
             data_source='yahoo'
         )
         
-        # Create test stock
         self.stock = Stock.objects.create(
             symbol='TEST',
             short_name='Test Stock',
@@ -45,7 +41,6 @@ class TechnicalAnalysisEngineTestCase(TestCase):
             data_source='yahoo'
         )
         
-        # Create test price data (200 days for comprehensive testing)
         self.base_date = date(2023, 1, 1)
         self.create_test_prices()
         

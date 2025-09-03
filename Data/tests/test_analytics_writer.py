@@ -5,7 +5,7 @@ Tests AnalyticsWriter repository for storing technical analysis outputs.
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from unittest.mock import Mock, patch
+# All tests use real database operations - no mocks required
 from django.test import TestCase
 from django.utils import timezone
 from django.contrib.auth.models import User

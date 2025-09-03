@@ -103,27 +103,8 @@ def analyze_stock(request, symbol):
     Returns:
         Comprehensive analysis with trading signals and optional explanations
     """
-    # IMMEDIATE DEBUG OUTPUT - This should appear first
-    import sys
-    print("*" * 100, flush=True)
-    print(f"*** ANALYZE_STOCK VIEW CALLED FOR {symbol} ***", flush=True)
-    print("*" * 100, flush=True)
-    sys.stderr.write(f"STDERR: ANALYZE_STOCK CALLED FOR {symbol}\n")
-    sys.stderr.flush()
-    
-    # Force Django logging - this WILL appear
     import logging
     logger = logging.getLogger(__name__)
-    logger.error(f"=== DJANGO VIEW CALLED FOR {symbol} ===")
-
-    # Also try print to stderr
-    import sys
-    print(f"=== STDERR: VIEW CALLED FOR {symbol} ===", file=sys.stderr)
-
-    # Original code continues...
-    print("="*50)
-    print(f"DJANGO VIEW CALLED FOR {symbol}")
-    print("="*50)
 
     # Get parameters
     symbol = symbol.upper()
@@ -132,9 +113,8 @@ def analyze_stock(request, symbol):
     include_explanation = request.query_params.get('include_explanation', 'false').lower() == 'true'
     explanation_detail = request.query_params.get('explanation_detail', 'standard')
     
-    print(f"[BACKEND] Analysis request received for {symbol}")
-    print(f"[BACKEND] Request from user: {request.user.username if hasattr(request.user, 'username') else 'Unknown'}")
-    print(f"[BACKEND] Parameters - months: {months}, sync: {sync}, explanation: {include_explanation}, detail: {explanation_detail}")
+    logger.info(f"Analysis request received for {symbol} from user {request.user.username if hasattr(request.user, 'username') else 'Unknown'}")
+    logger.debug(f"Parameters - months: {months}, sync: {sync}, explanation: {include_explanation}, detail: {explanation_detail}")
     
     # Validate parameters
     if months < 1 or months > 24:
@@ -167,32 +147,22 @@ def analyze_stock(request, symbol):
     
     # Run analysis
     try:
-        print(f"[BACKEND] Starting analysis process for {symbol}")
+        logger.info(f"Starting analysis process for {symbol}")
         
         # Create analysis logger for web-based requests
         analysis_logger = None
         if request.user and hasattr(request.user, 'username'):
             try:
-                print(f"[BACKEND] Creating analysis logger for user {request.user.username}")
                 analysis_logger = AnalysisLogger(request.user.username, symbol)
-                print(f"[BACKEND] AnalysisLogger created successfully: {analysis_logger.log_filename}")
+                logger.debug(f"AnalysisLogger created successfully: {analysis_logger.log_filename}")
             except Exception as logger_error:
-                # Log the error but continue without logger
-                print(f"[BACKEND] Failed to create analysis logger: {str(logger_error)}")
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning(f"Failed to create analysis logger for {symbol}: {str(logger_error)}")
         
-        print(f"[BACKEND] Initializing TechnicalAnalysisEngine")
         engine = TechnicalAnalysisEngine()
-        
-        print(f"[BACKEND] Calling engine.analyze_stock() for {symbol}")
         analysis = engine.analyze_stock(symbol, user=request.user, logger_instance=analysis_logger)
-        print(f"[BACKEND] Engine analysis completed successfully")
+        logger.info(f"Engine analysis completed for {symbol}")
         
         # New engine always returns successful analysis or raises exception
-        
-        print(f"[BACKEND] Formatting response data for {symbol}")
         
         # Format response for new TA engine
         analysis_date = analysis.get('analysis_date', datetime.now())
@@ -201,10 +171,7 @@ def analyze_stock(request, symbol):
         else:
             analysis_date_str = str(analysis_date)
         
-        print(f"[BACKEND] Processing weighted scores for response")
         weighted_scores_dict = analysis.get('weighted_scores', {})
-        print(f"[BACKEND] Original weighted_scores type: {type(weighted_scores_dict)}")
-        print(f"[BACKEND] Weighted scores keys: {list(weighted_scores_dict.keys()) if weighted_scores_dict else 'None'}")
         
         # Safe conversion of weighted scores
         safe_weighted_scores = {}
@@ -214,9 +181,9 @@ def analyze_stock(request, symbol):
                     safe_weighted_scores[k] = float(v)
                 else:
                     safe_weighted_scores[k] = 0.0
-                    print(f"[BACKEND] Warning: weighted_score {k} was None, defaulting to 0.0")
+                    logger.warning(f"weighted_score {k} was None, defaulting to 0.0 for {symbol}")
             except (ValueError, TypeError) as e:
-                print(f"[BACKEND] Error converting weighted_score {k}={v}: {e}")
+                logger.error(f"Error converting weighted_score {k}={v} for {symbol}: {e}")
                 safe_weighted_scores[k] = 0.0
             
         # CRITICAL FIX: Verify database transaction was successful before responding
@@ -232,38 +199,29 @@ def analyze_stock(request, symbol):
                 ).first()
                 
                 if not saved_analysis:
-                    # Database save failed silently - this is the critical bug we're fixing
-                    print(f"[BACKEND] CRITICAL ERROR: Analysis {analytics_result_id} not found in database for {symbol}")
                     logger.error(f"Analysis result ID {analytics_result_id} not found in database for {symbol} user {request.user.id}")
-                    
-                    # Instead of returning fake success, report the actual error
                     return Response(
                         {'error': f'Analysis completed but failed to save to database. Please try again.'},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR
                     )
                 else:
-                    print(f"[BACKEND] Verified analysis {analytics_result_id} saved successfully for {symbol}")
+                    logger.debug(f"Verified analysis {analytics_result_id} saved successfully for {symbol}")
                     
                     # Double-check the analysis data matches what we're returning
                     if saved_analysis.stock.symbol != symbol:
-                        print(f"[BACKEND] CRITICAL ERROR: Analysis ID {analytics_result_id} belongs to {saved_analysis.stock.symbol}, not {symbol}")
                         logger.error(f"Analysis result ID mismatch: expected {symbol}, found {saved_analysis.stock.symbol}")
-                        
                         return Response(
                             {'error': f'Analysis result ID mismatch detected. Please try again.'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR
                         )
                         
             except Exception as db_error:
-                print(f"[BACKEND] Database verification error for {symbol}: {str(db_error)}")
                 logger.error(f"Database verification failed for {symbol}: {str(db_error)}", exc_info=True)
-                
                 return Response(
                     {'error': f'Failed to verify analysis save: {str(db_error)}'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
         else:
-            print(f"[BACKEND] WARNING: No analytics_result_id returned for {symbol}")
             logger.warning(f"No analytics_result_id returned for {symbol} analysis")
 
         # Generate explanation if requested

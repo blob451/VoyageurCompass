@@ -5,7 +5,7 @@ Tests UserSecurityProfile, PasswordResetRequest, and BlacklistedToken models.
 
 import uuid
 from datetime import timedelta
-from unittest.mock import patch, MagicMock
+# Removed mock imports - using real operations
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -352,18 +352,18 @@ class BlacklistedTokenTestCase(TestCase):
         self.assertEqual(retrieved.reason, 'timeout')
         self.assertEqual(retrieved.expires_at, expires_at)
     
-    @patch('jwt.decode')
-    def test_blacklist_token_failure(self, mock_jwt_decode):
-        """Test failed token blacklisting due to invalid token."""
-        mock_jwt_decode.side_effect = Exception("Invalid token")
+    def test_blacklist_token_failure(self):
+        """Test failed token blacklisting due to invalid token using real JWT operations."""
+        # Use a malformed token that will actually fail JWT decode
+        invalid_token = "invalid.malformed.token"
         
         result = BlacklistedToken.blacklist_token(
-            "invalid.token", 
+            invalid_token, 
             self.user
         )
         
         self.assertFalse(result)
-        self.assertFalse(BlacklistedToken.is_token_blacklisted("invalid.token"))
+        self.assertFalse(BlacklistedToken.is_token_blacklisted(invalid_token))
     
     def test_cleanup_expired_tokens(self):
         """Test cleanup of expired tokens."""

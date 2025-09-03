@@ -1,6 +1,6 @@
 """
-Serializers for Core app.
-Handles user authentication and registration.
+Core application serializers.
+User authentication and registration data serialisation.
 """
 
 from rest_framework import serializers
@@ -11,7 +11,7 @@ from Core.models import UserSecurityProfile, PasswordResetRequest
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Basic user serializer."""
+    """Standard user profile serialisation."""
     
     class Meta:
         model = User
@@ -20,7 +20,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    """Serializer for user registration with security question."""
+    """User account creation with integrated security profile."""
     
     email = serializers.EmailField(
         required=True,
@@ -62,7 +62,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         }
     
     def validate(self, attrs):
-        """Validate that passwords match."""
+        """Verify password field consistency."""
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({
                 'password': "Password fields didn't match."
@@ -70,13 +70,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return attrs
     
     def create(self, validated_data):
-        """Create user with validated data and security profile."""
-        # Extract security data
+        """Create user account with associated security profile."""
         secret_question = validated_data.pop('secret_question')
         secret_answer = validated_data.pop('secret_answer')
         validated_data.pop('password2')
         
-        # Create user
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],
@@ -85,7 +83,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             last_name=validated_data.get('last_name', '')
         )
         
-        # Create security profile
         security_profile = UserSecurityProfile(
             user=user,
             secret_question=secret_question
@@ -97,7 +94,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
-    """Serializer for password change."""
+    """Authenticated password modification serialisation."""
     
     old_password = serializers.CharField(
         required=True,
@@ -115,7 +112,7 @@ class ChangePasswordSerializer(serializers.Serializer):
     )
     
     def validate(self, attrs):
-        """Validate that new passwords match."""
+        """Verify new password field consistency."""
         if attrs['new_password'] != attrs['new_password2']:
             raise serializers.ValidationError({
                 'new_password': "New password fields didn't match."
@@ -123,7 +120,7 @@ class ChangePasswordSerializer(serializers.Serializer):
         return attrs
     
     def validate_old_password(self, value):
-        """Validate old password is correct."""
+        """Verify current password authenticity."""
         user = self.context['request'].user
         if not user.check_password(value):
             raise serializers.ValidationError('Old password is incorrect')
@@ -131,7 +128,7 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    """Detailed user profile serializer."""
+    """Comprehensive user profile with portfolio statistics."""
     
     portfolio_count = serializers.SerializerMethodField()
     last_login = serializers.DateTimeField(read_only=True)
@@ -145,12 +142,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'username', 'date_joined', 'last_login']
     
     def get_portfolio_count(self, obj):
-        """Get number of portfolios for the user."""
+        """Calculate user's portfolio count."""
         return obj.portfolios.count()
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):
-    """Serializer for requesting password reset with secret answer."""
+    """Password reset token request via security question validation."""
     
     username = serializers.CharField(
         required=True,
@@ -163,11 +160,10 @@ class PasswordResetRequestSerializer(serializers.Serializer):
     )
     
     def validate(self, attrs):
-        """Validate username exists and secret answer is correct."""
+        """Verify user identity and security answer correctness."""
         username = attrs.get('username')
         secret_answer = attrs.get('secret_answer')
         
-        # Try to find user by username or email
         user = None
         if '@' in username:
             try:
@@ -184,15 +180,12 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         if not user:
             raise serializers.ValidationError("User not found")
         
-        # Check if user has security profile
         try:
             security_profile = user.security_profile
         except:
             raise serializers.ValidationError("Security profile not found. Please contact admin.")
         
-        # Verify secret answer
         if not security_profile.check_secret_answer(secret_answer):
-            # Increment failed attempts
             security_profile.failed_reset_attempts += 1
             from django.utils import timezone
             security_profile.last_reset_attempt = timezone.now()
@@ -204,7 +197,6 @@ class PasswordResetRequestSerializer(serializers.Serializer):
                 )
             raise serializers.ValidationError("Incorrect answer to security question")
         
-        # Reset failed attempts on success
         security_profile.failed_reset_attempts = 0
         security_profile.save()
         
@@ -213,7 +205,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
 
 class PasswordResetSerializer(serializers.Serializer):
-    """Serializer for resetting password with token."""
+    """Password reset execution with token validation."""
     
     token = serializers.UUIDField(
         required=True,
@@ -233,22 +225,19 @@ class PasswordResetSerializer(serializers.Serializer):
     )
     
     def validate(self, attrs):
-        """Validate token and passwords."""
+        """Verify reset token validity and password consistency."""
         token = attrs.get('token')
         new_password = attrs.get('new_password')
         new_password2 = attrs.get('new_password2')
         
-        # Check passwords match
         if new_password != new_password2:
             raise serializers.ValidationError("Passwords don't match")
         
-        # Find user by token
         try:
             security_profile = UserSecurityProfile.objects.get(reset_token=token)
         except UserSecurityProfile.DoesNotExist:
             raise serializers.ValidationError("Invalid or expired reset token")
         
-        # Check if token is valid
         if not security_profile.is_reset_token_valid():
             raise serializers.ValidationError("Reset token has expired")
         
@@ -258,7 +247,7 @@ class PasswordResetSerializer(serializers.Serializer):
 
 
 class AdminPasswordResetRequestSerializer(serializers.ModelSerializer):
-    """Serializer for requesting admin help with password reset."""
+    """Administrative password reset assistance request."""
     
     username = serializers.CharField(
         required=True,
@@ -270,7 +259,7 @@ class AdminPasswordResetRequestSerializer(serializers.ModelSerializer):
         fields = ['username', 'reason']
     
     def validate_username(self, value):
-        """Validate that user exists."""
+        """Verify user account existence."""
         user = None
         if '@' in value:
             try:
@@ -287,7 +276,6 @@ class AdminPasswordResetRequestSerializer(serializers.ModelSerializer):
         if not user:
             raise serializers.ValidationError("User not found")
         
-        # Check for existing pending request
         existing = PasswordResetRequest.objects.filter(
             user=user,
             status='pending'
@@ -302,7 +290,7 @@ class AdminPasswordResetRequestSerializer(serializers.ModelSerializer):
         return value
     
     def create(self, validated_data):
-        """Create the password reset request."""
+        """Generate administrative password reset request."""
         validated_data.pop('username')
         user = self.context['user']
         

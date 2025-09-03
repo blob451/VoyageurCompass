@@ -11,24 +11,13 @@ from .managers import StockManager, RealDataManager
 
 
 class DataSourceChoices(models.TextChoices):
-    """
-    Data source choices for tracking data origin.
-    
-    Usage:
-        from Data.models import DataSourceChoices
-        
-        # In queries
-        Stock.objects.filter(data_source=DataSourceChoices.YAHOO)
-        Stock.objects.exclude(data_source=DataSourceChoices.MOCK)
-    """
+    """Data source enumeration for tracking data origin."""
     YAHOO = 'yahoo', 'Yahoo Finance'
     MOCK = 'mock', 'Mock Data'
 
 
 class DataSector(models.Model):
-    """
-    Model to store normalized sector information.
-    """
+    """Normalised sector classification model."""
     
     sectorKey = models.CharField(
         max_length=50, 
@@ -73,9 +62,7 @@ class DataSector(models.Model):
 
 
 class DataIndustry(models.Model):
-    """
-    Model to store normalized industry information.
-    """
+    """Normalised industry classification model."""
     
     industryKey = models.CharField(
         max_length=100, 
@@ -127,9 +114,7 @@ class DataIndustry(models.Model):
 
 
 class DataSectorPrice(models.Model):
-    """
-    Model to store sector composite price data.
-    """
+    """Sector composite price index model."""
     
     sector = models.ForeignKey(
         DataSector,
@@ -144,7 +129,7 @@ class DataSectorPrice(models.Model):
     close_index = models.DecimalField(
         max_digits=20, 
         decimal_places=6,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Sector composite close index"
     )
     fiftyTwoWeekChange = models.DecimalField(
@@ -220,9 +205,7 @@ class DataSectorPrice(models.Model):
 
 
 class DataIndustryPrice(models.Model):
-    """
-    Model to store industry composite price data.
-    """
+    """Industry composite price index model."""
     
     industry = models.ForeignKey(
         DataIndustry,
@@ -237,7 +220,7 @@ class DataIndustryPrice(models.Model):
     close_index = models.DecimalField(
         max_digits=20, 
         decimal_places=6,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Industry composite close index"
     )
     fiftyTwoWeekChange = models.DecimalField(
@@ -313,9 +296,7 @@ class DataIndustryPrice(models.Model):
 
 
 class Stock(models.Model):
-    """
-    Model to store stock metadata and company information.
-    """
+    """Stock metadata and company information model."""
     
     # Basic identification
     symbol = models.CharField(
@@ -584,38 +565,34 @@ class Stock(models.Model):
         return f"{self.symbol} - {self.short_name or self.long_name}"
     
     def get_latest_price(self):
-        """Get the most recent stock price."""
+        """Retrieve most recent stock price entry."""
         return self.prices.order_by('-date').first()
     
     def get_price_history(self, days=30):
-        """Get price history for the specified number of days."""
+        """Retrieve price history for specified time period."""
         cutoff_date = timezone.now().date() - timedelta(days=days)
         return self.prices.filter(date__gte=cutoff_date).order_by('-date')
     
     @property
     def needs_sync(self):
-        """Check if the stock data needs synchronization."""
+        """Evaluate data synchronisation requirement."""
         if not self.last_sync:
             return True
-        # Use configurable threshold from settings
         from django.conf import settings
         threshold = getattr(settings, 'STOCK_DATA_SYNC_THRESHOLD_SECONDS', 3600)
         return (timezone.now() - self.last_sync).total_seconds() > threshold
 
     @property
     def sectorNeedsUpdate(self):
-        """Check if sector/industry data needs update (older than 3 years)."""
+        """Evaluate sector classification update requirement."""
         if not self.sectorUpdatedAt:
             return True
-        # 3 years threshold using precise date arithmetic
         threshold_date = timezone.now() - relativedelta(years=3)
         return self.sectorUpdatedAt < threshold_date
 
 
 class StockPrice(models.Model):
-    """
-    Model to store historical stock price data.
-    """
+    """Historical stock price data model."""
     
     stock = models.ForeignKey(
         Stock, 
@@ -632,31 +609,31 @@ class StockPrice(models.Model):
     open = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Opening price"
     )
     high = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Highest price of the day"
     )
     low = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Lowest price of the day"
     )
     close = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Closing price"
     )
     adjusted_close = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         null=True,
         blank=True,
         help_text="Adjusted closing price (accounts for splits, dividends)"
@@ -700,12 +677,12 @@ class StockPrice(models.Model):
     
     @property
     def daily_change(self):
-        """Calculate the daily price change using Decimal precision."""
+        """Calculate daily price change with decimal precision."""
         return self.close - self.open
     
     @property
     def daily_change_percent(self):
-        """Calculate the daily price change percentage using Decimal precision."""
+        """Calculate daily price change percentage with decimal precision."""
         if self.open and self.open != Decimal('0'):
             percentage = (self.daily_change / self.open) * Decimal('100')
             return percentage.quantize(Decimal('0.01'))
@@ -713,22 +690,17 @@ class StockPrice(models.Model):
     
     @property
     def daily_range(self):
-        """Get the daily price range."""
+        """Format daily price range as string."""
         return f"{self.low} - {self.high}"
     
     @property
     def is_gain(self):
-        """Check if the day was a gain."""
+        """Determine if daily price movement was positive."""
         return self.close > self.open
     
     @property
     def change_amount(self):
-        """
-        Calculate the daily price change amount.
-        
-        .. deprecated:: 1.0
-           Use :attr:`daily_change` instead. This property will be removed in a future version.
-        """
+        """Daily price change amount (deprecated - use daily_change)."""
         import warnings
         warnings.warn(
             "change_amount is deprecated, use daily_change instead",
@@ -739,12 +711,7 @@ class StockPrice(models.Model):
     
     @property
     def change_percent(self):
-        """
-        Calculate the daily price change percentage.
-        
-        .. deprecated:: 1.0
-           Use :attr:`daily_change_percent` instead. This property will be removed in a future version.
-        """
+        """Daily price change percentage (deprecated - use daily_change_percent)."""
         import warnings
         warnings.warn(
             "change_percent is deprecated, use daily_change_percent instead",
@@ -756,9 +723,7 @@ class StockPrice(models.Model):
 
 
 class Portfolio(models.Model):
-    """
-    Model to store user portfolio information.
-    """
+    """User investment portfolio model."""
     
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -780,14 +745,14 @@ class Portfolio(models.Model):
         max_digits=12, 
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Initial investment amount"
     )
     current_value = models.DecimalField(
         max_digits=12, 
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Current portfolio value"
     )
     
@@ -820,13 +785,13 @@ class Portfolio(models.Model):
         return self.name
     
     def calculate_returns(self):
-        """Calculate portfolio returns."""
+        """Calculate portfolio return percentage."""
         if self.initial_value and self.initial_value != 0:
             return ((self.current_value - self.initial_value) / self.initial_value) * Decimal('100')
         return Decimal('0')
     
     def update_value(self):
-        """Update the current portfolio value based on holdings."""
+        """Recalculate portfolio value from active holdings."""
         total_value = sum(
             (holding.current_value for holding in self.holdings.filter(is_active=True)),
             start=Decimal('0')
@@ -836,9 +801,7 @@ class Portfolio(models.Model):
 
 
 class PortfolioHolding(models.Model):
-    """
-    Model to store individual holdings within a portfolio.
-    """
+    """Individual stock position within portfolio."""
     
     portfolio = models.ForeignKey(
         Portfolio,
@@ -857,20 +820,20 @@ class PortfolioHolding(models.Model):
     quantity = models.DecimalField(
         max_digits=12,
         decimal_places=4,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Number of shares"
     )
     average_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Average purchase price per share"
     )
     current_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Current market price per share"
     )
     
@@ -879,14 +842,14 @@ class PortfolioHolding(models.Model):
         max_digits=12,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Total investment cost"
     )
     current_value = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(Decimal('0'))],
         help_text="Current market value"
     )
     
@@ -925,30 +888,20 @@ class PortfolioHolding(models.Model):
         return f"{self.portfolio.name} - {self.stock.symbol}: {self.quantity} shares"
     
     def save(self, *args, **kwargs):
-        """Override save to calculate derived fields and update portfolio."""
-        # Calculate cost basis
+        """Calculate derived fields and update portfolio value."""
         self.cost_basis = self.quantity * self.average_price
-        
-        # Calculate current value
         self.current_value = self.quantity * self.current_price
-        
-        # Calculate unrealized gains/losses
         self.unrealized_gain_loss = self.current_value - self.cost_basis
         
-        # Calculate percentage
         if self.cost_basis > 0:
             self.unrealized_gain_loss_percent = (self.unrealized_gain_loss / self.cost_basis) * Decimal('100')
         
         super().save(*args, **kwargs)
-        
-        # Update portfolio total value after saving
         self.portfolio.update_value()
 
 
 class AnalyticsResults(models.Model):
-    """
-    Model to store technical analysis results for stocks.
-    """
+    """Technical analysis results storage model."""
     
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

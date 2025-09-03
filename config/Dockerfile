@@ -1,16 +1,12 @@
-# Use official Python runtime as base image
 FROM python:3.11-slim
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Set work directory
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -24,35 +20,25 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file
 COPY config/requirements.txt .
 
-# Install Python dependencies with SSL fixes
 RUN pip install --upgrade pip --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org && \
     pip install -r requirements.txt --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
 
-# Copy project files
 COPY . .
 
-# Create a non-root user to run the application
 RUN useradd -m -u 1001 voyageur
 
-# Create necessary directories for static files and logs
 RUN mkdir -p /app/staticfiles /app/logs /app/Design/media /app/Design/static && \
     chown -R voyageur:voyageur /app
 
-# Collect static files for WhiteNoise to serve (as root before switching users)
 RUN python manage.py collectstatic --noinput
 
-# Switch to non-root user
 USER voyageur
 
-# Expose port
 EXPOSE 8000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -fsS http://localhost:8000/healthz -o /dev/null
 
-# Run Django development server
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

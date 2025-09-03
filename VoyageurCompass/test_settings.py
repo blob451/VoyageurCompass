@@ -55,6 +55,11 @@ CELERY_TASK_EAGER_PROPAGATES = True
 # Password validation disabled for faster test user creation
 AUTH_PASSWORD_VALIDATORS = []
 
+# Use faster password hasher for tests
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.MD5PasswordHasher',
+]
+
 # Disable debug mode
 DEBUG = False
 

@@ -34,14 +34,14 @@ const Navbar = () => {
   const [toolsMenuAnchor, setToolsMenuAnchor] = useState(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
 
-  // Mock user credits
+  // User credits display (temporary mock data)
   const userCredits = 25;
 
   const handleLogout = async () => {
     try {
       setUserMenuAnchor(null);
       
-      // Get refresh token for API logout
+      // Retrieve refresh token for secure API logout
       const refreshToken = localStorage.getItem('refreshToken');
       
       // Call logout API
@@ -54,10 +54,10 @@ const Navbar = () => {
         }
       }
       
-      // Dispatch logout action
+      // Dispatch logout action to Redux store
       dispatch(logout({ reason: 'manual' }));
       
-      // Navigate to logout page
+      // Redirect to logout confirmation page
       navigate('/logout', { 
         replace: true, 
         state: { reason: 'manual' } 
@@ -65,7 +65,7 @@ const Navbar = () => {
       
     } catch (error) {
       console.error('Logout error:', error);
-      // Fallback: force logout anyway
+      // Fallback: force logout regardless of API failures
       dispatch(logout({ reason: 'manual' }));
       navigate('/logout', { 
         replace: true, 

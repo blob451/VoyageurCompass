@@ -1,5 +1,6 @@
 """
-URL configuration for Core app.
+Core application URL configuration.
+Authentication, user management, and system monitoring endpoints.
 """
 
 from django.urls import path

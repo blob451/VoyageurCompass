@@ -1,9 +1,10 @@
 /**
- * JWT Token validation utilities
+ * JWT token validation utilities for client-side authentication management.
+ * Provides token decoding, expiration checking, and localStorage cleanup functions.
  */
 
 /**
- * Decode JWT token without signature verification (for client-side inspection)
+ * Decode JWT token payload without signature verification (client-side inspection only).
  */
 export const decodeJWTPayload = (token) => {
   try {
@@ -22,7 +23,7 @@ export const decodeJWTPayload = (token) => {
 };
 
 /**
- * Check if JWT token is expired
+ * Verify JWT token expiration status.
  */
 export const isTokenExpired = (token) => {
   try {
@@ -33,12 +34,12 @@ export const isTokenExpired = (token) => {
     return payload.exp < currentTime;
   } catch (error) {
     console.warn('Error checking token expiration:', error);
-    return true; // Assume expired if we can't validate
+    return true; // Assume expired if validation fails
   }
 };
 
 /**
- * Get token expiration time
+ * Extract token expiration timestamp.
  */
 export const getTokenExpiration = (token) => {
   try {
@@ -53,7 +54,7 @@ export const getTokenExpiration = (token) => {
 };
 
 /**
- * Get time remaining until token expires (in milliseconds)
+ * Calculate remaining time until token expiration (milliseconds).
  */
 export const getTimeUntilExpiration = (token) => {
   try {
@@ -115,7 +116,7 @@ export const isValidTokenFormat = (token) => {
 };
 
 /**
- * Clean up invalid tokens from localStorage
+ * Remove invalid or expired tokens from localStorage.
  */
 export const cleanupInvalidTokens = () => {
   const accessToken = localStorage.getItem('token');

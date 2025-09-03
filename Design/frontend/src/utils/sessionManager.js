@@ -1,5 +1,6 @@
 /**
- * Session management utilities for handling timeouts and logout scenarios
+ * Session management utilities for handling timeouts and logout scenarios.
+ * Provides automated session tracking, user activity monitoring, and timeout handling.
  */
 
 class SessionManager {
@@ -19,7 +20,7 @@ class SessionManager {
   }
 
   /**
-   * Initialize session monitoring
+   * Initialise session monitoring with callback functions.
    */
   init(callbacks = {}) {
     this.onWarning = callbacks.onWarning || (() => {});
@@ -30,11 +31,11 @@ class SessionManager {
     this.bindActivityEvents();
     this.startMonitoring();
     
-    // Session manager initialized
+    // Session manager initialised
   }
 
   /**
-   * Reset session timers
+   * Reset session timers and update activity tracking.
    */
   resetSession() {
     this.lastActivity = Date.now();
@@ -58,7 +59,7 @@ class SessionManager {
   }
 
   /**
-   * Show session warning
+   * Display session expiration warning to user.
    */
   showWarning() {
     if (!this.isWarningShown) {
@@ -78,7 +79,7 @@ class SessionManager {
   }
 
   /**
-   * Extend session (user clicked "Stay logged in" during warning)
+   * Extend session duration when user confirms continued activity.
    */
   extendSession() {
     console.log('Session extended');
@@ -86,7 +87,7 @@ class SessionManager {
   }
 
   /**
-   * Manual logout
+   * Handle manual user logout.
    */
   logout() {
     console.log('Manual logout');

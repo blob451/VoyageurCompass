@@ -1,7 +1,5 @@
 """
-Universal LSTM Prediction Service for Analytics Engine
-Provides real-time stock price predictions using the trained Universal LSTM model.
-Replaces stock-specific model loading with single universal model architecture.
+Universal LSTM prediction service for real-time stock price forecasting.
 """
 
 import logging
@@ -24,50 +22,33 @@ logger = logging.getLogger(__name__)
 
 
 class UniversalLSTMAnalyticsService:
-    """
-    Universal LSTM prediction service for Analytics Engine.
-    Single model replaces 100+ stock-specific models with sector-aware processing.
-    """
+    """Universal LSTM prediction service with sector-aware processing architecture."""
     
     def __init__(self, model_dir: str = "Data/ml_models/universal_lstm"):
-        """
-        Initialize Universal LSTM service for analytics.
-        
-        Args:
-            model_dir: Directory containing the trained universal model
-        """
+        """Initialise Universal LSTM service with model directory configuration."""
         self.model_dir = model_dir
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        # Universal model and preprocessor (loaded once)
         self.model = None
         self.preprocessor = None
         self.model_metadata = None
         self.sector_mapper = get_sector_mapper()
         self.price_reader = PriceReader()
         
-        # Configuration
-        self.sequence_length = 50  # Reduced to 50-day sequences for production compatibility
-        self.cache_ttl = 300  # 5 minutes
+        self.sequence_length = 50
+        self.cache_ttl = 300
         self.prediction_enabled = getattr(settings, 'ENABLE_UNIVERSAL_PREDICTIONS', True)
         
-        # Load model on initialization
         self._load_universal_model()
         
         logger.info(f"Universal LSTM Analytics service initialized on device: {self.device}")
     
     def _load_universal_model(self) -> bool:
-        """
-        Load the trained Universal LSTM model and preprocessor.
-        
-        Returns:
-            True if model loaded successfully, False otherwise
-        """
+        """Load trained Universal LSTM model and preprocessor components."""
         if not os.path.exists(self.model_dir):
             logger.warning(f"Universal model directory not found: {self.model_dir}")
             return False
         
-        # Look for the latest universal model file
         try:
             model_files = [f for f in os.listdir(self.model_dir) if f.startswith('universal_lstm_') and f.endswith('.pth')]
         except OSError:
@@ -167,7 +148,8 @@ class UniversalLSTMAnalyticsService:
                 if not price_data:
                     from Data.services.yahoo_finance import yahoo_finance_service
                     logger.info(f"Attempting auto-sync for {symbol}")
-                    if yahoo_finance_service.sync_stock_data(symbol, years=1):
+                    sync_result = yahoo_finance_service.get_stock_data(symbol, period='1y', sync_db=True)
+                    if sync_result and 'error' not in sync_result:
                         # Retry fetching after sync
                         price_data = self.price_reader.get_stock_prices(
                             symbol=symbol,

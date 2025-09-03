@@ -1,9 +1,7 @@
 from django.shortcuts import render
 
-# Create your views here.
 """
-API Views for Data app.
-Provides REST endpoints for stock data and portfolio management.
+REST API views for financial data and portfolio management.
 """
 
 from rest_framework import viewsets, status, filters
@@ -26,31 +24,25 @@ from Data.services.yahoo_finance import yahoo_finance_service
 
 
 class StockViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    ViewSet for Stock model.
-    Provides list, retrieve, and custom actions for stock data.
-    """
+    """Read-only viewset for stock data and market information."""
     
     queryset = Stock.objects.filter(is_active=True)
     serializer_class = StockSerializer
-    permission_classes = [AllowAny]  # Public data
+    permission_classes = [AllowAny]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['symbol', 'short_name', 'long_name', 'sector', 'industry']
     ordering_fields = ['symbol', 'market_cap', 'last_sync']
     ordering = ['symbol']
     
     def get_serializer_class(self):
-        """Use detailed serializer for retrieve action."""
+        """Select appropriate serialiser based on action type."""
         if self.action == 'retrieve':
             return StockDetailSerializer
         return StockSerializer
     
     @action(detail=True, methods=['get'])
     def prices(self, request, pk=None):
-        """
-        Get price history for a specific stock.
-        Optional query params: days (default 30)
-        """
+        """Retrieve historical price data with optional day range filter."""
         stock = self.get_object()
         days = int(request.query_params.get('days', 30))
         
@@ -68,14 +60,10 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def sync(self, request, pk=None):
-        """
-        Sync stock data from Yahoo Finance.
-        Requires authentication.
-        """
+        """Synchronise stock data from external financial data provider."""
         stock = self.get_object()
         period = request.data.get('period', '1mo')
         
-        # Call Yahoo Finance service to sync
         result = yahoo_finance_service.get_stock_data(
             stock.symbol, 
             period=period, 
@@ -88,7 +76,6 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Refresh stock from database
         stock.refresh_from_db()
         serializer = self.get_serializer(stock)
         
@@ -99,10 +86,7 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
     
     @action(detail=False, methods=['get'])
     def search(self, request):
-        """
-        Search for stocks by symbol or name.
-        Query param: q (search query)
-        """
+        """Search stocks by symbol or company name."""
         query = request.query_params.get('q', '').strip()
         
         if not query:
@@ -111,7 +95,6 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Search using Yahoo Finance service
         results = yahoo_finance_service.search_symbols(query)
         serializer = StockSearchSerializer(results, many=True)
         
@@ -119,24 +102,20 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
     
     @action(detail=False, methods=['get'])
     def market_status(self, request):
-        """Get current market status."""
+        """Retrieve current market operating status."""
         status_data = yahoo_finance_service.get_market_status()
         serializer = MarketStatusSerializer(status_data)
         return Response(serializer.data)
     
     @action(detail=True, methods=['get'])
     def historical(self, request, pk=None):
-        """
-        Get historical data for a specific stock.
-        Query params: start_date, end_date (ISO format)
-        """
+        """Retrieve historical stock data within specified date range."""
         stock = self.get_object()
         
         start_date_str = request.query_params.get('start_date')
         end_date_str = request.query_params.get('end_date')
         
         if not start_date_str or not end_date_str:
-            # Default to last 3 months using timezone-aware datetime
             end_date = timezone.now()
             start_date = end_date - timedelta(days=90)
         else:
@@ -144,13 +123,11 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
                 start_date = datetime.fromisoformat(start_date_str)
                 end_date = datetime.fromisoformat(end_date_str)
                 
-                # Make timezone-aware if not already
                 if timezone.is_naive(start_date):
                     start_date = timezone.make_aware(start_date)
                 if timezone.is_naive(end_date):
                     end_date = timezone.make_aware(end_date)
                 
-                # Validate date range
                 if start_date > end_date:
                     return Response(
                         {'error': 'start_date must be before end_date'},
@@ -171,9 +148,7 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
     
     @action(detail=True, methods=['get'])
     def info(self, request, pk=None):
-        """
-        Get detailed company information for a stock.
-        """
+        """Retrieve comprehensive company information."""
         stock = self.get_object()
         
         try:
@@ -187,7 +162,6 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
             
             return Response(info)
         except Exception as e:
-            # Log detailed error for debugging but return generic message
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Stock info retrieval failed for {stock.symbol}: {str(e)}")
@@ -369,28 +343,23 @@ class StockViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class StockPriceViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    ViewSet for StockPrice model.
-    Provides historical price data access.
-    """
+    """Read-only viewset for historical stock price data."""
     
     queryset = StockPrice.objects.all()
     serializer_class = StockPriceSerializer
-    permission_classes = [AllowAny]  # Public data
+    permission_classes = [AllowAny]
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['date', 'close', 'volume']
     ordering = ['-date']
     
     def get_queryset(self):
-        """Filter by stock if provided."""
+        """Apply stock and date range filters to queryset."""
         queryset = super().get_queryset()
         
-        # Filter by stock symbol
         symbol = self.request.query_params.get('symbol')
         if symbol:
             queryset = queryset.filter(stock__symbol=symbol.upper())
         
-        # Filter by date range
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
         
@@ -403,10 +372,7 @@ class StockPriceViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class PortfolioViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for Portfolio model.
-    Provides CRUD operations for user portfolios.
-    """
+    """Full CRUD viewset for user portfolio management."""
     
     serializer_class = PortfolioSerializer
     permission_classes = [IsAuthenticated]
@@ -415,34 +381,29 @@ class PortfolioViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
     
     def get_queryset(self):
-        """Return portfolios for the current user only."""
+        """Filter portfolios to current authenticated user."""
         return Portfolio.objects.filter(user=self.request.user)
     
     def get_serializer_class(self):
-        """Use detailed serializer for retrieve action."""
+        """Select appropriate serialiser based on action type."""
         if self.action == 'retrieve':
             return PortfolioDetailSerializer
         return PortfolioSerializer
     
     def perform_create(self, serializer):
-        """Set the user when creating a portfolio."""
+        """Associate portfolio with authenticated user during creation."""
         serializer.save(user=self.request.user)
     
     @action(detail=True, methods=['post'])
     def add_holding(self, request, pk=None):
-        """
-        Add a holding to the portfolio.
-        Required: stock_symbol, quantity, purchase_price, purchase_date
-        """
+        """Add stock holding to portfolio with validation and synchronisation."""
         portfolio = self.get_object()
         
-        # Validate stock exists
         stock_symbol = request.data.get('stock_symbol', '').upper()
         
         try:
             stock = Stock.objects.get(symbol=stock_symbol)
         except Stock.DoesNotExist:
-            # Try to sync from Yahoo Finance
             if yahoo_finance_service.validate_symbol(stock_symbol):
                 sync_result = yahoo_finance_service.get_stock_data(
                     stock_symbol, 
@@ -461,7 +422,6 @@ class PortfolioViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
-        # Create holding
         data = request.data.copy()
         data['portfolio'] = portfolio.id
         data['stock'] = stock.id
@@ -475,9 +435,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def performance(self, request, pk=None):
-        """
-        Get portfolio performance metrics.
-        """
+        """Calculate comprehensive portfolio performance metrics."""
         portfolio = self.get_object()
         holdings = portfolio.holdings.filter(is_active=True)
         
@@ -513,9 +471,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def update_prices(self, request, pk=None):
-        """
-        Update current prices for all holdings in the portfolio.
-        """
+        """Synchronise current market prices for all portfolio holdings."""
         portfolio = self.get_object()
         holdings = portfolio.holdings.filter(is_active=True)
         
@@ -526,10 +482,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
                 'new_total_value': float(portfolio.current_value)
             })
         
-        # Collect all unique stock symbols from holdings
         stock_symbols = list(holdings.values_list('stock__symbol', flat=True).distinct())
-        
-        # Make a single batch API call to fetch data for all symbols
         batch_stock_data = yahoo_finance_service.get_multiple_stocks(stock_symbols, period='1d')
         
         updated_holdings = []
@@ -540,9 +493,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
             symbol = holding.stock.symbol
             stock_data = batch_stock_data.get(symbol, {})
             
-            # Update holding if stock data is available and has no error
             if stock_data and 'error' not in stock_data:
-                # Get the latest price from database after sync
                 latest_price = holding.stock.get_latest_price()
                 if latest_price:
                     holding.current_price = latest_price.close
@@ -563,18 +514,15 @@ class PortfolioViewSet(viewsets.ModelViewSet):
                     'error': error_msg
                 })
         
-        # Bulk update all holdings at once to reduce database writes
         if holdings_to_update:
             PortfolioHolding.objects.bulk_update(holdings_to_update, ['current_price'], batch_size=100)
         
-        # Log failed updates for observability
         if failed_updates:
             import logging
             logger = logging.getLogger(__name__)
             for failure in failed_updates:
                 logger.warning(f"Failed to update price for {failure['symbol']}: {failure['error']}")
         
-        # Update portfolio total value
         portfolio.update_value()
         
         return Response({
@@ -585,10 +533,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def remove_holding(self, request, pk=None):
-        """
-        Remove a holding from the portfolio.
-        Body: { "symbol": "AAPL" }
-        """
+        """Deactivate holding within portfolio by stock symbol."""
         portfolio = self.get_object()
         symbol = request.data.get('symbol', '').upper()
         
@@ -603,7 +548,6 @@ class PortfolioViewSet(viewsets.ModelViewSet):
             holding.is_active = False
             holding.save()
             
-            # Update portfolio value
             portfolio.update_value()
             
             return Response({
@@ -618,10 +562,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def update_holding(self, request, pk=None):
-        """
-        Update a holding in the portfolio.
-        Body: { "symbol": "AAPL", "quantity": 100, "average_price": 150.00 }
-        """
+        """Modify existing portfolio holding attributes with validation."""
         portfolio = self.get_object()
         symbol = request.data.get('symbol', '').upper()
         
@@ -634,7 +575,6 @@ class PortfolioViewSet(viewsets.ModelViewSet):
         try:
             holding = portfolio.holdings.get(stock__symbol=symbol)
             
-            # Update fields if provided with validation
             if 'quantity' in request.data:
                 try:
                     quantity = float(request.data['quantity'])
@@ -667,11 +607,9 @@ class PortfolioViewSet(viewsets.ModelViewSet):
                     
             if 'purchase_date' in request.data:
                 try:
-                    # Try to parse as ISO date string (YYYY-MM-DD)
                     purchase_date_str = str(request.data['purchase_date'])
                     purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
                     
-                    # Validate date is not in the future
                     from datetime import date
                     if purchase_date > date.today():
                         return Response(
@@ -686,7 +624,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST
                     )
             
-            holding.save()  # This will trigger recalculation of derived fields
+            holding.save()
             
             serializer = PortfolioHoldingSerializer(holding)
             return Response(serializer.data)
@@ -699,9 +637,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def allocation(self, request, pk=None):
-        """
-        Get portfolio allocation breakdown.
-        """
+        """Generate portfolio allocation breakdown by stock, sector, and industry."""
         portfolio = self.get_object()
         holdings = portfolio.holdings.filter(is_active=True)
         
@@ -720,7 +656,6 @@ class PortfolioViewSet(viewsets.ModelViewSet):
         for holding in holdings:
             percentage = float((float(holding.current_value) / total_value_float * 100) if total_value_float > 0 else 0)
             
-            # Stock allocation
             allocation['by_stock'].append({
                 'symbol': holding.stock.symbol,
                 'name': holding.stock.short_name or holding.stock.long_name,
@@ -728,48 +663,41 @@ class PortfolioViewSet(viewsets.ModelViewSet):
                 'percentage': percentage
             })
             
-            # Sector allocation - only aggregate values
             sector = holding.stock.sector or 'Unknown'
             if sector not in allocation['by_sector']:
                 allocation['by_sector'][sector] = {'value': 0}
             allocation['by_sector'][sector]['value'] += float(holding.current_value)
             
-            # Industry allocation - only aggregate values
             industry = holding.stock.industry or 'Unknown'
             if industry not in allocation['by_industry']:
                 allocation['by_industry'][industry] = {'value': 0}
             allocation['by_industry'][industry]['value'] += float(holding.current_value)
         
-        # Calculate percentages after aggregating all values to avoid rounding drift
         for sector_data in allocation['by_sector'].values():
             sector_data['percentage'] = float((sector_data['value'] / total_value_float * 100) if total_value_float > 0 else 0)
         
         for industry_data in allocation['by_industry'].values():
             industry_data['percentage'] = float((industry_data['value'] / total_value_float * 100) if total_value_float > 0 else 0)
         
-        # Sort by value
         allocation['by_stock'].sort(key=lambda x: x['value'], reverse=True)
         
         return Response(allocation)
 
 
 class PortfolioHoldingViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for PortfolioHolding model.
-    Manages individual holdings within portfolios.
-    """
+    """Full CRUD viewset for individual portfolio holdings."""
     
     serializer_class = PortfolioHoldingSerializer
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        """Return holdings for the current user's portfolios only."""
+        """Filter holdings to current authenticated user's portfolios."""
         return PortfolioHolding.objects.filter(
             portfolio__user=self.request.user
         )
     
     def perform_create(self, serializer):
-        """Ensure the portfolio belongs to the current user."""
+        """Validate portfolio ownership before creating holding."""
         portfolio = serializer.validated_data.get('portfolio')
         if portfolio and portfolio.user != self.request.user:
             raise PermissionError("You can only add holdings to your own portfolios")

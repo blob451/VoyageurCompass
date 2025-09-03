@@ -1,6 +1,6 @@
 """
-Authentication Service Module
-Handles user authentication and authorization for VoyageurCompass.
+Authentication service module.
+Comprehensive user authentication and authorisation services for VoyageurCompass.
 """
 
 import logging
@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class AuthenticationService:
-    """
-    Service class for handling authentication operations.
-    """
+    """Comprehensive authentication service with input validation and security features."""
     
     # =====================================================================
     # Input validation methods (camelCase)
@@ -26,7 +24,7 @@ class AuthenticationService:
     
     @staticmethod
     def validate_username(username: str) -> str:
-        """Validate username input"""
+        """Validate username input format and constraints."""
         if not username or not isinstance(username, str):
             raise ValueError("Username must be a non-empty string")
         username = username.strip()
@@ -39,7 +37,7 @@ class AuthenticationService:
     
     @staticmethod
     def validate_email(email: str) -> str:
-        """Validate email format"""
+        """Validate email address format and length constraints."""
         if not email or not isinstance(email, str):
             raise ValueError("Email must be a non-empty string")
         email = email.strip().lower()
@@ -52,7 +50,7 @@ class AuthenticationService:
     
     @staticmethod
     def validate_password(password: str) -> str:
-        """Validate password strength"""
+        """Validate password strength using Django's built-in validators."""
         if not password or not isinstance(password, str):
             raise ValueError("Password must be a non-empty string")
         
@@ -66,41 +64,30 @@ class AuthenticationService:
     
     @staticmethod
     def sanitize_input(value: str, max_length: int = 255) -> str:
-        """Sanitize and limit input string"""
+        """Sanitise and limit input string length."""
         if not value:
             return ""
         # Remove control characters and limit length
-        sanitized = ''.join(char for char in value if char.isprintable())
-        return sanitized[:max_length].strip()
+        sanitised = ''.join(char for char in value if char.isprintable())
+        return sanitised[:max_length].strip()
     
     
     @staticmethod
     def register_user(username: str, email: str, password: str, **extra_fields) -> Dict:
-        """
-        Register a new user.
-        
-        Args:
-            username: Username for the new user
-            email: Email address
-            password: Password
-            **extra_fields: Additional user fields
-        
-        Returns:
-            Dictionary with success status and user or error message
-        """
+        """Register new user with validation and duplicate checking."""
         try:
             # Input validation
             username = AuthenticationService.validate_username(username)
             email = AuthenticationService.validate_email(email)
             password = AuthenticationService.validate_password(password)
             
-            # Sanitize extra fields
-            sanitized_extra_fields = {}
+            # Sanitise extra fields
+            sanitised_extra_fields = {}
             for key, value in extra_fields.items():
                 if key in ['first_name', 'last_name'] and isinstance(value, str):
-                    sanitized_extra_fields[key] = AuthenticationService.sanitize_input(value, 30)
+                    sanitised_extra_fields[key] = AuthenticationService.sanitize_input(value, 30)
                 else:
-                    sanitized_extra_fields[key] = value
+                    sanitised_extra_fields[key] = value
             
             # Validate email
             if User.objects.filter(email=email).exists():
@@ -114,7 +101,7 @@ class AuthenticationService:
                 username=username,
                 email=email,
                 password=password,
-                **sanitized_extra_fields
+                **sanitised_extra_fields
             )
             
             logger.info(f"New user registered: {username}")

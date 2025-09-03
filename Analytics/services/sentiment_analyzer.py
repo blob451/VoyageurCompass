@@ -1,6 +1,5 @@
 """
-Sentiment Analysis Service using FinBERT
-Analyzes financial text sentiment with confidence scoring and batch processing.
+Financial sentiment analysis service using FinBERT with confidence scoring and batch processing.
 """
 
 import logging
@@ -30,15 +29,15 @@ TORCH_AVAILABLE = True
 logger = logging.getLogger(__name__)
 
 
-# Stocks that are known to cause sentiment analysis timeouts - use fallback
-PROBLEMATIC_STOCKS = {'TSLA', 'GM', 'F', 'NIO', 'RIVN', 'LCID', 'URI', 'PLUG', 'FCEL', 'BE', 'TROW', 'NVDA'}  # Stocks with problematic news content
+# Stocks requiring fallback due to processing timeouts
+PROBLEMATIC_STOCKS = {'TSLA', 'GM', 'F', 'NIO', 'RIVN', 'LCID', 'URI', 'PLUG', 'FCEL', 'BE', 'TROW', 'NVDA'}
 
-# Global flag to disable FinBERT if persistent timeouts occur
-_FINBERT_DISABLED = False  # Re-enabled with improved safety mechanisms
+# Global FinBERT availability flag
+_FINBERT_DISABLED = False
 
 
 class ErrorType(Enum):
-    """Classification of error types for intelligent retry strategies."""
+    """Error classification for intelligent retry strategy implementation."""
     TOKENIZER_ERROR = "tokenizer"  # Text processing issues
     MODEL_ERROR = "model"  # Model inference errors
     TIMEOUT_ERROR = "timeout"  # Processing timeout
@@ -48,7 +47,7 @@ class ErrorType(Enum):
 
 
 class CircuitBreaker:
-    """Circuit breaker pattern for handling persistent failures."""
+    """Circuit breaker pattern implementation for failure management."""
     
     def __init__(self, failure_threshold: int = 5, recovery_timeout: int = 60):
         self.failure_threshold = failure_threshold
@@ -58,12 +57,12 @@ class CircuitBreaker:
         self.is_open = False
     
     def record_success(self):
-        """Record successful operation."""
+        """Record successful operation and reset failure state."""
         self.failure_count = 0
         self.is_open = False
     
     def record_failure(self):
-        """Record failed operation and check if circuit should open."""
+        """Record operation failure and evaluate circuit state."""
         self.failure_count += 1
         self.last_failure_time = time.time()
         
@@ -72,11 +71,10 @@ class CircuitBreaker:
             logger.warning(f"Circuit breaker opened after {self.failure_count} failures")
     
     def can_attempt(self) -> bool:
-        """Check if operation can be attempted."""
+        """Evaluate operation attempt eligibility based on circuit state."""
         if not self.is_open:
             return True
         
-        # Check if recovery timeout has passed
         if self.last_failure_time and \
            (time.time() - self.last_failure_time) > self.recovery_timeout:
             self.is_open = False
@@ -88,16 +86,12 @@ class CircuitBreaker:
 
 
 class SentimentMetrics:
-    """
-    Enhanced metrics collector with real-time monitoring and anomaly detection.
-    Tracks performance, accuracy, usage statistics, and detects degradation.
-    """
+    """Enhanced metrics collection with performance monitoring and anomaly detection."""
     
     def __init__(self):
         self.reset_metrics()
         
-        # Performance monitoring
-        self.performance_window = []  # Sliding window of performance metrics
+        self.performance_window = []
         self.window_size = 100
         self.anomaly_threshold = 2.5  # Z-score threshold for anomalies
         self.degradation_callbacks = []  # Callbacks for performance degradation

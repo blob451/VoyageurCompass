@@ -1,5 +1,6 @@
 /**
- * Tests for DashboardPage component
+ * DashboardPage component test suite.
+ * Comprehensive testing for dashboard functionality, data loading, and user interface elements.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -12,7 +13,7 @@ import DashboardPage from './DashboardPage'
 import authSlice from '../features/auth/authSlice'
 import { apiSlice } from '../features/api/apiSlice'
 
-// Mock the Chart components to avoid Canvas issues in tests
+// Mock Chart components to prevent Canvas-related test failures
 vi.mock('recharts', () => ({
   LineChart: ({ children }) => <div data-testid="line-chart">{children}</div>,
   Line: () => <div data-testid="line" />,
@@ -31,7 +32,7 @@ vi.mock('recharts', () => ({
   Area: () => <div data-testid="area" />,
 }))
 
-// Create a mock store
+// Mock Redux store factory
 const createMockStore = (initialState = {}) => {
   return configureStore({
     reducer: {
@@ -44,10 +45,10 @@ const createMockStore = (initialState = {}) => {
   })
 }
 
-// Create a test theme
+// Material-UI test theme configuration
 const theme = createTheme()
 
-// Test wrapper component
+// Test environment wrapper with all providers
 const TestWrapper = ({ children, store = createMockStore() }) => (
   <Provider store={store}>
     <BrowserRouter>
@@ -58,7 +59,7 @@ const TestWrapper = ({ children, store = createMockStore() }) => (
   </Provider>
 )
 
-// Mock API responses
+// Mock API response data structures
 const mockPortfolioData = {
   id: 1,
   name: 'My Portfolio',
@@ -111,13 +112,13 @@ describe('DashboardPage', () => {
   let originalInnerWidth
 
   beforeEach(() => {
-    // Clear all mocks before each test
+    // Reset all mocks before each test execution
     vi.clearAllMocks()
     
     // Save original window.innerWidth
     originalInnerWidth = window.innerWidth
     
-    // Mock fetch for API calls
+    // Mock global fetch for API call testing
     window.fetch = vi.fn()
   })
 
@@ -141,7 +142,7 @@ describe('DashboardPage', () => {
       }
     })
 
-    // Mock successful API responses
+    // Configure successful API response mocks
     window.fetch
       .mockResolvedValueOnce({
         ok: true,

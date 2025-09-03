@@ -146,7 +146,7 @@ def generate_explanation(request, analysis_id):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        print(f"[BACKEND] Generating explanation for analysis {analysis_id} ({analysis_result.stock.symbol})")
+        logger.info(f"Generating explanation for analysis {analysis_id} ({analysis_result.stock.symbol})")
         
         # Get explanation service
         explanation_service = get_explanation_service()
@@ -224,11 +224,11 @@ def generate_explanation(request, analysis_id):
             }
         }
         
-        print(f"[BACKEND] Explanation generated successfully for analysis {analysis_id}")
+        logger.info(f"Explanation generated successfully for analysis {analysis_id}")
         return Response(response_data)
         
     except Exception as e:
-        print(f"[BACKEND] Error in generate_explanation: {str(e)}")
+        logger.error(f"Error in generate_explanation: {str(e)}", exc_info=True)
         logger.error(f"Explanation generation failed for analysis {analysis_id}: {str(e)}")
         return Response(
             {'error': f'Explanation generation failed: {str(e)}'},

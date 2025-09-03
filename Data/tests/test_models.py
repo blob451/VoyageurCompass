@@ -2,7 +2,6 @@
 Comprehensive tests for Data app models.
 """
 
-# import pytest  # Not needed for Django TestCase
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -93,9 +92,9 @@ class TestStockModel(TestCase):
                 volume=50000000
             )
         
-        # Get last 7 days (cutoff is 7 days ago, includes today + 7 previous days = 8 total)
+        # Get last 7 days
         history = stock.get_price_history(days=7)
-        self.assertEqual(history.count(), 8)
+        self.assertEqual(history.count(), 7)
         
         # Get last 30 days (should return all 10)
         history = stock.get_price_history(days=30)

@@ -18,7 +18,7 @@ from pathlib import Path
 from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
 
-# Guard Sentry import to prevent crashes when package not installed
+# Conditional Sentry import with error handling
 try:
     import sentry_sdk
     SENTRY_AVAILABLE = True
@@ -28,16 +28,16 @@ except ImportError:
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Initialize environ
+# Environment variable configuration
 env = environ.Env(
-    # Set casting, default values
+    # Environment variable type casting and defaults
     DEBUG=(bool, False),
     SECURE_SSL_REDIRECT=(bool, False),
     SESSION_COOKIE_SECURE=(bool, False),
     CSRF_COOKIE_SECURE=(bool, False),
 )
 
-# Read .env file if it exists
+# Load environment variables from .env file
 env_file = os.path.join(BASE_DIR, '.env')
 if os.path.exists(env_file):
     environ.Env.read_env(env_file)
@@ -70,28 +70,29 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
-    # Third-party apps
+    # Third-party applications
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'drf_spectacular',
     'django_celery_beat',
     
-    # Our custom apps
+    # VoyageurCompass applications
     'Analytics',
     'Core',
     'Data',
+    'Design',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Add WhiteNoise for static file serving
-    'Core.middleware.CustomCorsMiddleware',  # Use custom CORS middleware with preflight handling
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Static file serving middleware
+    'Core.middleware.CustomCorsMiddleware',  # Custom CORS middleware with preflight support
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'Core.backends.BlacklistCheckMiddleware',  # Check for blacklisted JWT tokens
+    'Core.backends.BlacklistCheckMiddleware',  # JWT token blacklist verification
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'Core.middleware.RequestLoggingMiddleware',
@@ -146,9 +147,9 @@ DATABASES = {
     }
 }
 
-# SQLite Guard - Prevent SQLite usage
+# Database engine validation - enforce PostgreSQL usage
 def checkDatabaseEngine():
-    """Ensure PostgreSQL is used, not SQLite"""
+    """Enforce PostgreSQL database engine usage."""
     if ('sqlite' in DATABASES['default']['ENGINE'].lower()
             and 'test' not in sys.argv
             and 'pytest' not in sys.modules):
@@ -157,7 +158,7 @@ def checkDatabaseEngine():
         )
 checkDatabaseEngine()
 
-# Override database for testing - Use PostgreSQL consistently
+# Test database configuration - PostgreSQL for consistency
 if 'test' in sys.argv or 'pytest' in sys.modules:
     DATABASES = {
         'default': {
@@ -316,7 +317,7 @@ SIMPLE_JWT = {
 }
 
 
-# CORS Configuration - Strict allow-list based on environment
+# CORS configuration with environment-based origin validation
 if DEBUG:
     corsOrigins = [
         "http://localhost:3000",
@@ -329,7 +330,7 @@ if DEBUG:
         "http://127.0.0.1:3003",
     ]
 else:
-    # Production: require explicit origins from environment
+    # Production: explicit origin configuration required
     corsOrigins = env.list('CORS_ALLOWED_ORIGINS', default=[])
     if not corsOrigins:
         raise ImproperlyConfigured(
@@ -380,7 +381,7 @@ SPECTACULAR_SETTINGS = {
 }
 
 
-# Security Settings - Apply security headers in all environments
+# Security configuration with mandatory header enforcement
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
@@ -411,14 +412,14 @@ if not DEBUG:
     SESSION_COOKIE_AGE = 86400  # 24 hours
     SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
-# Session cookie security (apply in all environments)
+# Session cookie security configuration
 SESSION_COOKIE_HTTPONLY = True
 
 
 # Structured Logging Configuration
 LOG_LEVEL = env('LOG_LEVEL', default='INFO')
 
-# Create all logging directories
+# Logging directory structure configuration
 LOGS_BASE_DIR = BASE_DIR / 'Temp' / 'logs'
 LOG_DIRS = {
     'web_analysis': LOGS_BASE_DIR / 'web_analysis' / 'current',
@@ -466,7 +467,6 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        # Django system logs
         'django_file': {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOG_DIRS['system_django'] / 'django.log',
@@ -474,7 +474,6 @@ LOGGING = {
             'backupCount': 5,
             'formatter': 'verbose',
         },
-        # Celery logs
         'celery_file': {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOG_DIRS['system_celery'] / 'celery.log',
@@ -482,7 +481,6 @@ LOGGING = {
             'backupCount': 5,
             'formatter': 'verbose',
         },
-        # API logs
         'api_file': {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOG_DIRS['system_api'] / 'api.log',
@@ -490,7 +488,6 @@ LOGGING = {
             'backupCount': 5,
             'formatter': 'verbose',
         },
-        # Data collection logs
         'data_collection_file': {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOG_DIRS['data_collection_stock'] / 'stock_data.log',
@@ -505,7 +502,6 @@ LOGGING = {
             'backupCount': 5,
             'formatter': 'verbose',
         },
-        # Analytics logs
         'analytics_file': {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOG_DIRS['analytics_technical'] / 'technical_analysis.log',
@@ -520,7 +516,6 @@ LOGGING = {
             'backupCount': 5,
             'formatter': 'verbose',
         },
-        # Security logs
         'security_file': {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOG_DIRS['security_auth'] / 'auth.log',
@@ -535,11 +530,10 @@ LOGGING = {
             'backupCount': 10,
             'formatter': 'security',
         },
-        # Model training logs
         'model_training_file': {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOG_DIRS['model_training_universal'] / 'universal_lstm.log',
-            'maxBytes': 52428800,  # 50MB for training logs
+            'maxBytes': 52428800,  # 50MB
             'backupCount': 3,
             'formatter': 'verbose',
         },
@@ -617,21 +611,16 @@ LOGGING = {
     },
 }
 
-# Archive old log directories - previously removed
-# LOGS_DIR = BASE_DIR / 'logs'
-# if not LOGS_DIR.exists():
-#     LOGS_DIR.mkdir(parents=True, exist_ok=True)
-
 # Sentry Error Tracking
 SENTRY_DSN = env('SENTRY_DSN', default=None)
 if SENTRY_AVAILABLE and SENTRY_DSN:
     def before_send(event, hint):
-        """Redact sensitive data instead of dropping entire events"""
+        """Data sanitisation filter for Sentry events."""
         # List of sensitive keys to redact
         sensitive_keys = ['password', 'token', 'secret', 'api_key', 'private_key', 'ssn']
         
         def redact_dict(d):
-            """Recursively redact sensitive keys in dictionary"""
+            """Recursive sensitive key redaction."""
             if not isinstance(d, dict):
                 return d
             for key in list(d.keys()):
@@ -652,7 +641,7 @@ if SENTRY_AVAILABLE and SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         before_send=before_send,
-        send_default_pii=False,  # Don't send PII by default
+        send_default_pii=False,
         integrations=[
             sentry_sdk.integrations.django.DjangoIntegration(),
             sentry_sdk.integrations.redis.RedisIntegration(),

@@ -1,6 +1,5 @@
 """
-Serializers for Data app models.
-Handles data serialization/deserialization for API endpoints.
+Data model serialisers for REST API endpoints.
 """
 
 from rest_framework import serializers
@@ -9,7 +8,7 @@ from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding
 
 
 class StockPriceSerializer(serializers.ModelSerializer):
-    """Serializer for StockPrice model."""
+    """Historical stock price data serialisation."""
     
     daily_range = serializers.ReadOnlyField()
     is_gain = serializers.ReadOnlyField()
@@ -24,7 +23,7 @@ class StockPriceSerializer(serializers.ModelSerializer):
 
 
 class StockSerializer(serializers.ModelSerializer):
-    """Serializer for Stock model."""
+    """Stock metadata and company information serialisation."""
     
     latest_price = StockPriceSerializer(source='get_latest_price', read_only=True)
     needs_sync = serializers.ReadOnlyField()
@@ -42,7 +41,7 @@ class StockSerializer(serializers.ModelSerializer):
 
 
 class StockDetailSerializer(StockSerializer):
-    """Detailed serializer for Stock with price history."""
+    """Extended stock serialiser with embedded price history."""
     
     price_history = serializers.SerializerMethodField()
     
@@ -50,14 +49,14 @@ class StockDetailSerializer(StockSerializer):
         fields = StockSerializer.Meta.fields + ['price_history']
     
     def get_price_history(self, obj):
-        """Get recent price history for the stock."""
+        """Retrieve configurable price history for stock."""
         days = self.context.get('price_history_days', 30)
         prices = obj.get_price_history(days)
         return StockPriceSerializer(prices, many=True).data
 
 
 class PortfolioHoldingSerializer(serializers.ModelSerializer):
-    """Serializer for PortfolioHolding model."""
+    """Individual portfolio stock holding serialisation."""
     
     stock = StockSerializer(read_only=True)
     stock_symbol = serializers.CharField(write_only=True, required=False)
@@ -79,7 +78,7 @@ class PortfolioHoldingSerializer(serializers.ModelSerializer):
         ]
     
     def create(self, validated_data):
-        """Create a new holding with stock lookup."""
+        """Create holding with automatic stock symbol resolution."""
         stock_symbol = validated_data.pop('stock_symbol', None)
         
         if stock_symbol:
@@ -95,7 +94,7 @@ class PortfolioHoldingSerializer(serializers.ModelSerializer):
 
 
 class PortfolioSerializer(serializers.ModelSerializer):
-    """Serializer for Portfolio model."""
+    """Investment portfolio serialisation with summary metrics."""
     
     user = serializers.ReadOnlyField(source='user.username')
     holdings_count = serializers.SerializerMethodField()
@@ -110,17 +109,17 @@ class PortfolioSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'user', 'created_at', 'updated_at']
     
     def get_holdings_count(self, obj):
-        """Get the number of holdings in the portfolio."""
+        """Calculate total number of holdings in portfolio."""
         return obj.holdings.count()
     
     def get_total_value(self, obj):
-        """Calculate total portfolio value."""
+        """Calculate aggregate portfolio market value."""
         total = sum(holding.current_value for holding in obj.holdings.all())
         return float(total)
 
 
 class PortfolioDetailSerializer(PortfolioSerializer):
-    """Detailed serializer for Portfolio with holdings."""
+    """Extended portfolio serialiser with embedded holdings."""
     
     holdings = PortfolioHoldingSerializer(many=True, read_only=True)
     
@@ -129,7 +128,7 @@ class PortfolioDetailSerializer(PortfolioSerializer):
 
 
 class StockSearchSerializer(serializers.Serializer):
-    """Serializer for stock search results."""
+    """Stock search result serialisation."""
     
     symbol = serializers.CharField()
     name = serializers.CharField()
@@ -140,7 +139,7 @@ class StockSearchSerializer(serializers.Serializer):
 
 
 class MarketStatusSerializer(serializers.Serializer):
-    """Serializer for market status."""
+    """Market operating status serialisation."""
     
     is_open = serializers.BooleanField()
     current_time = serializers.DateTimeField()

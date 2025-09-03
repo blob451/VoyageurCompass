@@ -1,5 +1,6 @@
 """
 Custom authentication backends for VoyageurCompass.
+Flexible user authentication supporting username or email credentials.
 """
 
 from django.contrib.auth.backends import ModelBackend
@@ -11,24 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 class EmailOrUsernameModelBackend(ModelBackend):
-    """
-    Custom authentication backend that allows users to log in 
-    using either their username or email address.
-    """
+    """Custom authentication backend supporting username or email credentials."""
     
     def authenticate(self, request, username=None, password=None, **kwargs):
-        """
-        Authenticate user with username or email.
-        
-        Args:
-            request: The request object
-            username: Username or email address
-            password: User's password
-            **kwargs: Additional keyword arguments
-            
-        Returns:
-            User object if authentication successful, None otherwise
-        """
+        """Authenticate user with username or email credentials."""
         if username is None or password is None:
             return None
         
@@ -54,15 +41,7 @@ class EmailOrUsernameModelBackend(ModelBackend):
             return None
     
     def get_user(self, user_id):
-        """
-        Get user by ID.
-        
-        Args:
-            user_id: User's primary key
-            
-        Returns:
-            User object or None
-        """
+        """Retrieve user by primary key identifier."""
         try:
             return User.objects.get(pk=user_id)
         except User.DoesNotExist:
@@ -70,9 +49,7 @@ class EmailOrUsernameModelBackend(ModelBackend):
 
 
 class BlacklistCheckMiddleware:
-    """
-    Middleware to check if JWT tokens are blacklisted.
-    """
+    """JWT token blacklist verification middleware."""
     
     def __init__(self, get_response):
         self.get_response = get_response

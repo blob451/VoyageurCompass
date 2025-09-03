@@ -185,9 +185,13 @@ class IntegratedPredictionService:
             ta_module.TechnicalAnalysisEngine.WEIGHTS = original_weights
             
             if analysis:
+                # Remove prediction indicator to avoid recursion
+                indicators = analysis.get('indicators', {}).copy()
+                indicators.pop('prediction', None)  # Remove prediction indicator
+                
                 return {
                     'success': True,
-                    'indicators': analysis.get('indicators', {}),
+                    'indicators': indicators,
                     'composite_score': analysis.get('composite_score', 5.0)
                 }
             

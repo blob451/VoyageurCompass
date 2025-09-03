@@ -6,6 +6,7 @@ from django.utils.cache import patch_vary_headers
 from django.utils.deprecation import MiddlewareMixin
 
 class CustomCorsMiddleware:
+    """Cross-Origin Resource Sharing middleware with development-focused origin handling."""
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -49,18 +50,19 @@ class CustomCorsMiddleware:
         return response
 
 class RequestLoggingMiddleware(MiddlewareMixin):
+    """Request and response logging middleware with performance metrics and correlation tracking."""
     def __init__(self, get_response=None):
         super().__init__(get_response)
         self.logger = logging.getLogger('VoyageurCompass.requests')
 
     def process_request(self, request):
-        # IMMEDIATE DEBUG - Log every request
+        # Debug logging for all incoming requests
         import sys
         print(f"*** MIDDLEWARE: REQUEST {request.method} {request.path} ***", flush=True)
         sys.stderr.write(f"STDERR: REQUEST {request.method} {request.path}\n")
         sys.stderr.flush()
         
-        # Honor incoming request ID for distributed tracing
+        # Honour incoming request ID for distributed tracing
         incoming = request.headers.get('X-Request-Id') or request.headers.get('X-Correlation-Id')
         request.correlation_id = incoming or str(uuid.uuid4())
         request.start_time = time.perf_counter()

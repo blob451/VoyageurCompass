@@ -1,6 +1,6 @@
 """
-API Views for Core app.
-Handles authentication, user management, and system utilities.
+Core application API views.
+Authentication, user management, and system utilities.
 """
 
 import logging
@@ -27,11 +27,11 @@ from Core.models import UserSecurityProfile
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
-    """Custom JWT token view with additional user data and proper error handling."""
+    """JWT authentication endpoint with enhanced user response data."""
     
     @extend_schema(
         summary="Login",
-        description="Authenticate user and receive JWT tokens",
+        description="User authentication with JWT token generation",
         responses={
             200: {
                 'description': 'Login successful',
@@ -54,15 +54,13 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         }
     )
     def post(self, request, *args, **kwargs):
-        """Override to add user data to response and improve error handling."""
-        # Get the response from parent class
+        """Authenticate user and append profile data to JWT response."""
         response = super().post(request, *args, **kwargs)
         
-        # Only add user data if authentication was successful
+        # Add user data on successful authentication
         if response.status_code == 200:
             username = request.data.get('username')
             
-            # Find the authenticated user using our custom backend logic
             try:
                 from django.db.models import Q
                 user = User.objects.get(
@@ -75,7 +73,6 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 logger.info(f"Successful login for user: {user.username} (ID: {user.id})")
                 
             except User.DoesNotExist:
-                # This should not happen if JWT authentication succeeded
                 logger.error(f"JWT authentication succeeded but user not found: {username}")
             except Exception as e:
                 logger.error(f"Error adding user data to JWT response: {e}")
@@ -84,7 +81,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 class RegisterView(generics.CreateAPIView):
-    """User registration view."""
+    """User account creation endpoint."""
     
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
@@ -92,7 +89,7 @@ class RegisterView(generics.CreateAPIView):
     
     @extend_schema(
         summary="Register new user",
-        description="Create a new user account",
+        description="User account creation with automatic token generation",
         responses={
             201: {
                 'description': 'User created successfully',
@@ -111,12 +108,11 @@ class RegisterView(generics.CreateAPIView):
         }
     )
     def create(self, request, *args, **kwargs):
-        """Override to return tokens after registration."""
+        """Create user account and generate authentication tokens."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         
-        # Generate tokens for the new user
         refresh = RefreshToken.for_user(user)
         
         return Response({
@@ -129,28 +125,28 @@ class RegisterView(generics.CreateAPIView):
 
 
 class UserProfileView(APIView):
-    """User profile management."""
+    """User profile retrieval and modification endpoint."""
     
     permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="Get user profile",
-        description="Get current user's profile information",
+        description="Current user profile retrieval",
         responses={200: UserProfileSerializer}
     )
     def get(self, request):
-        """Get current user profile."""
+        """Retrieve authenticated user's profile data."""
         serializer = UserProfileSerializer(request.user)
         return Response(serializer.data)
     
     @extend_schema(
         summary="Update user profile",
-        description="Update current user's profile information",
+        description="User profile modification",
         request=UserProfileSerializer,
         responses={200: UserProfileSerializer}
     )
     def put(self, request):
-        """Update user profile."""
+        """Modify authenticated user's profile attributes."""
         serializer = UserProfileSerializer(
             request.user, 
             data=request.data, 
@@ -168,13 +164,13 @@ class UserProfileView(APIView):
 
 
 class ChangePasswordView(APIView):
-    """Change password view."""
+    """Authenticated password modification endpoint."""
     
     permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="Change password",
-        description="Change the current user's password",
+        description="Authenticated user password modification",
         request=ChangePasswordSerializer,
         responses={
             200: {'description': 'Password changed successfully'},
@@ -182,7 +178,7 @@ class ChangePasswordView(APIView):
         }
     )
     def post(self, request):
-        """Change user password."""
+        """Update user password and regenerate authentication tokens."""
         serializer = ChangePasswordSerializer(
             data=request.data,
             context={'request': request}
@@ -193,7 +189,6 @@ class ChangePasswordView(APIView):
             user.set_password(serializer.validated_data['new_password'])
             user.save()
             
-            # Generate new tokens after password change
             refresh = RefreshToken.for_user(user)
             
             return Response({
@@ -212,7 +207,7 @@ class ChangePasswordView(APIView):
 
 @extend_schema(
     summary="Health check",
-    description="Check if the API is running",
+    description="API health status verification",
     responses={
         200: {
             'description': 'API is healthy',
@@ -226,7 +221,7 @@ class ChangePasswordView(APIView):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def health_check(request):
-    """Health check endpoint."""
+    """Basic API health status endpoint."""
     return Response({
         'status': 'healthy',
         'version': '1.0.0',
@@ -237,7 +232,7 @@ def health_check(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def healthCheck(request):
-    """Liveness probe - simple health check"""
+    """Kubernetes liveness probe endpoint."""
     from datetime import datetime, timezone
     return Response({
         'status': 'healthy',
@@ -250,11 +245,10 @@ def healthCheck(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def readinessCheck(request):
-    """Readiness probe - checks database connectivity"""
+    """Kubernetes readiness probe with database connectivity verification."""
     logger = logging.getLogger('VoyageurCompass.health')
     
     try:
-        # Ensure connection and simple DB ping
         connection.ensure_connection()
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
@@ -285,7 +279,7 @@ def readinessCheck(request):
 
 @extend_schema(
     summary="Get API statistics",
-    description="Get usage statistics for the current user",
+    description="Current user usage statistics",
     responses={
         200: {
             'description': 'User statistics',
@@ -300,7 +294,7 @@ def readinessCheck(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_stats(request):
-    """Get user statistics."""
+    """Retrieve authenticated user's usage statistics."""
     user = request.user
     
     stats = {
@@ -317,7 +311,7 @@ def user_stats(request):
 
 
 class PasswordResetRequestView(APIView):
-    """Request password reset using secret answer."""
+    """Password reset token generation via security question validation."""
     
     permission_classes = [AllowAny]
     
@@ -337,14 +331,13 @@ class PasswordResetRequestView(APIView):
         }
     )
     def post(self, request):
-        """Generate reset token after verifying secret answer."""
+        """Generate password reset token upon security answer verification."""
         serializer = PasswordResetRequestSerializer(data=request.data)
         
         if serializer.is_valid():
             user = serializer.validated_data['user']
             security_profile = user.security_profile
             
-            # Generate reset token
             token = security_profile.generate_reset_token()
             
             return Response({
@@ -371,7 +364,7 @@ class PasswordResetRequestView(APIView):
         }
     )
     def get(self, request):
-        """Get security question for a username."""
+        """Retrieve security question for specified username."""
         username = request.query_params.get('username')
         
         if not username:
@@ -380,7 +373,6 @@ class PasswordResetRequestView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Find user
         user = None
         if '@' in username:
             try:
@@ -413,7 +405,7 @@ class PasswordResetRequestView(APIView):
 
 
 class PasswordResetConfirmView(APIView):
-    """Reset password using token."""
+    """Password reset execution with validated token."""
     
     permission_classes = [AllowAny]
     
@@ -426,18 +418,16 @@ class PasswordResetConfirmView(APIView):
         }
     )
     def post(self, request):
-        """Reset password with valid token."""
+        """Execute password reset using validated token."""
         serializer = PasswordResetSerializer(data=request.data)
         
         if serializer.is_valid():
             user = serializer.validated_data['user']
             security_profile = serializer.validated_data['security_profile']
             
-            # Set new password
             user.set_password(serializer.validated_data['new_password'])
             user.save()
             
-            # Clear reset token
             security_profile.clear_reset_token()
             
             return Response({
@@ -451,7 +441,7 @@ class PasswordResetConfirmView(APIView):
 
 
 class AdminPasswordResetRequestView(APIView):
-    """Request admin help for password reset."""
+    """Administrative password reset assistance request endpoint."""
     
     permission_classes = [AllowAny]
     
@@ -470,13 +460,12 @@ class AdminPasswordResetRequestView(APIView):
         }
     )
     def post(self, request):
-        """Submit password reset request to admin."""
+        """Submit administrative password reset request."""
         serializer = AdminPasswordResetRequestSerializer(data=request.data)
         
         if serializer.is_valid():
             reset_request = serializer.save()
             
-            # Log the request for admin notification
             import logging
             logger = logging.getLogger('VoyageurCompass.admin')
             logger.warning(
@@ -495,9 +484,9 @@ class AdminPasswordResetRequestView(APIView):
 
 
 class LogoutView(APIView):
-    """User logout view with JWT token blacklisting."""
+    """User session termination with JWT token blacklisting."""
     
-    permission_classes = [AllowAny]  # Allow logout even with invalid tokens
+    permission_classes = [AllowAny]
     
     @extend_schema(
         summary="Logout user",
@@ -524,7 +513,7 @@ class LogoutView(APIView):
         }
     )
     def post(self, request):
-        """Logout user and blacklist tokens."""
+        """Terminate user session and blacklist JWT tokens."""
         try:
             from Core.models import BlacklistedToken
             from django.contrib.auth.models import User
@@ -534,29 +523,24 @@ class LogoutView(APIView):
             tokens_blacklisted = 0
             user = None
             
-            # Try to get user from token if authenticated, otherwise try to decode token manually
             if request.user.is_authenticated:
                 user = request.user
             else:
-                # Try to extract user from token manually for invalid/expired tokens
                 auth_header = request.META.get('HTTP_AUTHORIZATION')
                 if auth_header and auth_header.startswith('Bearer '):
                     access_token = auth_header.split(' ')[1]
                     try:
-                        # Decode token without verification to get user_id
                         decoded = jwt.decode(access_token, options={"verify_signature": False})
                         user_id = decoded.get('user_id')
                         if user_id:
                             user = User.objects.get(id=user_id)
                     except:
-                        pass  # Continue without user if token can't be decoded
+                        pass
             
-            # Get access token from Authorization header
             auth_header = request.META.get('HTTP_AUTHORIZATION')
             if auth_header and auth_header.startswith('Bearer '):
                 access_token = auth_header.split(' ')[1]
                 
-                # Blacklist access token (pass user if available, None otherwise)
                 if user and BlacklistedToken.blacklist_token(
                     access_token, 
                     user, 
@@ -564,10 +548,8 @@ class LogoutView(APIView):
                 ):
                     tokens_blacklisted += 1
             
-            # Get refresh token from request body
             refresh_token = request.data.get('refresh_token')
             if refresh_token and user:
-                # Blacklist refresh token
                 if BlacklistedToken.blacklist_token(
                     refresh_token, 
                     user, 
@@ -588,12 +570,12 @@ class LogoutView(APIView):
             logger.error(f"Error during logout for user {username}: {str(e)}")
             return Response(
                 {'message': 'Logout completed (with errors)', 'tokens_blacklisted': 0},
-                status=status.HTTP_200_OK  # Still return success since logout should always succeed
+                status=status.HTTP_200_OK
             )
 
 
 class ValidateTokenView(APIView):
-    """Validate JWT token and return auth status."""
+    """JWT token validation with authentication status verification."""
     
     permission_classes = [IsAuthenticated]
     
@@ -623,12 +605,10 @@ class ValidateTokenView(APIView):
         }
     )
     def get(self, request):
-        """Validate current token and return user info."""
+        """Validate JWT token and return user profile information."""
         try:
-            # If we reach here, the token is valid (IsAuthenticated passed)
             user = request.user
             
-            # Get token expiration from the JWT
             auth_header = request.META.get('HTTP_AUTHORIZATION')
             token_expires_at = None
             
@@ -648,7 +628,7 @@ class ValidateTokenView(APIView):
                         tz=timezone.utc
                     ).isoformat()
                 except:
-                    pass  # Continue without expiration info if decode fails
+                    pass
             
             return Response({
                 'valid': True,

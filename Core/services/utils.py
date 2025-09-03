@@ -1,6 +1,6 @@
 """
-Utility Functions Module
-Common utility functions used across VoyageurCompass.
+Core utility functions module.
+Common financial calculations, formatting, and data processing utilities.
 """
 
 import logging
@@ -14,15 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def safe_decimal(value: Any) -> Optional[Decimal]:
-    """
-    Safely convert a value to Decimal.
-    
-    Args:
-        value: Value to convert
-    
-    Returns:
-        Decimal value or None if conversion fails
-    """
+    """Safely convert value to Decimal with error handling."""
     try:
         if value is None:
             return None
@@ -35,16 +27,7 @@ def safe_decimal(value: Any) -> Optional[Decimal]:
 
 
 def format_currency(amount: Union[float, Decimal], currency: str = 'USD') -> str:
-    """
-    Format a number as currency.
-    
-    Args:
-        amount: Amount to format
-        currency: Currency code
-    
-    Returns:
-        Formatted currency string
-    """
+    """Format numeric amount as currency string."""
     try:
         if currency == 'USD':
             return f"${amount:,.2f}"
@@ -55,16 +38,7 @@ def format_currency(amount: Union[float, Decimal], currency: str = 'USD') -> str
 
 
 def format_percentage(value: Union[float, Decimal], decimal_places: int = 2) -> str:
-    """
-    Format a number as percentage.
-    
-    Args:
-        value: Value to format
-        decimal_places: Number of decimal places
-    
-    Returns:
-        Formatted percentage string
-    """
+    """Format numeric value as percentage string with specified precision."""
     try:
         return f"{value:.{decimal_places}f}%"
     except (ValueError, TypeError):
@@ -72,16 +46,7 @@ def format_percentage(value: Union[float, Decimal], decimal_places: int = 2) -> 
 
 
 def calculate_percentage_change(old_value: float, new_value: float) -> Optional[float]:
-    """
-    Calculate percentage change between two values.
-    
-    Args:
-        old_value: Original value
-        new_value: New value
-    
-    Returns:
-        Percentage change or None if calculation fails
-    """
+    """Calculate percentage change between two numeric values."""
     try:
         if old_value == 0:
             return None
@@ -185,15 +150,7 @@ def flatten_dict(d: Dict, parent_key: str = '', separator: str = '.') -> Dict:
 
 
 def sanitize_filename(filename: str) -> str:
-    """
-    Sanitize a filename by removing invalid characters.
-    
-    Args:
-        filename: Filename to sanitize
-    
-    Returns:
-        Sanitized filename
-    """
+    """Sanitise filename by removing invalid filesystem characters."""
     invalid_chars = '<>:"/\\|?*'
     for char in invalid_chars:
         filename = filename.replace(char, '_')
@@ -201,12 +158,7 @@ def sanitize_filename(filename: str) -> str:
 
 
 def is_market_open() -> bool:
-    """
-    Check if the US stock market is currently open.
-    
-    Returns:
-        True if market is open, False otherwise
-    """
+    """Check US stock market operating status."""
     now = datetime.now()
     
     # Check if weekend
@@ -222,15 +174,7 @@ def is_market_open() -> bool:
 
 
 def validate_stock_symbol(symbol: str) -> bool:
-    """
-    Validate a stock symbol format.
-    
-    Args:
-        symbol: Stock symbol to validate
-    
-    Returns:
-        True if valid, False otherwise
-    """
+    """Validate stock ticker symbol format constraints."""
     if not symbol:
         return False
     
@@ -248,15 +192,7 @@ def validate_stock_symbol(symbol: str) -> bool:
 
 
 def round_to_cents(value: Union[float, Decimal]) -> Decimal:
-    """
-    Round a value to 2 decimal places (cents).
-    
-    Args:
-        value: Value to round
-    
-    Returns:
-        Rounded Decimal value
-    """
+    """Round numeric value to two decimal places (cents precision)."""
     try:
         decimal_value = Decimal(str(value))
         return decimal_value.quantize(Decimal('0.01'))
