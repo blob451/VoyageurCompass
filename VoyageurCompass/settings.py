@@ -142,8 +142,8 @@ DATABASES = {
             'client_encoding': 'UTF8',
         },
         
-        # Transaction Settings
-        'ATOMIC_REQUESTS': True,
+        # Transaction Settings - Disabled for performance (use selective transactions instead)
+        'ATOMIC_REQUESTS': False,
     }
 }
 
@@ -668,8 +668,12 @@ OLLAMA_MODEL = env('OLLAMA_MODEL', default='llama3.1:70b')
 OLLAMA_PRIMARY_MODEL = env('OLLAMA_PRIMARY_MODEL', default='llama3.1:8b')
 OLLAMA_DETAILED_MODEL = env('OLLAMA_DETAILED_MODEL', default='llama3.1:70b')
 OLLAMA_PERFORMANCE_MODE = env.bool('OLLAMA_PERFORMANCE_MODE', default=True)
-OLLAMA_GENERATION_TIMEOUT = int(env('OLLAMA_GENERATION_TIMEOUT', default=45))
+OLLAMA_GENERATION_TIMEOUT = int(env('OLLAMA_GENERATION_TIMEOUT', default=60))  # Increased from 45
 OLLAMA_GPU_LAYERS = int(env('OLLAMA_GPU_LAYERS', default=-1))  # -1 = use all available
+
+# Connection retry configuration
+OLLAMA_RETRY_ATTEMPTS = int(env('OLLAMA_RETRY_ATTEMPTS', default=3))
+OLLAMA_RETRY_DELAY = int(env('OLLAMA_RETRY_DELAY', default=1))
 
 # Explainability Settings
 EXPLAINABILITY_ENABLED = env.bool('EXPLAINABILITY_ENABLED', default=True)

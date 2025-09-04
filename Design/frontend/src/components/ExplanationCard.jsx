@@ -60,6 +60,18 @@ const ExplanationCard = ({
     };
   }, []);
 
+  // Handle detail level changes - only when user explicitly changes the dropdown
+  const handleDetailLevelChange = (newDetailLevel) => {
+    setSelectedDetail(newDetailLevel);
+    if (onRefresh) {
+      explanationLogger.workflow(analysisId, 'Detail level changed by user', { 
+        from: selectedDetail,
+        to: newDetailLevel 
+      });
+      onRefresh(newDetailLevel);
+    }
+  };
+
   const handleExpand = () => {
     setExpanded(!expanded);
   };
@@ -151,6 +163,219 @@ const ExplanationCard = ({
     }
   };
 
+  const formatStructuredContent = (content) => {
+    if (!content) return null;
+    
+    // For summary mode, keep formatting minimalistic - no visual enhancements
+    if (selectedDetail === 'summary') {
+      // Handle basic bold formatting but without enhanced styling
+      if (content.includes('**')) {
+        const parts = content.split(/(\*\*.*?\*\*)/g);
+        return (
+          <Typography variant="body1" paragraph sx={{ lineHeight: 1.7 }}>
+            {parts.map((part, index) => {
+              if (part.startsWith('**') && part.endsWith('**')) {
+                return (
+                  <Box 
+                    key={index} 
+                    component="span" 
+                    sx={{ fontWeight: 600 }}
+                  >
+                    {part.slice(2, -2)}
+                  </Box>
+                );
+              }
+              return part;
+            })}
+          </Typography>
+        );
+      }
+      // Return clean paragraph for summary
+      return (
+        <Typography variant="body1" paragraph sx={{ lineHeight: 1.7 }}>
+          {content}
+        </Typography>
+      );
+    }
+    
+    // Enhanced structured content parsing for standard and detailed modes
+    if (content.includes('**') && content.includes(':')) {
+      // Split by double line breaks first to get major sections
+      const majorSections = content.split('\n\n').filter(section => section.trim());
+      
+      return (
+        <Box sx={{ lineHeight: 1.8 }}>
+          {majorSections.map((section, index) => {
+            const trimmed = section.trim();
+            // Pattern 1: **Title:** content (primary sections)  
+            // Handle malformed LLM output: **Title:****content
+            const primaryMatch = trimmed.match(/^\*\*(.*?):\*\*+\s*(.*)/s);
+            if (primaryMatch) {
+              const title = primaryMatch[1].trim();
+              let content = primaryMatch[2].trim();
+              
+              // If content is empty, check if it's in the next major section
+              if (!content && index + 1 < majorSections.length) {
+                const nextSection = majorSections[index + 1];
+                if (nextSection && !nextSection.startsWith('**')) {
+                  content = nextSection.trim();
+                  majorSections.splice(index + 1, 1); // Remove the consumed section
+                }
+              }
+              
+              // Determine section type for enhanced styling
+              const sectionType = getSectionType(title);
+              
+              return (
+                <Box key={index} sx={{ mb: 2.5 }}>
+                  <Typography 
+                    variant="subtitle2" 
+                    sx={{ 
+                      fontWeight: 700, 
+                      color: sectionType.color,
+                      mb: 1,
+                      fontSize: '0.95rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    {sectionType.icon} {title}
+                  </Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      pl: 2, 
+                      borderLeft: 3, 
+                      borderColor: sectionType.borderColor,
+                      backgroundColor: sectionType.bgColor,
+                      p: 1.5,
+                      borderRadius: 1,
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    {content}
+                  </Typography>
+                </Box>
+              );
+            }
+            
+            // Pattern 2: **Bold text** within paragraphs
+            if (trimmed.includes('**') && !trimmed.match(/^\*\*.*\*\*:/)) {
+              const parts = trimmed.split(/(\*\*.*?\*\*)/g);
+              
+              return (
+                <Typography key={index} variant="body1" paragraph sx={{ mb: 2, lineHeight: 1.7 }}>
+                  {parts.map((part, partIndex) => {
+                    if (part.startsWith('**') && part.endsWith('**')) {
+                      return (
+                        <Box 
+                          key={partIndex} 
+                          component="span" 
+                          sx={{ fontWeight: 600, color: 'primary.main' }}
+                        >
+                          {part.slice(2, -2)}
+                        </Box>
+                      );
+                    }
+                    return part;
+                  })}
+                </Typography>
+              );
+            }
+            
+            // Pattern 3: Regular paragraph
+            return (
+              <Typography key={index} variant="body1" paragraph sx={{ mb: 2, lineHeight: 1.7 }}>
+                {trimmed}
+              </Typography>
+            );
+          })}
+        </Box>
+      );
+    }
+    
+    // Fallback: Check for inline bold formatting
+    if (content.includes('**')) {
+      const parts = content.split(/(\*\*.*?\*\*)/g);
+      
+      return (
+        <Typography variant="body1" paragraph sx={{ lineHeight: 1.7 }}>
+          {parts.map((part, index) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+              return (
+                <Box 
+                  key={index} 
+                  component="span" 
+                  sx={{ fontWeight: 600, color: 'primary.main' }}
+                >
+                  {part.slice(2, -2)}
+                </Box>
+              );
+            }
+            return part;
+          })}
+        </Typography>
+      );
+    }
+    
+    // Final fallback to regular paragraph
+    return (
+      <Typography variant="body1" paragraph sx={{ lineHeight: 1.7 }}>
+        {content}
+      </Typography>
+    );
+  };
+
+  // Helper function to determine section styling based on title
+  const getSectionType = (title) => {
+    const titleLower = title.toLowerCase();
+    
+    if (titleLower.includes('investment') || titleLower.includes('recommendation') || titleLower.includes('thesis')) {
+      return {
+        color: 'success.main',
+        borderColor: 'success.light',
+        bgColor: 'rgba(76, 175, 80, 0.08)',
+        icon: '📈'
+      };
+    } else if (titleLower.includes('technical') || titleLower.includes('indicator')) {
+      return {
+        color: 'info.main',
+        borderColor: 'info.light',
+        bgColor: 'rgba(33, 150, 243, 0.08)',
+        icon: '📊'
+      };
+    } else if (titleLower.includes('risk') || titleLower.includes('challenge')) {
+      return {
+        color: 'warning.main',
+        borderColor: 'warning.light',
+        bgColor: 'rgba(255, 152, 0, 0.08)',
+        icon: '⚠️'
+      };
+    } else if (titleLower.includes('market') || titleLower.includes('outlook') || titleLower.includes('context')) {
+      return {
+        color: 'secondary.main',
+        borderColor: 'secondary.light',
+        bgColor: 'rgba(156, 39, 176, 0.08)',
+        icon: '🏢'
+      };
+    } else if (titleLower.includes('sentiment')) {
+      return {
+        color: '#9c27b0',
+        borderColor: '#ba68c8',
+        bgColor: 'rgba(156, 39, 176, 0.08)',
+        icon: '💭'
+      };
+    }
+    
+    // Default styling
+    return {
+      color: 'primary.main',
+      borderColor: 'primary.light',
+      bgColor: 'rgba(25, 118, 210, 0.08)',
+      icon: '📋'
+    };
+  };
+
   return (
     <Card sx={{ mb: 2 }}>
       <CardContent>
@@ -193,7 +418,7 @@ const ExplanationCard = ({
                   <Select
                     value={selectedDetail}
                     label="Detail"
-                    onChange={(e) => setSelectedDetail(e.target.value)}
+                    onChange={(e) => handleDetailLevelChange(e.target.value)}
                     disabled={isLoading}
                   >
                     <MenuItem value="summary">Summary</MenuItem>
@@ -306,9 +531,11 @@ const ExplanationCard = ({
             
             return (
               <Box>
-                <Typography variant="body1" paragraph sx={{ lineHeight: 1.7 }}>
-                  {content || 'No explanation available'}
-                </Typography>
+                {formatStructuredContent(content) || (
+                  <Typography variant="body1" paragraph sx={{ lineHeight: 1.7 }}>
+                    No explanation available
+                  </Typography>
+                )}
                 
                 {timestamp && (
                   <>

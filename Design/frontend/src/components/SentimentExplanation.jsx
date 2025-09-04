@@ -33,15 +33,17 @@ const SentimentExplanation = ({
   sentimentData,
   defaultExpanded = false 
 }) => {
+  const [currentDetailLevel, setCurrentDetailLevel] = React.useState('standard');
   const [generateExplanation, { isLoading: isGenerating }] = useGenerateExplanationMutation();
   const { 
     data: explanation, 
     error: explanationError, 
     isLoading: isLoadingExplanation,
     refetch: refetchExplanation 
-  } = useGetExplanationQuery(analysisId, {
-    skip: !analysisId
-  });
+  } = useGetExplanationQuery(
+    { analysisId, detailLevel: currentDetailLevel }, 
+    { skip: !analysisId }
+  );
 
   if (!sentimentData || !sentimentData.raw) {
     return null;
@@ -136,6 +138,7 @@ const SentimentExplanation = ({
         success: true
       });
       
+      // Refetch to get the newly generated explanation
       refetchExplanation();
     } catch (error) {
       const duration = performance.now() - startTime;
@@ -152,7 +155,21 @@ const SentimentExplanation = ({
   };
 
   const handleRefreshExplanation = async (detailLevel) => {
-    await handleGenerateExplanation(detailLevel);
+    // Update detail level first
+    setCurrentDetailLevel(detailLevel);
+    
+    // Force refetch to see if explanation exists for this detail level
+    const result = await refetchExplanation();
+    
+    // If no explanation exists for this detail level, generate it
+    if (!result?.data?.explanation?.content) {
+      explanationLogger.workflow(analysisId, 'No explanation found for detail level, generating new one', {
+        sentimentLabel: label,
+        detailLevel,
+        newsCount
+      });
+      await handleGenerateExplanation(detailLevel);
+    }
   };
 
   const sentimentExplanation = explanation?.explanation;
@@ -248,14 +265,14 @@ const SentimentExplanation = ({
           <ListItemText
             primary="Market Impact Potential"
             secondary={
-              <span style={{ display: 'inline-block', marginTop: '4px' }}>
+              <Typography variant="body2" component="div" sx={{ mt: 0.5 }}>
                 <Chip
                   label={impact.level}
                   size="small"
                   color={impact.color}
                   variant="outlined"
                 />
-              </span>
+              </Typography>
             }
           />
         </ListItem>

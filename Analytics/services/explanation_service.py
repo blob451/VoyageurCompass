@@ -20,7 +20,7 @@ class ExplanationService:
     """Financial analysis explanation generation service with LLM integration."""
     
     def __init__(self):
-        self.llm_service = get_local_llm_service()
+        self._llm_service = None
         self.enabled = getattr(settings, 'EXPLAINABILITY_ENABLED', True)
         self.cache_ttl = getattr(settings, 'EXPLANATION_CACHE_TTL', 300)
         
@@ -40,9 +40,21 @@ class ExplanationService:
             'srcontext': 'Support and resistance level analysis based on price history'
         }
     
+    @property
+    def llm_service(self):
+        """Lazy-loaded LLM service."""
+        if self._llm_service is None:
+            logger.info("Initializing LLM service for explanation generation")
+            self._llm_service = get_local_llm_service()
+        return self._llm_service
+    
     def is_enabled(self) -> bool:
         """Verify explanation service availability status."""
         return self.enabled and self.llm_service.is_available()
+    
+    def is_available_or_fallback(self) -> bool:
+        """Check if ANY explanation generation is possible (LLM or template)."""
+        return self.enabled  # Always true if feature enabled, regardless of LLM availability
     
     def explain_prediction_single(self, 
                                 analysis_result: Union[Dict[str, Any], 'AnalyticsResults'], 
@@ -63,10 +75,12 @@ class ExplanationService:
             
             start_time = time.time()
             
+            # Always try to generate something - LLM preferred, template as fallback
             if self.llm_service.is_available():
+                logger.info(f"Using LLM for {analysis_data.get('symbol', 'unknown')} ({detail_level})")
                 explanation = self._generate_llm_explanation(analysis_data, detail_level)
             else:
-                logger.warning("LLM service unavailable, using template fallback")
+                logger.warning(f"LLM unavailable, using template for {analysis_data.get('symbol', 'unknown')} ({detail_level})")
                 explanation = self._generate_template_explanation(analysis_data, detail_level)
             
             if explanation:

@@ -1,10 +1,9 @@
-from django.shortcuts import render
+"""
+Analytics API endpoints for financial analysis and trading signals.
+Provides technical analysis, explanation generation, and portfolio insights.
+"""
 
-# Create your views here.
-"""
-API Views for Analytics app.
-Provides endpoints for stock analysis and trading signals.
-"""
+from django.shortcuts import render
 
 from datetime import datetime
 from django.core.cache import cache
@@ -19,6 +18,8 @@ from drf_spectacular.types import OpenApiTypes
 from Analytics.engine.ta_engine import TechnicalAnalysisEngine
 from Analytics.utils.analysis_logger import AnalysisLogger
 from Analytics.services.explanation_service import get_explanation_service
+from Analytics.services.async_processing_pipeline import get_async_processing_pipeline
+from Analytics.services.hybrid_analysis_coordinator import get_hybrid_analysis_coordinator
 from Data.services.yahoo_finance import yahoo_finance_service
 from Data.models import Portfolio, AnalyticsResults, Stock
 
@@ -26,7 +27,7 @@ from Data.models import Portfolio, AnalyticsResults, Stock
 
 class AnalysisThrottle(UserRateThrottle):
     """Custom throttle for analysis endpoints."""
-    rate = '100/hour'
+    rate = '1000/hour'  # Increased for development to prevent issues with rapid testing
 
 
 @extend_schema(
@@ -112,6 +113,9 @@ def analyze_stock(request, symbol):
     sync = request.query_params.get('sync', 'false').lower() == 'true'
     include_explanation = request.query_params.get('include_explanation', 'false').lower() == 'true'
     explanation_detail = request.query_params.get('explanation_detail', 'standard')
+    
+    # DEBUG: Log all received parameters
+    # Parameters validated
     
     logger.info(f"Analysis request received for {symbol} from user {request.user.username if hasattr(request.user, 'username') else 'Unknown'}")
     logger.debug(f"Parameters - months: {months}, sync: {sync}, explanation: {include_explanation}, detail: {explanation_detail}")
@@ -214,6 +218,138 @@ def analyze_stock(request, symbol):
                             {'error': f'Analysis result ID mismatch detected. Please try again.'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR
                         )
+                    
+                    # FORCE: Always generate summary explanation for better UX (unconditional)
+                    try:
+                        from Analytics.services.explanation_service import get_explanation_service
+                        
+                        explanation_service = get_explanation_service()
+                        
+                        if explanation_service.enabled:  # Only check if feature is enabled
+                            # Check existing explanations
+                            existing = saved_analysis.explanations_json or {}
+                            levels = existing.get('levels', {})
+                            
+                            if 'summary' not in levels or not levels['summary'].get('content'):
+                                
+                                result = explanation_service.explain_prediction_single(
+                                    saved_analysis,
+                                    detail_level='summary',
+                                    user=request.user
+                                )
+                                
+                                if result:
+                                    
+                                    # Save to database with forced save
+                                    saved_analysis.refresh_from_db()
+                                    existing_explanations = saved_analysis.explanations_json or {}
+                                    levels = existing_explanations.get('levels', {})
+                                    levels['summary'] = {
+                                        'content': result.get('content', ''),
+                                        'confidence': result.get('confidence_score', 0.0),
+                                        'generated_at': datetime.now().isoformat(),
+                                        'word_count': result.get('word_count', 0)
+                                    }
+                                    saved_analysis.explanations_json = {
+                                        'levels': levels,
+                                        'indicators_explained': result.get('indicators_explained', []),
+                                        'risk_factors': result.get('risk_factors', []),
+                                        'recommendation': result.get('recommendation', 'HOLD'),
+                                        'current_level': 'summary'
+                                    }
+                                    # Also update legacy fields
+                                    saved_analysis.narrative_text = result.get('content', '')
+                                    saved_analysis.explanation_confidence = result.get('confidence_score', 0.0)
+                                    saved_analysis.explanation_method = result.get('method', 'unknown')
+                                    saved_analysis.explained_at = datetime.now()
+                                    saved_analysis.save()
+                                    
+                                    # Verify the save worked
+                                    saved_analysis.refresh_from_db()
+                                    if saved_analysis.explanations_json and 'levels' in saved_analysis.explanations_json:
+                                        if 'summary' in saved_analysis.explanations_json['levels']:
+                                            # Summary verification successful
+                                        else:
+                                            # Summary verification failed
+                                    else:
+                                        # Explanations JSON verification failed
+                                        
+                                # Generation attempt completed
+                                    # Creating fallback content
+                                    
+                                    # Create fallback content
+                                    score = saved_analysis.score_0_10 if hasattr(saved_analysis, 'score_0_10') else 5.0
+                                    recommendation = 'BUY' if score >= 7 else 'HOLD' if score >= 4 else 'SELL'
+                                    fallback_content = f'{symbol} receives a technical analysis score of {score:.1f}/10, suggesting a {recommendation} position based on current technical indicators.'
+                                    
+                                    result = {
+                                        'content': fallback_content,
+                                        'method': 'fallback',
+                                        'confidence_score': 0.5,
+                                        'word_count': len(fallback_content.split()),
+                                        'indicators_explained': ['Technical Analysis'],
+                                        'risk_factors': ['Market conditions'],
+                                        'recommendation': recommendation
+                                    }
+                                    
+                                    # Save fallback content
+                                    saved_analysis.refresh_from_db()
+                                    existing_explanations = saved_analysis.explanations_json or {}
+                                    levels = existing_explanations.get('levels', {})
+                                    levels['summary'] = {
+                                        'content': result.get('content', ''),
+                                        'confidence': result.get('confidence_score', 0.0),
+                                        'generated_at': datetime.now().isoformat(),
+                                        'word_count': result.get('word_count', 0)
+                                    }
+                                    saved_analysis.explanations_json = {
+                                        'levels': levels,
+                                        'indicators_explained': result.get('indicators_explained', []),
+                                        'risk_factors': result.get('risk_factors', []),
+                                        'recommendation': result.get('recommendation', 'HOLD'),
+                                        'current_level': 'summary'
+                                    }
+                                    saved_analysis.narrative_text = result.get('content', '')
+                                    saved_analysis.explanation_confidence = result.get('confidence_score', 0.0)
+                                    saved_analysis.explanation_method = result.get('method', 'fallback')
+                                    saved_analysis.explained_at = datetime.now()
+                                    saved_analysis.save()
+                                    # Fallback explanation saved
+                            # Summary already exists
+                        else:
+                            
+                            # Even if service disabled, create minimal explanation
+                            score = saved_analysis.score_0_10 if hasattr(saved_analysis, 'score_0_10') else 5.0
+                            recommendation = 'BUY' if score >= 7 else 'HOLD' if score >= 4 else 'SELL'
+                            minimal_content = f'{symbol}: {score:.1f}/10 - {recommendation}'
+                            
+                            saved_analysis.refresh_from_db()
+                            existing_explanations = saved_analysis.explanations_json or {}
+                            levels = existing_explanations.get('levels', {})
+                            levels['summary'] = {
+                                'content': minimal_content,
+                                'confidence': 0.3,
+                                'generated_at': datetime.now().isoformat(),
+                                'word_count': len(minimal_content.split())
+                            }
+                            saved_analysis.explanations_json = {
+                                'levels': levels,
+                                'indicators_explained': [],
+                                'risk_factors': [],
+                                'recommendation': recommendation,
+                                'current_level': 'summary'
+                            }
+                            saved_analysis.narrative_text = minimal_content
+                            saved_analysis.explanation_confidence = 0.3
+                            saved_analysis.explanation_method = 'minimal'
+                            saved_analysis.explained_at = datetime.now()
+                            saved_analysis.save()
+                            
+                    except Exception as force_error:
+                        logger.error(f"Force generation failed for {symbol}: {str(force_error)}")
+                        # Continue execution despite error
+                    
+                    # Original pre-generation code removed - replaced by forced generation above
                         
             except Exception as db_error:
                 logger.error(f"Database verification failed for {symbol}: {str(db_error)}", exc_info=True)
@@ -228,10 +364,9 @@ def analyze_stock(request, symbol):
         explanation_data = None
         if include_explanation and analytics_result_id:
             try:
-                print(f"[BACKEND] Generating explanation for {symbol} (detail: {explanation_detail})")
                 explanation_service = get_explanation_service()
                 
-                if explanation_service.is_enabled():
+                if explanation_service.enabled:  # Use enabled instead of is_enabled() for consistency
                     # Get the saved analysis result for explanation
                     saved_analysis = AnalyticsResults.objects.filter(
                         id=analytics_result_id,
@@ -247,18 +382,30 @@ def analyze_stock(request, symbol):
                         )
                         
                         if explanation_result:
-                            # Update the database with explanation
+                            # Update the database with explanation in levels structure
+                            existing_explanations = saved_analysis.explanations_json or {}
+                            levels = existing_explanations.get('levels', {})
+                            levels[explanation_detail] = {
+                                'content': explanation_result.get('content', ''),
+                                'confidence': explanation_result.get('confidence_score', 0.0),
+                                'generated_at': datetime.now().isoformat(),
+                                'word_count': explanation_result.get('word_count', 0)
+                            }
                             saved_analysis.explanations_json = {
+                                'levels': levels,
                                 'indicators_explained': explanation_result.get('indicators_explained', []),
                                 'risk_factors': explanation_result.get('risk_factors', []),
-                                'recommendation': explanation_result.get('recommendation', 'HOLD')
+                                'recommendation': explanation_result.get('recommendation', 'HOLD'),
+                                'current_level': explanation_detail
                             }
+                            # Also update legacy fields for backward compatibility
                             saved_analysis.explanation_method = explanation_result.get('method', 'unknown')
                             saved_analysis.explanation_version = '1.0'
                             saved_analysis.narrative_text = explanation_result.get('content', '')
                             saved_analysis.explanation_confidence = explanation_result.get('confidence_score', 0.0)
                             saved_analysis.explained_at = datetime.now()
                             saved_analysis.save()
+                            # Explanation saved successfully
                             
                             explanation_data = {
                                 'content': explanation_result.get('content', ''),
@@ -272,13 +419,10 @@ def analyze_stock(request, symbol):
                                 'recommendation': explanation_result.get('recommendation', 'HOLD')
                             }
                             
-                            print(f"[BACKEND] Explanation generated successfully for {symbol}")
-                        else:
-                            print(f"[BACKEND] Failed to generate explanation for {symbol}")
-                    else:
-                        print(f"[BACKEND] Could not find saved analysis for explanation")
-                else:
-                    print(f"[BACKEND] Explanation service not available")
+                            # Explanation generation completed
+                        # Explanation generation attempted
+                    # Analysis lookup completed
+                # Service availability checked
                     explanation_data = {
                         'error': 'Explanation service not available',
                         'detail_level': explanation_detail,
@@ -286,7 +430,7 @@ def analyze_stock(request, symbol):
                     }
                     
             except Exception as e:
-                print(f"[BACKEND] Error generating explanation: {str(e)}")
+                logger.error(f"Error generating explanation for {symbol}: {str(e)}")
                 logger.error(f"Explanation generation failed for {symbol}: {str(e)}")
                 explanation_data = {
                     'error': f'Explanation generation failed: {str(e)}',
@@ -310,9 +454,7 @@ def analyze_stock(request, symbol):
         if explanation_data:
             response_data['explanation'] = explanation_data
         
-        print(f"[BACKEND] Response formatted successfully")
-        print(f"[BACKEND] Response data keys: {list(response_data.keys())}")
-        print(f"[BACKEND] Database transaction verified, returning response for {symbol}")
+        # Response formatted and verified
         
         # Invalidate analysis history cache for this user since we just created a new analysis
         user_cache_pattern = f"analysis_history:{request.user.id}:*"
@@ -328,10 +470,9 @@ def analyze_stock(request, symbol):
         return Response(response_data)
         
     except Exception as e:
-        print(f"[BACKEND] EXCEPTION occurred during analysis for {symbol}: {str(e)}")
-        print(f"[BACKEND] Exception type: {type(e).__name__}")
+        logger.error(f"Analysis failed for {symbol}: {type(e).__name__}: {str(e)}")
         import traceback
-        print(f"[BACKEND] Full traceback: {traceback.format_exc()}")
+        logger.debug(f"Full traceback for {symbol}: {traceback.format_exc()}")
         
         import logging
         logger = logging.getLogger(__name__)

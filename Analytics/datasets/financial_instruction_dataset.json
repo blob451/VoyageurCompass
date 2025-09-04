@@ -1,0 +1,268 @@
+[
+  {
+    "instruction": "Generate a comprehensive investment analysis for AMGN with score 2.8/10 considering negative sentiment (confidence: 0.87, score: -0.44) based on the provided technical indicators. Integrate sentiment analysis with technical findings.",
+    "input": {
+      "symbol": "AMGN",
+      "score_0_10": 2.8,
+      "weighted_scores": {
+        "w_obv20": -0.028,
+        "w_macd12269": 0.0295,
+        "w_sma50vs200": 0.0779,
+        "w_bbpos20": -0.0812,
+        "w_rel2y": -0.0774,
+        "w_candlestick_patterns": -0.0345
+      },
+      "components": {},
+      "sentiment": {
+        "sentimentScore": -0.436,
+        "sentimentLabel": "negative",
+        "sentimentConfidence": 0.873,
+        "newsCount": 5,
+        "timestamp": "2025-09-03T10:34:50.464810"
+      }
+    },
+    "output": "**SELL** recommendation for AMGN (Score: 2.8/10). The Bollinger Bands Position shows moderate bearish momentum (-0.081), while SMA 50/200 Crossover indicates weak bullish pressure (+0.078). Current negative sentiment (score: -0.44, confidence: 87%) aligns well the technical analysis. Consider reducing exposure.",
+    "metadata": {
+      "recommendation_category": "sell",
+      "has_sentiment": true,
+      "complexity_score": 0.5,
+      "created_at": "2025-09-03T10:34:50.464855"
+    }
+  },
+  {
+    "instruction": "Generate a comprehensive investment analysis for SBUX with score 1.7/10 based on the provided technical indicators.",
+    "input": {
+      "symbol": "SBUX",
+      "score_0_10": 1.7,
+      "weighted_scores": {
+        "w_volsurge": 0.0345,
+        "w_sma50vs200": -0.2071,
+        "w_rsi14": -0.0797,
+        "w_support_resistance": -0.0487,
+        "w_price_vs_sma50": -0.0736,
+        "w_candlestick_patterns": -0.0172,
+        "w_obv20": -0.0715
+      },
+      "components": {}
+    },
+    "output": "**STRONG SELL** - SBUX exhibits severe technical weakness (1.7/10). The SMA 50/200 Crossover shows strong bearish momentum (-0.207), while RSI(14) indicates weak bearish pressure (-0.080). Avoid or exit position.",
+    "metadata": {
+      "recommendation_category": "strong_sell",
+      "has_sentiment": false,
+      "complexity_score": 0.5833333333333334,
+      "created_at": "2025-09-03T10:34:50.464887"
+    }
+  },
+  {
+    "instruction": "Generate a comprehensive investment analysis for AMZN with score 3.8/10 considering neutral sentiment (confidence: 0.61, score: -0.11) based on the provided technical indicators. Integrate sentiment analysis with technical findings.",
+    "input": {
+      "symbol": "AMZN",
+      "score_0_10": 3.8,
+      "weighted_scores": {
+        "w_rel2y": -0.0216,
+        "w_candlestick_patterns": -0.0204,
+        "w_rsi14": 0.0028,
+        "w_volsurge": 0.0313,
+        "w_bbwidth20": 0.0079,
+        "w_bbpos20": -0.0587,
+        "w_obv20": -0.0152
+      },
+      "components": {},
+      "sentiment": {
+        "sentimentScore": -0.113,
+        "sentimentLabel": "neutral",
+        "sentimentConfidence": 0.607,
+        "newsCount": 4,
+        "timestamp": "2025-09-03T10:34:50.464899"
+      }
+    },
+    "output": "**SELL** - AMZN shows concerning technical deterioration (3.8/10). Technical analysis reveals Bollinger Bands Position with weak bearish divergence (-0.059) and Volume Surge showing weak bullish signals (+0.031). Sentiment analysis shows neutral market mood (-0.11) with 61% confidence, contrasts technical indicators.",
+    "metadata": {
+      "recommendation_category": "sell",
+      "has_sentiment": true,
+      "complexity_score": 0.5833333333333334,
+      "created_at": "2025-09-03T10:34:50.464916"
+    }
+  },
+  {
+    "instruction": "Generate a comprehensive investment analysis for INTC with score 3.3/10 considering negative sentiment (confidence: 0.93, score: -0.27) based on the provided technical indicators. Integrate sentiment analysis with technical findings.",
+    "input": {
+      "symbol": "INTC",
+      "score_0_10": 3.3,
+      "weighted_scores": {
+        "w_rel1y": 0.0107,
+        "w_rsi14": -0.0043,
+        "w_obv20": -0.0202,
+        "w_bbpos20": -0.0345,
+        "w_sma50vs200": 0.0409,
+        "w_macd12269": -0.0841,
+        "w_support_resistance": -0.0473,
+        "w_rel2y": -0.0636
+      },
+      "components": {},
+      "sentiment": {
+        "sentimentScore": -0.268,
+        "sentimentLabel": "negative",
+        "sentimentConfidence": 0.928,
+        "newsCount": 6,
+        "timestamp": "2025-09-03T10:34:50.465147"
+      }
+    },
+    "output": "INTC receives a **SELL** rating due to weak technicals (3.3/10). Key technical factors include MACD Histogram at -0.084 showing bearish bias, and Relative Performance 2Y at -0.064 indicating bearish momentum. Market sentiment is negative (confidence: 93%, score: -0.27), which aligns well with the technical outlook. Exit recommended.",
+    "metadata": {
+      "recommendation_category": "sell",
+      "has_sentiment": true,
+      "complexity_score": 0.6666666666666666,
+      "created_at": "2025-09-03T10:34:50.465173"
+    }
+  },
+  {
+    "instruction": "Generate a comprehensive investment analysis for OKE with score 3.3/10 considering negative sentiment (confidence: 0.63, score: -0.61) based on the provided technical indicators. Integrate sentiment analysis with technical findings.",
+    "input": {
+      "symbol": "OKE",
+      "score_0_10": 3.3,
+      "weighted_scores": {
+        "w_rsi14": -0.0982,
+        "w_obv20": 0.0321,
+        "w_rel2y": -0.0409,
+        "w_bbpos20": -0.0322
+      },
+      "components": {},
+      "sentiment": {
+        "sentimentScore": -0.608,
+        "sentimentLabel": "negative",
+        "sentimentConfidence": 0.633,
+        "newsCount": 4,
+        "timestamp": "2025-09-03T10:34:50.465181"
+      }
+    },
+    "output": "**SELL** - OKE shows concerning technical deterioration (3.3/10). Technical analysis reveals RSI(14) with moderate bearish divergence (-0.098) and Relative Performance 2Y showing weak bearish signals (-0.041). Market sentiment is negative (confidence: 63%, score: -0.61), which aligns well with the technical outlook.",
+    "metadata": {
+      "recommendation_category": "sell",
+      "has_sentiment": true,
+      "complexity_score": 0.3333333333333333,
+      "created_at": "2025-09-03T10:34:50.465195"
+    }
+  },
+  {
+    "instruction": "Generate a comprehensive investment analysis for PXD with score 8.3/10 considering positive sentiment (confidence: 0.83, score: +0.58) based on the provided technical indicators. Integrate sentiment analysis with technical findings.",
+    "input": {
+      "symbol": "PXD",
+      "score_0_10": 8.3,
+      "weighted_scores": {
+        "w_volsurge": 0.1378,
+        "w_bbwidth20": 0.0599,
+        "w_rsi14": 0.1086,
+        "w_bbpos20": 0.0873,
+        "w_rel1y": -0.0093,
+        "w_macd12269": 0.0882,
+        "w_obv20": -0.0187,
+        "w_price_vs_sma50": 0.1136
+      },
+      "components": {},
+      "sentiment": {
+        "sentimentScore": 0.579,
+        "sentimentLabel": "positive",
+        "sentimentConfidence": 0.828,
+        "newsCount": 4,
+        "timestamp": "2025-09-03T10:34:50.465206"
+      }
+    },
+    "output": "**STRONG BUY** - PXD shows exceptional technical strength (8.3/10). Key technical factors include Volume Surge at +0.138 showing bullish bias, and Price vs SMA50 at +0.114 indicating bullish momentum. Current positive sentiment (score: +0.58, confidence: 83%) aligns well the technical analysis. Price target: $160.",
+    "metadata": {
+      "recommendation_category": "strong_buy",
+      "has_sentiment": true,
+      "complexity_score": 0.6666666666666666,
+      "created_at": "2025-09-03T10:34:50.465220"
+    }
+  },
+  {
+    "instruction": "Generate a comprehensive investment analysis for TSLA with score 3.5/10 considering negative sentiment (confidence: 0.90, score: -0.52) based on the provided technical indicators. Integrate sentiment analysis with technical findings.",
+    "input": {
+      "symbol": "TSLA",
+      "score_0_10": 3.5,
+      "weighted_scores": {
+        "w_rel1y": 0.0139,
+        "w_rsi14": 0.0153,
+        "w_bbpos20": -0.0116,
+        "w_candlestick_patterns": 0.0135,
+        "w_volsurge": 0.0359,
+        "w_price_vs_sma50": -0.1637,
+        "w_macd12269": 0.0051
+      },
+      "components": {},
+      "sentiment": {
+        "sentimentScore": -0.519,
+        "sentimentLabel": "negative",
+        "sentimentConfidence": 0.903,
+        "newsCount": 4,
+        "timestamp": "2025-09-03T10:34:50.465229"
+      }
+    },
+    "output": "TSLA receives a **SELL** rating due to weak technicals (3.5/10). Key technical factors include Price vs SMA50 at -0.164 showing bearish bias, and Volume Surge at +0.036 indicating bullish momentum. Current negative sentiment (score: -0.52, confidence: 90%) aligns well the technical analysis. Exit recommended.",
+    "metadata": {
+      "recommendation_category": "sell",
+      "has_sentiment": true,
+      "complexity_score": 0.5833333333333334,
+      "created_at": "2025-09-03T10:34:50.465241"
+    }
+  },
+  {
+    "instruction": "Generate a comprehensive investment analysis for ORCL with score 9.3/10 considering positive sentiment (confidence: 0.91, score: +0.76) based on the provided technical indicators. Integrate sentiment analysis with technical findings.",
+    "input": {
+      "symbol": "ORCL",
+      "score_0_10": 9.3,
+      "weighted_scores": {
+        "w_sma50vs200": 0.1552,
+        "w_price_vs_sma50": 0.1376,
+        "w_obv20": -0.0321,
+        "w_volsurge": 0.1098,
+        "w_rel1y": 0.0311
+      },
+      "components": {},
+      "sentiment": {
+        "sentimentScore": 0.755,
+        "sentimentLabel": "positive",
+        "sentimentConfidence": 0.909,
+        "newsCount": 1,
+        "timestamp": "2025-09-03T10:34:50.465248"
+      }
+    },
+    "output": "ORCL receives a **STRONG BUY** rating with a 9.3/10 score. Technical analysis reveals SMA 50/200 Crossover with strong bullish divergence (+0.155) and Price vs SMA50 showing moderate bullish signals (+0.138). Market sentiment is positive (confidence: 91%, score: +0.76), which aligns well with the technical outlook. Entry recommended with stop-loss at $108.",
+    "metadata": {
+      "recommendation_category": "strong_buy",
+      "has_sentiment": true,
+      "complexity_score": 0.4166666666666667,
+      "created_at": "2025-09-03T10:34:50.465264"
+    }
+  },
+  {
+    "instruction": "Generate a comprehensive investment analysis for INTC with score 1.6/10 considering negative sentiment (confidence: 0.89, score: -0.52) based on the provided technical indicators. Integrate sentiment analysis with technical findings.",
+    "input": {
+      "symbol": "INTC",
+      "score_0_10": 1.6,
+      "weighted_scores": {
+        "w_bbwidth20": -0.057,
+        "w_candlestick_patterns": -0.0818,
+        "w_obv20": 0.0245,
+        "w_price_vs_sma50": -0.2153,
+        "w_support_resistance": -0.0573
+      },
+      "components": {},
+      "sentiment": {
+        "sentimentScore": -0.523,
+        "sentimentLabel": "negative",
+        "sentimentConfidence": 0.894,
+        "newsCount": 5,
+        "timestamp": "2025-09-03T10:34:50.465271"
+      }
+    },
+    "output": "**STRONG SELL** - INTC exhibits severe technical weakness (1.6/10). Key technical factors include Price vs SMA50 at -0.215 showing bearish bias, and Candlestick Patterns at -0.082 indicating bearish momentum. Current negative sentiment (score: -0.52, confidence: 89%) aligns well the technical analysis. Avoid or exit position.",
+    "metadata": {
+      "recommendation_category": "strong_sell",
+      "has_sentiment": true,
+      "complexity_score": 0.4166666666666667,
+      "created_at": "2025-09-03T10:34:50.465284"
+    }
+  }
+]

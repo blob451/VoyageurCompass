@@ -605,7 +605,7 @@ class ValidateTokenView(APIView):
         }
     )
     def get(self, request):
-        """Validate JWT token and return user profile information."""
+        """Validate JWT token and return user profile information with Redis caching."""
         try:
             user = request.user
             
@@ -614,6 +614,17 @@ class ValidateTokenView(APIView):
             
             if auth_header and auth_header.startswith('Bearer '):
                 access_token = auth_header.split(' ')[1]
+                
+                # Check Redis cache first for token validation
+                from django.core.cache import cache
+                import hashlib
+                cache_key = f"token_validation:{hashlib.sha256(access_token.encode()).hexdigest()[:16]}"
+                cached_result = cache.get(cache_key)
+                
+                if cached_result:
+                    cached_result['user']['id'] = user.id  # Ensure current user ID
+                    return Response(cached_result)
+                
                 try:
                     import jwt
                     from django.conf import settings
@@ -630,7 +641,7 @@ class ValidateTokenView(APIView):
                 except:
                     pass
             
-            return Response({
+            response_data = {
                 'valid': True,
                 'user': {
                     'id': user.id,
@@ -641,7 +652,13 @@ class ValidateTokenView(APIView):
                     'date_joined': user.date_joined.isoformat()
                 },
                 'token_expires_at': token_expires_at
-            })
+            }
+            
+            # Cache the validation result for 2 minutes
+            if auth_header:
+                cache.set(cache_key, response_data, 120)
+            
+            return Response(response_data)
             
         except Exception as e:
             logger.error(f"Error validating token: {str(e)}")

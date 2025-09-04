@@ -1,0 +1,101 @@
+{
+  "timestamp": "2025-08-17T13:24:10.788196",
+  "model_info": {
+    "model_type": "UniversalLSTM",
+    "device": "cuda",
+    "model_dir": "Data/ml_models/universal_lstm",
+    "sequence_length": 60,
+    "sectors_supported": 11,
+    "industries_supported": 50,
+    "cache_ttl": 300,
+    "prediction_enabled": true,
+    "model_version": "4.0.0",
+    "saved_at": "2025-08-17T12:48:17.767920",
+    "training_stocks": 114,
+    "model_config": {
+      "input_size": 24,
+      "sector_embedding_dim": 12,
+      "industry_embedding_dim": 6,
+      "hidden_size": 128,
+      "num_layers": 3,
+      "sequence_length": 60,
+      "num_sectors": 11,
+      "num_industries": 50,
+      "use_cross_attention": false,
+      "multi_task_output": true
+    },
+    "version": "4.0.0",
+    "input_size": 24,
+    "sector_embedding_dim": 12,
+    "industry_embedding_dim": 6,
+    "hidden_size": 128,
+    "num_layers": 3,
+    "num_sectors": 11,
+    "num_industries": 50,
+    "use_cross_attention": false,
+    "multi_task_output": true,
+    "total_params": 1034037,
+    "trainable_params": 1034037,
+    "created_at": "2025-08-17T13:24:10.598047"
+  },
+  "validation_results": {
+    "performance": {
+      "test_type": "performance_benchmark",
+      "sample_size": 5,
+      "latency_metrics": {
+        "avg_latency_ms": 32.33284950256348,
+        "max_latency_ms": 108.69169235229492,
+        "min_latency_ms": 11.834859848022461,
+        "success_rate": 1.0
+      },
+      "model_metrics": {
+        "total_parameters": 1034037,
+        "model_size_mb": 3.944538116455078,
+        "sequence_length": 50,
+        "device": "cuda"
+      },
+      "prediction_quality": {
+        "avg_confidence": 0.85,
+        "avg_price_change_magnitude": 100.00051022181485,
+        "sectors_covered": 5
+      },
+      "detailed_tests": [
+        {
+          "symbol": "AAPL",
+          "latency_ms": 108.69169235229492,
+          "success": true
+        },
+        {
+          "symbol": "JNJ",
+          "latency_ms": 13.85188102722168,
+          "success": true
+        },
+        {
+          "symbol": "JPM",
+          "latency_ms": 14.87421989440918,
+          "success": true
+        },
+        {
+          "symbol": "XOM",
+          "latency_ms": 12.41159439086914,
+          "success": true
+        },
+        {
+          "symbol": "HD",
+          "latency_ms": 11.834859848022461,
+          "success": true
+        }
+      ]
+    }
+  },
+  "summary": {
+    "timestamp": "2025-08-17T13:24:10.788286",
+    "tests_completed": [
+      "performance"
+    ],
+    "overall_assessment": "EXCELLENT",
+    "avg_latency_ms": 32.33284950256348,
+    "model_parameters": 1034037,
+    "prediction_success_rate": 1.0
+  }
+}

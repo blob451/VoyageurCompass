@@ -64,9 +64,9 @@ const StockSearchPage = () => {
   const [confirmDialog, setConfirmDialog] = useState(false);
   const [userCredits] = useState(25); // Mock credit balance
   
-  // AI Explanation controls
-  const [includeExplanation, setIncludeExplanation] = useState(false);
-  const [explanationDetail, setExplanationDetail] = useState('standard');
+  // AI Explanation controls - automatically generate Summary explanations
+  const includeExplanation = true;
+  const explanationDetail = 'summary';
   
   // Proper state machine for analysis flow
   const [analysisMode, setAnalysisMode] = useState('none'); // 'none' | 'manual' | 'auto'
@@ -392,37 +392,8 @@ const StockSearchPage = () => {
                 />
               </Box>
               
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={includeExplanation}
-                      onChange={(e) => setIncludeExplanation(e.target.checked)}
-                      disabled={analysisPhase === 'analyzing' || analysisPhase === 'syncing'}
-                    />
-                  }
-                  label="Generate AI explanations"
-                />
-                
-                {includeExplanation && (
-                  <FormControl size="small" sx={{ minWidth: 120 }}>
-                    <InputLabel>Detail Level</InputLabel>
-                    <Select
-                      value={explanationDetail}
-                      label="Detail Level"
-                      onChange={(e) => setExplanationDetail(e.target.value)}
-                      disabled={analysisPhase === 'analyzing' || analysisPhase === 'syncing'}
-                    >
-                      <MenuItem value="summary">Summary</MenuItem>
-                      <MenuItem value="standard">Standard</MenuItem>
-                      <MenuItem value="detailed">Detailed</MenuItem>
-                    </Select>
-                  </FormControl>
-                )}
-              </Box>
-              
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                Get natural language explanations of technical analysis and sentiment results
+                🤖 Summary AI explanations will be automatically generated to help you understand your analysis results
               </Typography>
             </Box>
             

@@ -7,7 +7,7 @@ const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const baseQuery = fetchBaseQuery({
   baseUrl: apiUrl,
   // Remove credentials: 'include' since JWT doesn't need cookies and it causes CORS issues
-  timeout: 90000, // 90 second timeout for analysis operations that may take longer
+  timeout: 180000, // 180 second timeout for analysis operations that may take longer (includes auto-sync, FinBERT, and LLM)
   prepareHeaders: (headers, { getState }) => {
     const token = getState().auth.token;
     if (token) {
@@ -170,8 +170,14 @@ export const apiSlice = createApi({
       invalidatesTags: (result, error, { analysisId }) => [{ type: 'Analysis', id: analysisId }],
     }),
     getExplanation: builder.query({
-      query: (analysisId) => `/analytics/explanation/${analysisId}/`,
-      providesTags: (result, error, analysisId) => [{ type: 'Analysis', id: `explanation-${analysisId}` }],
+      query: ({ analysisId, detailLevel }) => ({
+        url: `/analytics/explanation/${analysisId}/`,
+        params: detailLevel ? { detail_level: detailLevel } : {},
+      }),
+      providesTags: (result, error, { analysisId, detailLevel }) => [
+        { type: 'Analysis', id: `explanation-${analysisId}` },
+        { type: 'Analysis', id: `explanation-${analysisId}-${detailLevel || 'default'}` }
+      ],
     }),
     getExplanationStatus: builder.query({
       query: () => `/analytics/explanation-status/`,

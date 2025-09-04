@@ -1,6 +1,7 @@
 """
 Tests for Analytics Dynamic Predictor.
 Validates real-time prediction updates, adaptive algorithms, and dynamic model selection.
+Uses real functionality without mocks.
 """
 
 from django.test import TestCase, TransactionTestCase
@@ -8,7 +9,6 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import datetime, timedelta
 from decimal import Decimal
-from unittest.mock import patch
 import numpy as np
 import pandas as pd
 

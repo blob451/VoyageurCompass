@@ -56,12 +56,6 @@ class RequestLoggingMiddleware(MiddlewareMixin):
         self.logger = logging.getLogger('VoyageurCompass.requests')
 
     def process_request(self, request):
-        # Debug logging for all incoming requests
-        import sys
-        print(f"*** MIDDLEWARE: REQUEST {request.method} {request.path} ***", flush=True)
-        sys.stderr.write(f"STDERR: REQUEST {request.method} {request.path}\n")
-        sys.stderr.flush()
-        
         # Honour incoming request ID for distributed tracing
         incoming = request.headers.get('X-Request-Id') or request.headers.get('X-Correlation-Id')
         request.correlation_id = incoming or str(uuid.uuid4())

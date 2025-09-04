@@ -66,17 +66,36 @@ class BlacklistCheckMiddleware:
             token = auth_header.split(' ')[1]
             
             try:
-                from Core.models import BlacklistedToken
-                if BlacklistedToken.is_token_blacklisted(token):
-                    from django.http import JsonResponse
-                    return JsonResponse(
-                        {'detail': 'Token has been blacklisted'}, 
-                        status=401
-                    )
+                from django.core.cache import cache
+                import hashlib
+                
+                # Check Redis cache first (60-second cache)
+                cache_key = f"blacklist_check:{hashlib.sha256(token.encode()).hexdigest()[:16]}"
+                cached_result = cache.get(cache_key)
+                
+                if cached_result is not None:
+                    if cached_result:  # Token is blacklisted
+                        from django.http import JsonResponse
+                        return JsonResponse(
+                            {'detail': 'Token has been blacklisted'}, 
+                            status=401
+                        )
+                    # Token is not blacklisted (cached as False), continue
+                else:
+                    # Check database and cache result
+                    from Core.models import BlacklistedToken
+                    is_blacklisted = BlacklistedToken.is_token_blacklisted(token)
+                    cache.set(cache_key, is_blacklisted, 60)  # Cache for 60 seconds
+                    
+                    if is_blacklisted:
+                        from django.http import JsonResponse
+                        return JsonResponse(
+                            {'detail': 'Token has been blacklisted'}, 
+                            status=401
+                        )
+                        
             except Exception as e:
                 # Log the error but don't block the request if blacklist check fails
-                print(f"[MIDDLEWARE ERROR] BlacklistCheckMiddleware error: {e}")
-                print(f"[MIDDLEWARE ERROR] Request path: {request.path}")
                 logger.error(f"Error checking blacklisted token: {e}")
                 # Allow request to continue if blacklist check fails (graceful degradation)
                 pass

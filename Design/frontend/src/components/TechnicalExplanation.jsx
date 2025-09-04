@@ -40,15 +40,17 @@ const TechnicalExplanation = ({
   analysisData,
   defaultExpanded = true 
 }) => {
+  const [currentDetailLevel, setCurrentDetailLevel] = React.useState('summary');
   const [generateExplanation, { isLoading: isGenerating }] = useGenerateExplanationMutation();
   const { 
     data: explanation, 
     error: explanationError, 
     isLoading: isLoadingExplanation,
     refetch: refetchExplanation 
-  } = useGetExplanationQuery(analysisId, {
-    skip: !analysisId
-  });
+  } = useGetExplanationQuery(
+    { analysisId, detailLevel: currentDetailLevel }, 
+    { skip: !analysisId }
+  );
 
   if (!analysisData) {
     return null;
@@ -135,6 +137,7 @@ const TechnicalExplanation = ({
         success: true
       });
       
+      // Refetch to get the newly generated explanation
       refetchExplanation();
     } catch (error) {
       const duration = performance.now() - startTime;
@@ -151,7 +154,21 @@ const TechnicalExplanation = ({
   };
 
   const handleRefreshExplanation = async (detailLevel) => {
-    await handleGenerateExplanation(detailLevel);
+    // Update detail level first
+    setCurrentDetailLevel(detailLevel);
+    
+    // Force refetch to see if explanation exists for this detail level
+    const result = await refetchExplanation();
+    
+    // If no explanation exists for this detail level, generate it
+    if (!result?.data?.explanation?.content) {
+      explanationLogger.workflow(analysisId, 'No explanation found for detail level, generating new one', {
+        symbol,
+        detailLevel,
+        score
+      });
+      await handleGenerateExplanation(detailLevel);
+    }
   };
 
   const technicalExplanation = explanation?.explanation;
@@ -168,6 +185,7 @@ const TechnicalExplanation = ({
       onGenerate={handleGenerateExplanation}
       onRefresh={handleRefreshExplanation}
       defaultExpanded={defaultExpanded}
+      variant={currentDetailLevel}
       confidence={technicalExplanation?.confidence}
       method={technicalExplanation?.method}
       timestamp={technicalExplanation?.explained_at}

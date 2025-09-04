@@ -528,7 +528,7 @@ const AnalysisResultsPage = () => {
           
           {/* Service Status Indicator */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {explanationStatus?.llm_available ? (
+            {explanationStatus?.status?.llm_available ? (
               <Chip 
                 label="LLaMA 3.1 70B Online" 
                 color="success" 
@@ -555,7 +555,7 @@ const AnalysisResultsPage = () => {
         
         <Typography variant="body2" color="text.secondary" paragraph>
           Get natural language explanations powered by LLaMA 3.1 70B to better understand your analysis results.
-          {!explanationStatus?.llm_available && (
+          {!explanationStatus?.status?.llm_available && (
             <Typography component="span" color="warning.main" sx={{ ml: 1 }}>
               LLM service unavailable - using template explanations.
             </Typography>

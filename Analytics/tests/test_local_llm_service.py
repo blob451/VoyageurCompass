@@ -29,8 +29,8 @@ class RealLocalLLMServiceTestCase(TestCase):
         # Test stock for realistic data
         self.test_stock = Stock.objects.create(
             symbol='TEST',
-            name='Test Corporation',
-            sector='Technology',
+            short_name='Test Corporation',
+            long_name='Test Corporation Ltd.',
             exchange='NASDAQ'
         )
         
@@ -258,33 +258,33 @@ class RealLocalLLMServiceTestCase(TestCase):
         service = LocalLLMService()
         
         # Test options for both models
-        options_8b = service._get_generation_options('standard', 'llama3.1:8b')
-        options_70b = service._get_generation_options('standard', 'llama3.1:70b')
+        options_8b = service._get_optimized_generation_options('standard', 'llama3.1:8b')
+        options_70b = service._get_optimized_generation_options('standard', 'llama3.1:70b')
         
         # Verify basic structure
         self.assertIn('temperature', options_8b)
         self.assertIn('num_predict', options_8b)
         self.assertIn('num_ctx', options_8b)
         
-        # 8B model should have smaller context
-        self.assertEqual(options_8b['num_ctx'], 1024)
-        self.assertEqual(options_70b['num_ctx'], 2048)
+        # 8B model should have smaller context (optimized values)
+        self.assertEqual(options_8b['num_ctx'], 512)
+        self.assertEqual(options_70b['num_ctx'], 1024)
         
-        # Verify temperature differences
-        self.assertEqual(options_8b['temperature'], 0.6)
-        self.assertEqual(options_70b['temperature'], 0.4)
+        # Verify temperature differences (optimized values)
+        self.assertEqual(options_8b['temperature'], 0.4)
+        self.assertEqual(options_70b['temperature'], 0.2)
     
     def test_max_tokens_by_detail_level(self):
         """Test token limits for different detail levels."""
         service = LocalLLMService()
         
-        tokens_summary = service._get_max_tokens('summary')
-        tokens_standard = service._get_max_tokens('standard')
-        tokens_detailed = service._get_max_tokens('detailed')
+        tokens_summary = service._get_optimized_tokens('summary')
+        tokens_standard = service._get_optimized_tokens('standard')
+        tokens_detailed = service._get_optimized_tokens('detailed')
         
-        self.assertEqual(tokens_summary, 75)
-        self.assertEqual(tokens_standard, 150)
-        self.assertEqual(tokens_detailed, 250)
+        self.assertEqual(tokens_summary, 50)
+        self.assertEqual(tokens_standard, 100)
+        self.assertEqual(tokens_detailed, 175)
         
         # Verify ordering
         self.assertLess(tokens_summary, tokens_standard)
@@ -489,8 +489,8 @@ class RealLocalLLMServiceIntegrationTestCase(TestCase):
         # Create realistic stock and price data
         self.aapl_stock = Stock.objects.create(
             symbol='AAPL',
-            name='Apple Inc.',
-            sector='Technology',
+            short_name='Apple Inc.',
+            long_name='Apple Inc. Corporation',
             exchange='NASDAQ'
         )
         

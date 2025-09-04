@@ -52,7 +52,7 @@ const SessionWarningDialog = ({
     <Dialog
       open={open}
       disableEscapeKeyDown
-      disableBackdropClick
+      onClose={() => {}} // Prevents backdrop click closing
       maxWidth="sm"
       fullWidth
       PaperProps={{

@@ -1,0 +1,28 @@
+{
+  "total_samples": 8008,
+  "generation_date": "2025-09-03T11:13:20.420286",
+  "format": "jsonl",
+  "split": true,
+  "categories": [
+    "strong_buy",
+    "buy",
+    "hold",
+    "sell",
+    "strong_sell"
+  ],
+  "indicators": [
+    "w_sma50vs200",
+    "w_price_vs_sma50",
+    "w_rsi14",
+    "w_macd12269",
+    "w_bbpos20",
+    "w_bbwidth20",
+    "w_volsurge",
+    "w_obv20",
+    "w_rel1y",
+    "w_rel2y",
+    "w_support_resistance",
+    "w_candlestick_patterns"
+  ],
+  "description": "Financial instruction dataset for LLM fine-tuning on investment analysis"
+}

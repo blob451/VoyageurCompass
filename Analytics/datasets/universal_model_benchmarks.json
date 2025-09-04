@@ -1,0 +1,395 @@
+{
+  "timestamp": "2025-08-17T14:00:30.410040",
+  "model_info": {
+    "model_type": "UniversalLSTM",
+    "device": "cuda",
+    "model_dir": "Data/ml_models/universal_lstm",
+    "sequence_length": 60,
+    "sectors_supported": 11,
+    "industries_supported": 50,
+    "cache_ttl": 300,
+    "prediction_enabled": true,
+    "model_version": "4.0.0",
+    "saved_at": "2025-08-17T13:46:35.409347",
+    "training_stocks": 114,
+    "model_config": {
+      "input_size": 24,
+      "sector_embedding_dim": 12,
+      "industry_embedding_dim": 6,
+      "hidden_size": 128,
+      "num_layers": 3,
+      "sequence_length": 60,
+      "num_sectors": 11,
+      "num_industries": 50,
+      "use_cross_attention": false,
+      "multi_task_output": true
+    },
+    "version": "4.0.0",
+    "input_size": 24,
+    "sector_embedding_dim": 12,
+    "industry_embedding_dim": 6,
+    "hidden_size": 128,
+    "num_layers": 3,
+    "num_sectors": 11,
+    "num_industries": 50,
+    "use_cross_attention": false,
+    "multi_task_output": true,
+    "total_params": 1034037,
+    "trainable_params": 1034037,
+    "created_at": "2025-08-17T14:00:29.946876"
+  },
+  "benchmark_config": {
+    "sample_size": 5,
+    "iterations": 2,
+    "concurrent_threads": 4,
+    "target_latency_ms": 100.0
+  },
+  "benchmark_results": {
+    "speed": {
+      "total_predictions": 10,
+      "successful_predictions": 10,
+      "failed_predictions": 0,
+      "success_rate": 1.0,
+      "latency_stats": {
+        "mean_ms": 20.93854999402538,
+        "median_ms": 12.515150010585785,
+        "min_ms": 11.14620000589639,
+        "max_ms": 96.12339996965602,
+        "std_ms": 25.074977512550173,
+        "p95_ms": 59.28891997318706,
+        "p99_ms": 88.75650397036226
+      },
+      "target_compliance": {
+        "target_latency_ms": 100.0,
+        "predictions_under_target": 10,
+        "compliance_rate": 1.0
+      },
+      "detailed_results": [
+        {
+          "stock": "AAPL",
+          "iteration": 0,
+          "latency_ms": 96.12339996965602,
+          "success": true
+        },
+        {
+          "stock": "ABT",
+          "iteration": 0,
+          "latency_ms": 12.394099961966276,
+          "success": true
+        },
+        {
+          "stock": "ADBE",
+          "iteration": 0,
+          "latency_ms": 12.504999991506338,
+          "success": true
+        },
+        {
+          "stock": "AEP",
+          "iteration": 0,
+          "latency_ms": 12.525300029665232,
+          "success": true
+        },
+        {
+          "stock": "AIG",
+          "iteration": 0,
+          "latency_ms": 12.223900004755706,
+          "success": true
+        },
+        {
+          "stock": "AAPL",
+          "iteration": 1,
+          "latency_ms": 14.268999977502972,
+          "success": true
+        },
+        {
+          "stock": "ABT",
+          "iteration": 1,
+          "latency_ms": 13.545299996621907,
+          "success": true
+        },
+        {
+          "stock": "ADBE",
+          "iteration": 1,
+          "latency_ms": 11.797400016803294,
+          "success": true
+        },
+        {
+          "stock": "AEP",
+          "iteration": 1,
+          "latency_ms": 11.14620000589639,
+          "success": true
+        },
+        {
+          "stock": "AIG",
+          "iteration": 1,
+          "latency_ms": 12.85589998587966,
+          "success": true
+        }
+      ]
+    },
+    "memory": {
+      "baseline_memory_mb": 861.89453125,
+      "model_memory_mb": 3.944538116455078,
+      "model_parameters": 1034037,
+      "peak_memory_mb": 861.953125,
+      "memory_efficiency": {
+        "avg_memory_delta_mb": 0.01015625,
+        "max_memory_delta_mb": 0.01953125,
+        "min_memory_delta_mb": 0.0
+      },
+      "memory_per_parameter_bytes": 4.0,
+      "detailed_measurements": [
+        {
+          "stock": "AAPL",
+          "memory_before_mb": 861.90234375,
+          "memory_after_mb": 861.91015625,
+          "memory_delta_mb": 0.0078125,
+          "success": true
+        },
+        {
+          "stock": "ABT",
+          "memory_before_mb": 861.91015625,
+          "memory_after_mb": 861.91015625,
+          "memory_delta_mb": 0.0,
+          "success": true
+        },
+        {
+          "stock": "ADBE",
+          "memory_before_mb": 861.91015625,
+          "memory_after_mb": 861.9296875,
+          "memory_delta_mb": 0.01953125,
+          "success": true
+        },
+        {
+          "stock": "AEP",
+          "memory_before_mb": 861.9296875,
+          "memory_after_mb": 861.9375,
+          "memory_delta_mb": 0.0078125,
+          "success": true
+        },
+        {
+          "stock": "AIG",
+          "memory_before_mb": 861.9375,
+          "memory_after_mb": 861.953125,
+          "memory_delta_mb": 0.015625,
+          "success": true
+        }
+      ]
+    },
+    "throughput": {
+      "concurrent_threads": 4,
+      "total_predictions": 5,
+      "successful_predictions": 5,
+      "total_time_seconds": 0.07138430001214147,
+      "throughput_metrics": {
+        "predictions_per_second": 70.04341289540656,
+        "successful_predictions_per_second": 70.04341289540656,
+        "avg_concurrent_latency_ms": 52.513820002786815,
+        "max_concurrent_latency_ms": 67.99840001622215
+      },
+      "thread_distribution": {
+        "77992": {
+          "total_predictions": 2,
+          "successful_predictions": 2,
+          "latencies": [
+            34.67789996648207,
+            31.283800024539232
+          ],
+          "avg_latency_ms": 32.98084999551065
+        },
+        "73740": {
+          "total_predictions": 1,
+          "successful_predictions": 1,
+          "latencies": [
+            61.764500045683235
+          ],
+          "avg_latency_ms": 61.764500045683235
+        },
+        "78480": {
+          "total_predictions": 1,
+          "successful_predictions": 1,
+          "latencies": [
+            66.84449996100739
+          ],
+          "avg_latency_ms": 66.84449996100739
+        },
+        "45720": {
+          "total_predictions": 1,
+          "successful_predictions": 1,
+          "latencies": [
+            67.99840001622215
+          ],
+          "avg_latency_ms": 67.99840001622215
+        }
+      },
+      "detailed_results": [
+        {
+          "stock": "AEP",
+          "latency_ms": 34.67789996648207,
+          "success": true,
+          "thread_id": 77992
+        },
+        {
+          "stock": "AAPL",
+          "latency_ms": 61.764500045683235,
+          "success": true,
+          "thread_id": 73740
+        },
+        {
+          "stock": "AIG",
+          "latency_ms": 31.283800024539232,
+          "success": true,
+          "thread_id": 77992
+        },
+        {
+          "stock": "ADBE",
+          "latency_ms": 66.84449996100739,
+          "success": true,
+          "thread_id": 78480
+        },
+        {
+          "stock": "ABT",
+          "latency_ms": 67.99840001622215,
+          "success": true,
+          "thread_id": 45720
+        }
+      ]
+    },
+    "accuracy": {
+      "total_predictions": 5,
+      "successful_predictions": 5,
+      "realistic_predictions": 5,
+      "success_rate": 1.0,
+      "realistic_rate": 1.0,
+      "confidence_stats": {
+        "mean_confidence": 0.85,
+        "min_confidence": 0.85,
+        "max_confidence": 0.85,
+        "std_confidence": 0.0
+      },
+      "prediction_stats": {
+        "mean_abs_price_change": 0.04412363876286969,
+        "median_abs_price_change": 0.044123638762868525,
+        "max_abs_price_change": 0.044123638762879315,
+        "predictions_with_variation": 5
+      },
+      "sector_distribution": {
+        "Technology": {
+          "count": 2,
+          "confidences": [
+            0.85,
+            0.85
+          ],
+          "price_changes": [
+            0.0441236387628726,
+            0.044123638762868525
+          ],
+          "avg_confidence": 0.85,
+          "avg_price_change": 0.044123638762870565
+        },
+        "Healthcare": {
+          "count": 1,
+          "confidences": [
+            0.85
+          ],
+          "price_changes": [
+            0.04412363876286152
+          ],
+          "avg_confidence": 0.85,
+          "avg_price_change": 0.04412363876286152
+        },
+        "Utilities": {
+          "count": 1,
+          "confidences": [
+            0.85
+          ],
+          "price_changes": [
+            0.0441236387628665
+          ],
+          "avg_confidence": 0.85,
+          "avg_price_change": 0.0441236387628665
+        },
+        "Financial Services": {
+          "count": 1,
+          "confidences": [
+            0.85
+          ],
+          "price_changes": [
+            0.044123638762879315
+          ],
+          "avg_confidence": 0.85,
+          "avg_price_change": 0.044123638762879315
+        }
+      },
+      "detailed_predictions": [
+        {
+          "stock": "AAPL",
+          "predicted_price": 231.69218593501094,
+          "current_price": 231.59,
+          "price_change_pct": 0.0441236387628726,
+          "confidence": 0.85,
+          "sector": "Technology",
+          "success": true
+        },
+        {
+          "stock": "ABT",
+          "predicted_price": 131.80813289407007,
+          "current_price": 131.75,
+          "price_change_pct": 0.04412363876286152,
+          "confidence": 0.85,
+          "sector": "Healthcare",
+          "success": true
+        },
+        {
+          "stock": "ADBE",
+          "predicted_price": 355.00657273215006,
+          "current_price": 354.85,
+          "price_change_pct": 0.044123638762868525,
+          "confidence": 0.85,
+          "sector": "Technology",
+          "success": true
+        },
+        {
+          "stock": "AEP",
+          "predicted_price": 112.03941406305053,
+          "current_price": 111.99,
+          "price_change_pct": 0.0441236387628665,
+          "confidence": 0.85,
+          "sector": "Utilities",
+          "success": true
+        },
+        {
+          "stock": "AIG",
+          "predicted_price": 80.04530332337418,
+          "current_price": 80.01,
+          "price_change_pct": 0.044123638762879315,
+          "confidence": 0.85,
+          "sector": "Financial Services",
+          "success": true
+        }
+      ]
+    }
+  },
+  "summary": {
+    "timestamp": "2025-08-17T14:00:30.410214",
+    "benchmarks_completed": [
+      "speed",
+      "memory",
+      "throughput",
+      "accuracy"
+    ],
+    "overall_performance": "GOOD",
+    "avg_latency_ms": 20.93854999402538,
+    "p95_latency_ms": 59.28891997318706,
+    "speed_compliance_rate": 1.0,
+    "meets_latency_target": "True",
+    "model_memory_mb": 3.944538116455078,
+    "model_parameters": 1034037,
+    "peak_memory_mb": 861.953125,
+    "predictions_per_second": 70.04341289540656,
+    "concurrent_latency_ms": 52.513820002786815,
+    "prediction_success_rate": 1.0,
+    "realistic_prediction_rate": 1.0,
+    "avg_confidence": 0.85
+  }
+}

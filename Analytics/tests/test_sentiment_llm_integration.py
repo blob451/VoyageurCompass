@@ -9,7 +9,6 @@ from django.core.cache import cache
 from django.utils import timezone
 from datetime import datetime, timedelta
 from decimal import Decimal
-from unittest.mock import patch
 # Real functionality testing - minimal mocks for external services
 import json
 
@@ -107,53 +106,32 @@ class SentimentLLMIntegrationTestCase(TransactionTestCase):
             )
     
     def test_sentiment_analysis_in_ta_engine_integration(self):
-        """Test sentiment analysis integration within the TA engine."""
-        # Mock the sentiment analyzer to return predictable results
-        with patch.object(self.sentiment_service, 'analyzeSentimentBatch') as mock_batch:
-            mock_batch.return_value = [
-                {
-                    'sentimentScore': 0.65,
-                    'sentimentLabel': 'positive',
-                    'sentimentConfidence': 0.82,
-                    'timestamp': timezone.now().isoformat()
-                }
-            ]
-            
-            with patch.object(self.sentiment_service, 'aggregateSentiment') as mock_agg:
-                mock_agg.return_value = {
-                    'sentimentScore': 0.65,
-                    'sentimentLabel': 'positive',
-                    'sentimentConfidence': 0.82,
-                    'distribution': {'positive': 8, 'neutral': 2, 'negative': 0},
-                    'totalArticles': 10
-                }
-                
-                # Mock news fetching to return sample data
-                with patch('Data.services.yahoo_finance.yahoo_finance_service.fetchNewsForStock') as mock_news:
-                    mock_news.return_value = [
-                        {
-                            'title': 'Strong quarterly results show growth',
-                            'summary': 'Company reports record revenue and profit margins',
-                            'publishedDate': timezone.now().isoformat(),
-                            'source': 'Financial News'
-                        }
-                    ]
-                    
-                    # Run full TA analysis
-                    result = self.ta_engine.analyze_stock('INTEG_TEST')
-                    
-                    # Verify sentiment was integrated
-                    self.assertIsNotNone(result)
-                    self.assertEqual(result['symbol'], 'INTEG_TEST')
-                    self.assertIn('indicators', result)
-                    
-                    # Check if sentiment indicator is present (may be None if no news)
-                    if 'sentiment' in result['indicators']:
-                        sentiment_result = result['indicators']['sentiment']
-                        if sentiment_result is not None:
-                            self.assertEqual(sentiment_result.weight, 0.10)  # 10% weight
-                            self.assertGreaterEqual(sentiment_result.score, 0)
-                            self.assertLessEqual(sentiment_result.score, 1)
+        """Test sentiment analysis integration within the TA engine using real functionality."""
+        # Run TA analysis with real sentiment integration
+        result = self.ta_engine.analyze_stock('INTEG_TEST')
+        
+        # Verify basic TA result structure
+        self.assertIsNotNone(result)
+        self.assertEqual(result['symbol'], 'INTEG_TEST')
+        self.assertIn('indicators', result)
+        self.assertIn('score_0_10', result)
+        
+        # Check sentiment integration (may not be present if no news available)
+        if 'sentiment' in result['indicators']:
+            sentiment_result = result['indicators']['sentiment']
+            if sentiment_result is not None:
+                # Test that sentiment has proper structure
+                self.assertEqual(sentiment_result.weight, 0.10)  # 10% weight for sentiment
+                self.assertGreaterEqual(sentiment_result.score, 0)
+                self.assertLessEqual(sentiment_result.score, 1)
+                self.assertIsNotNone(sentiment_result.raw)
+        
+        # Test that TA engine handles missing sentiment gracefully
+        sentiment_calculation = self.ta_engine._calculate_sentiment_analysis('INTEG_TEST')
+        # Result may be None if no news is available - this is expected behavior
+        if sentiment_calculation is not None:
+            from Analytics.engine.ta_engine import IndicatorResult
+            self.assertIsInstance(sentiment_calculation, IndicatorResult)
     
     def test_llm_explanation_with_sentiment_data(self):
         """Test LLM explanation generation incorporating sentiment analysis results."""
@@ -183,38 +161,30 @@ class SentimentLLMIntegrationTestCase(TransactionTestCase):
             }
         }
         
-        # Mock LLM service response
-        mock_llm_response = {
-            'response': 'INTEG_TEST shows strong bullish sentiment with positive news sentiment (0.65) based on 10 recent articles. Technical indicators support this with moving average crossover and RSI at 58. Combined score of 7.8/10 suggests BUY recommendation.',
-            'done': True,
-            'total_duration': 3000000000,
-            'prompt_eval_count': 180,
-            'eval_count': 55
-        }
         
         # Test explanation service with sentiment data using real service
-        try:
-            explanation = self.explanation_service._generate_template_explanation(
-                analysis_data, 'detailed'
-            )
-            
-            # Verify explanation was generated or service handled gracefully
-            if explanation is not None:
-                self.assertIn('content', explanation)
-            else:
-                print("LLM service unavailable - handled gracefully")
-        except Exception as e:
-            print(f"LLM service integration handled gracefully: {e}")
-            
-            # Verify sentiment is mentioned in explanation
-            content = explanation['content'].lower()
-            self.assertTrue(any(word in content for word in ['sentiment', 'news', 'positive']))
-            
-            # Check explanation structure
-            self.assertIn('recommendation', explanation)
-            self.assertEqual(explanation['recommendation'], 'BUY')
-            self.assertIn('indicators_explained', explanation)
-            self.assertIn('sentiment', explanation['indicators_explained'])
+        explanation = self.explanation_service._generate_template_explanation(
+            analysis_data, 'detailed'
+        )
+        
+        # Verify explanation was generated (uses template fallback if LLM unavailable)
+        self.assertIsNotNone(explanation)
+        self.assertIn('content', explanation)
+        self.assertIn('recommendation', explanation)
+        self.assertIn('model_used', explanation)
+        
+        # Check that sentiment data is incorporated
+        content = explanation['content']
+        self.assertIn('INTEG_TEST', content)
+        self.assertIn('7.8', content)  # Score should be mentioned
+        
+        # Verify recommendation logic
+        self.assertEqual(explanation['recommendation'], 'BUY')  # 7.8/10 should be BUY
+        
+        # Check explanation metadata
+        self.assertIn('indicators_explained', explanation)
+        self.assertIn('confidence_score', explanation)
+        self.assertGreater(explanation['confidence_score'], 0.5)
     
     def test_end_to_end_sentiment_llm_pipeline(self):
         """Test complete pipeline from TA analysis through sentiment to LLM explanation."""
@@ -308,8 +278,8 @@ class SentimentLLMIntegrationTestCase(TransactionTestCase):
         cached_result = self.sentiment_service.getCachedSentiment(cache_key, 'INTEG_TEST')
         self.assertIsNone(cached_result)
         
-        # Mock sentiment calculation
-        mock_result = {
+        # Create test sentiment result
+        test_result = {
             'sentimentScore': 0.6,
             'sentimentLabel': 'positive',
             'sentimentConfidence': 0.8,
@@ -317,67 +287,67 @@ class SentimentLLMIntegrationTestCase(TransactionTestCase):
             'articles_analyzed': 5
         }
         
-        # Store in cache
-        success = self.sentiment_service.setCachedSentiment(cache_key, mock_result, 'INTEG_TEST')
+        # Store in cache using real cache operations
+        success = self.sentiment_service.setCachedSentiment(cache_key, test_result, 'INTEG_TEST')
         self.assertTrue(success)
         
-        # Retrieve from cache
+        # Retrieve from cache using real cache operations
         cached_result = self.sentiment_service.getCachedSentiment(cache_key, 'INTEG_TEST')
         if cached_result is not None:
             self.assertEqual(cached_result['sentimentScore'], 0.6)
+            self.assertEqual(cached_result['sentimentLabel'], 'positive')
             self.assertTrue(cached_result['cached'])  # Should indicate it came from cache
-        else:
-            print("Cache service unavailable - handled gracefully")
         
-        # Verify cache integration works in TA engine
-        with patch('Data.services.yahoo_finance.yahoo_finance_service.fetchNewsForStock') as mock_news:
-            mock_news.return_value = []  # No news, should use cached sentiment
-            
-            # This should use the cached sentiment instead of fetching new
-            result = self.ta_engine._calculate_sentiment_analysis('INTEG_TEST')
-            
-            # Result may be None if sentiment service is unavailable
-            # This test validates the caching mechanism exists and handles unavailability
-            if result is not None:
-                # Verify the result is an IndicatorResult object (real functionality)
-                self.assertTrue(hasattr(result, 'score'))
-                self.assertTrue(hasattr(result, 'raw'))
-                print(f"Sentiment caching integration working: {result}")
-            else:
-                print("Sentiment analysis unavailable - caching mechanism validated")
+        # Test that TA engine sentiment calculation works with cache
+        result = self.ta_engine._calculate_sentiment_analysis('INTEG_TEST')
+        
+        # Result may be None if no news is available - this is expected behavior
+        if result is not None:
+            from Analytics.engine.ta_engine import IndicatorResult
+            self.assertIsInstance(result, IndicatorResult)
+            self.assertEqual(result.weight, 0.10)  # 10% weight for sentiment
+            self.assertIsNotNone(result.raw)
     
     def test_llm_service_availability_fallback(self):
         """Test graceful fallback when LLM service is unavailable."""
-        # Test graceful fallback when LLM service is unavailable
         analysis_data = {
             'symbol': 'FALLBACK_TEST',
             'score_0_10': 6.5,
-            'weighted_scores': {'sentimentScore': 0.5},
+            'weighted_scores': {
+                'w_sentiment': 0.08,
+                'sentimentScore': 0.5
+            },
             'components': {
                 'sentiment': {
-                    'raw': {'label': 'neutral', 'score': 0.0},
+                    'raw': {'label': 'neutral', 'score': 0.0, 'confidence': 0.6},
                     'score': 0.5
                 }
             }
         }
         
-        # Test template-based explanation as fallback
-        try:
-            explanation = self.explanation_service._generate_template_explanation(
-                analysis_data, 'standard'
-            )
-            
-            if explanation is not None:
-                self.assertIn('content', explanation)
-                self.assertIn('recommendation', explanation)
-            else:
-                print("Template explanation service handled gracefully")
-        except Exception as e:
-            print(f"Template service integration handled gracefully: {e}")
-            
-            # Should still include sentiment information in template
-            if 'sentiment' in explanation.get('indicators_explained', []):
-                self.assertTrue(True)  # Sentiment was included in fallback
+        # Test template-based explanation (always available as fallback)
+        explanation = self.explanation_service._generate_template_explanation(
+            analysis_data, 'standard'
+        )
+        
+        self.assertIsNotNone(explanation)
+        self.assertIn('content', explanation)
+        self.assertIn('recommendation', explanation)
+        self.assertEqual(explanation['model_used'], 'template_fallback')
+        
+        # Should include sentiment information in template
+        content = explanation['content']
+        self.assertIn('FALLBACK_TEST', content)
+        self.assertIn('6.5', content)
+        
+        # Check recommendation (6.5 should be HOLD)
+        self.assertEqual(explanation['recommendation'], 'HOLD')
+        
+        # Verify sentiment is included in indicators_explained
+        self.assertIn('indicators_explained', explanation)
+        if 'sentiment' in explanation['indicators_explained']:
+            sentiment_explanation = explanation['indicators_explained']['sentiment']
+            self.assertIn('neutral', sentiment_explanation.lower())
     
     def test_sentiment_metrics_collection(self):
         """Test that sentiment analysis metrics are properly collected."""
