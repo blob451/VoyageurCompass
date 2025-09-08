@@ -492,5 +492,6 @@ class DataSynchronizer:
         except:
             return False
 
+
 # Singleton instance
 data_synchronizer = DataSynchronizer()

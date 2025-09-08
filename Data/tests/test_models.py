@@ -42,10 +42,10 @@ class TestStockModel(TestCase):
     
     def test_stock_unique_symbol(self):
         """Test that stock symbols must be unique."""
-        Stock.objects.get_or_create(symbol='AAPL', defaults={'short_name': 'Apple'})
+        Stock.objects.get_or_create(symbol='AAPL_UNIQUE_TEST', defaults={'short_name': 'Apple'})
         
         with self.assertRaises(IntegrityError):
-            Stock.objects.create(symbol='AAPL', short_name='Another Apple')
+            Stock.objects.create(symbol='AAPL_UNIQUE_TEST', short_name='Another Apple')
     
     def test_get_latest_price(self):
         """Test getting the latest price for a stock."""
@@ -92,9 +92,9 @@ class TestStockModel(TestCase):
                 volume=50000000
             )
         
-        # Get last 7 days (test data creates 1-10 days ago, so expecting 6 in range)
+        # Get last 7 days (test data creates 1-10 days ago, so expecting 7 in range: days 1-7)
         history = stock.get_price_history(days=7)
-        self.assertEqual(history.count(), 6)
+        self.assertEqual(history.count(), 7)
         
         # Get last 30 days (should return all 10)
         history = stock.get_price_history(days=30)
@@ -143,9 +143,10 @@ class TestStockPriceModel(TestCase):
     def test_unique_stock_date_constraint(self):
         """Test that stock-date combination must be unique."""
         stock, _ = Stock.objects.get_or_create(symbol='AAPL_DATE_UNIQUE', defaults={'short_name': 'Apple Date Unique Test'})
+        test_date = date.today() - timedelta(days=100)  # Use a unique date to avoid conflicts
         StockPrice.objects.create(
             stock=stock,
-            date=date.today(),
+            date=test_date,
             open=Decimal('150.00'),
             high=Decimal('155.00'),
             low=Decimal('149.00'),
@@ -157,7 +158,7 @@ class TestStockPriceModel(TestCase):
         with self.assertRaises(IntegrityError):
             StockPrice.objects.create(
                 stock=stock,
-                date=date.today(),
+                date=test_date,
                 open=Decimal('151.00'),
                 high=Decimal('156.00'),
                 low=Decimal('150.00'),
@@ -364,12 +365,12 @@ class TestPortfolioHoldingModel(TestCase):
     
     def test_unique_portfolio_stock_constraint(self):
         """Test that portfolio-stock combination must be unique."""
-        user = User.objects.create_user(username='testuser', password='testpass')
+        user = User.objects.create_user(username='testuser_portfolio_unique', password='testpass')
         portfolio = Portfolio.objects.create(
             user=user,
-            name='My Portfolio'
+            name='My Portfolio Unique Test'
         )
-        stock, _ = Stock.objects.get_or_create(symbol='AAPL_HOLDING', defaults={'short_name': 'Apple Holding Test'})
+        stock, _ = Stock.objects.get_or_create(symbol='AAPL_HOLDING_UNIQUE', defaults={'short_name': 'Apple Holding Unique Test'})
         
         PortfolioHolding.objects.create(
             portfolio=portfolio,

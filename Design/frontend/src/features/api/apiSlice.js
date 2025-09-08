@@ -88,18 +88,30 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
   if (result?.error?.status === 401) {
     console.log('Token expired, attempting refresh...');
-    // Try to get a new token
-    const refreshResult = await baseQuery('/auth/refresh/', api, extraOptions);
+    // Try to get a new token using POST method with refresh token
+    const state = api.getState();
+    const refreshToken = state.auth.refreshToken;
     
-    if (refreshResult?.data) {
-      const user = api.getState().auth.user;
-      // Store the new token
-      api.dispatch(setCredentials({ ...refreshResult.data, user }));
-      // Retry the original query with new access token
-      console.log('Token refreshed, retrying original request...');
-      result = await baseQuery(args, api, extraOptions);
+    if (refreshToken) {
+      const refreshResult = await baseQuery({
+        url: '/auth/refresh/',
+        method: 'POST',
+        body: { refresh: refreshToken },
+      }, api, extraOptions);
+      
+      if (refreshResult?.data) {
+        const user = api.getState().auth.user;
+        // Store the new token
+        api.dispatch(setCredentials({ ...refreshResult.data, user }));
+        // Retry the original query with new access token
+        console.log('Token refreshed, retrying original request...');
+        result = await baseQuery(args, api, extraOptions);
+      } else {
+        console.log('Token refresh failed, logging out...');
+        api.dispatch(logout());
+      }
     } else {
-      console.log('Token refresh failed, logging out...');
+      console.log('No refresh token available, logging out...');
       api.dispatch(logout());
     }
   }

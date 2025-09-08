@@ -5,6 +5,7 @@ from django.http import HttpResponse
 from django.utils.cache import patch_vary_headers
 from django.utils.deprecation import MiddlewareMixin
 
+
 class CustomCorsMiddleware:
     """Cross-Origin Resource Sharing middleware with development-focused origin handling."""
     def __init__(self, get_response):
@@ -48,6 +49,7 @@ class CustomCorsMiddleware:
         response['Access-Control-Expose-Headers'] = 'X-Request-Id'
         response['Vary'] = 'Origin'
         return response
+
 
 class RequestLoggingMiddleware(MiddlewareMixin):
     """Request and response logging middleware with performance metrics and correlation tracking."""

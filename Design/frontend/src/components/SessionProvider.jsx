@@ -16,6 +16,42 @@ const SessionProvider = ({ children }) => {
   const [showWarning, setShowWarning] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // Define handleLogout function before it's used in useEffect hooks
+  const handleLogout = useCallback(async (reason = 'manual') => {
+    try {
+      setShowWarning(false);
+      
+      // Call logout API if we have a refresh token
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        try {
+          await logoutApi(refreshToken).unwrap();
+        } catch (error) {
+          console.warn('Logout API call failed:', error);
+          // Continue with client-side logout even if API fails
+        }
+      }
+      
+      // Dispatch logout action with reason
+      dispatch(logout({ reason }));
+      
+      // Navigate to logout page with reason
+      navigate('/logout', { 
+        replace: true, 
+        state: { reason } 
+      });
+      
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Fallback: force logout anyway
+      dispatch(logout({ reason }));
+      navigate('/logout', { 
+        replace: true, 
+        state: { reason: 'error' } 
+      });
+    }
+  }, [logoutApi, dispatch, navigate]);
+
   // Initialize session management when user is authenticated
   useEffect(() => {
     if (token && user && !isInitialized) {
@@ -93,41 +129,6 @@ const SessionProvider = ({ children }) => {
 
     return cleanup;
   }, [token, handleLogout]);
-
-  const handleLogout = useCallback(async (reason = 'manual') => {
-    try {
-      setShowWarning(false);
-      
-      // Call logout API if we have a refresh token
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (refreshToken) {
-        try {
-          await logoutApi(refreshToken).unwrap();
-        } catch (error) {
-          console.warn('Logout API call failed:', error);
-          // Continue with client-side logout even if API fails
-        }
-      }
-      
-      // Dispatch logout action with reason
-      dispatch(logout({ reason }));
-      
-      // Navigate to logout page with reason
-      navigate('/logout', { 
-        replace: true, 
-        state: { reason } 
-      });
-      
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Fallback: force logout anyway
-      dispatch(logout({ reason }));
-      navigate('/logout', { 
-        replace: true, 
-        state: { reason: 'error' } 
-      });
-    }
-  }, [logoutApi, dispatch, navigate]);
 
   const handleExtendSession = () => {
     console.log('Extending session');

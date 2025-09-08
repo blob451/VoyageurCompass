@@ -40,6 +40,7 @@ app.conf.beat_schedule = {
     },
 }
 
+
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):
     """A simple debug task to test Celery is working."""

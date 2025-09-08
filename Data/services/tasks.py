@@ -205,6 +205,7 @@ def generate_analytics_report():
         logger.error(f"Analytics report generation failed: {exc}")
         raise
 
+
 @shared_task
 def process_data_upload(file_path, user_id):
     """

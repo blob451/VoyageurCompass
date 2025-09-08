@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { 
@@ -18,6 +18,7 @@ const AuthInitializer = ({ children }) => {
   const token = useSelector(selectCurrentToken);
   const user = useSelector(selectCurrentUser);
   const [isInitialized, setIsInitialized] = useState(false);
+  const hasRunRef = useRef(false); // Prevent duplicate runs in React.StrictMode
   
   // Validate token with backend if we have one
   const { 
@@ -30,6 +31,12 @@ const AuthInitializer = ({ children }) => {
 
   useEffect(() => {
     const initializeAuth = async () => {
+      // Prevent duplicate runs in React.StrictMode during development
+      if (hasRunRef.current) {
+        return;
+      }
+      hasRunRef.current = true;
+      
       authLogger.info('Initializing authentication');
       
       // Clean up any invalid tokens from localStorage

@@ -2,6 +2,7 @@ import os
 from django.test import TestCase, override_settings
 from django.conf import settings
 
+
 class SentryIntegrationTestCase(TestCase):
     """Test Sentry integration behavior"""
     

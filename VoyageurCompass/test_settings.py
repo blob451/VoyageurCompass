@@ -17,6 +17,18 @@ if IS_CI_ENVIRONMENT and DATABASE_URL:
     DATABASES = {"default": dj_database_url.parse(DATABASE_URL)}
     # Database migrations enabled for comprehensive CI table creation
     MIGRATION_MODULES = {}
+    
+    # Ensure proper database configuration for CI environment
+    db_config = DATABASES["default"]
+    if not db_config.get("USER"):
+        # Set default user if not provided in DATABASE_URL
+        db_config["USER"] = os.getenv("POSTGRES_USER", "voyageur_user")
+    if not db_config.get("PASSWORD"):
+        db_config["PASSWORD"] = os.getenv("POSTGRES_PASSWORD", "ab727492Z")
+    if not db_config.get("HOST"):
+        db_config["HOST"] = os.getenv("POSTGRES_HOST", "localhost")
+    if not db_config.get("PORT"):
+        db_config["PORT"] = os.getenv("POSTGRES_PORT", "5432")
 else:
     # SQLite configuration for optimised local testing performance
     DATABASES = {

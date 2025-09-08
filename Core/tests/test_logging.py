@@ -4,6 +4,7 @@ import os
 from django.test import TestCase, override_settings
 from io import StringIO
 
+
 class LoggingConfigTestCase(TestCase):
     """Test structured logging configuration"""
     

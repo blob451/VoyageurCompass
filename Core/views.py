@@ -242,6 +242,7 @@ def healthCheck(request):
         'Cache-Control': 'no-store'
     })
 
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def readinessCheck(request):

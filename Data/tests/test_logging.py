@@ -2,6 +2,7 @@ import logging
 from django.test import TestCase
 from io import StringIO
 
+
 class DataLoggingTestCase(TestCase):
     """Test Data module logging integration"""
     

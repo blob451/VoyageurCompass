@@ -368,6 +368,7 @@ class ExplanationService:
 # Singleton instance
 _explanation_service = None
 
+
 def get_explanation_service() -> ExplanationService:
     """Get singleton instance of ExplanationService."""
     global _explanation_service

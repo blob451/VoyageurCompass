@@ -1530,6 +1530,7 @@ Use professional investment language with complete sentences."""
 # Singleton instance
 _llm_service = None
 
+
 def get_local_llm_service() -> LocalLLMService:
     """Get singleton instance of LocalLLMService."""
     global _llm_service

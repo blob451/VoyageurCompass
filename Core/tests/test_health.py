@@ -2,6 +2,7 @@ from django.test import TestCase, Client, override_settings
 from django.db import connection
 import time
 
+
 class HealthCheckTestCase(TestCase):
     """Test health check endpoints with real operations"""
     
