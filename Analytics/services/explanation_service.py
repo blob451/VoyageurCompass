@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 
 class ExplanationService:
     """Financial analysis explanation generation service with LLM integration."""
-    
+
     def __init__(self):
         self._llm_service = None
         self.enabled = getattr(settings, 'EXPLAINABILITY_ENABLED', True)
         self.cache_ttl = getattr(settings, 'EXPLANATION_CACHE_TTL', 300)
-        
+
         # Template explanations for LLM fallback scenarios
         self.indicator_templates = {
             'sma50vs200': 'Simple Moving Average crossover analysis comparing 50-day vs 200-day periods',
@@ -39,7 +39,7 @@ class ExplanationService:
             'candlerev': 'Candlestick reversal pattern recognition for trend changes',
             'srcontext': 'Support and resistance level analysis based on price history'
         }
-    
+
     @property
     def llm_service(self):
         """Lazy-loaded LLM service."""
@@ -47,15 +47,15 @@ class ExplanationService:
             logger.info("Initializing LLM service for explanation generation")
             self._llm_service = get_local_llm_service()
         return self._llm_service
-    
+
     def is_enabled(self) -> bool:
         """Verify explanation service availability status."""
         return self.enabled and self.llm_service.is_available()
-    
+
     def is_available_or_fallback(self) -> bool:
         """Check if ANY explanation generation is possible (LLM or template)."""
         return self.enabled  # Always true if feature enabled, regardless of LLM availability
-    
+
     def explain_prediction_single(self, 
                                 analysis_result: Union[Dict[str, Any], 'AnalyticsResults'], 
                                 detail_level: str = 'standard',
@@ -64,7 +64,7 @@ class ExplanationService:
         if not self.enabled:
             logger.info("Explanation service disabled")
             return None
-        
+
         try:
             analysis_data = self._prepare_analysis_data(analysis_result)
             cache_key = self._create_cache_key(analysis_data, detail_level, user)
@@ -72,9 +72,9 @@ class ExplanationService:
             if cached_explanation:
                 logger.info(f"Retrieved cached explanation for {analysis_data.get('symbol', 'unknown')}")
                 return cached_explanation
-            
+
             start_time = time.time()
-            
+
             # Always try to generate something - LLM preferred, template as fallback
             if self.llm_service.is_available():
                 logger.info(f"Using LLM for {analysis_data.get('symbol', 'unknown')} ({detail_level})")
@@ -82,48 +82,48 @@ class ExplanationService:
             else:
                 logger.warning(f"LLM unavailable, using template for {analysis_data.get('symbol', 'unknown')} ({detail_level})")
                 explanation = self._generate_template_explanation(analysis_data, detail_level)
-            
+
             if explanation:
                 explanation['generation_time'] = time.time() - start_time
                 explanation['method'] = 'llm' if self.llm_service.is_available() else 'template'
                 explanation['detail_level'] = detail_level
                 explanation['generated_at'] = datetime.now().isoformat()
-                
+
                 cache.set(cache_key, explanation, self.cache_ttl)
-                
+
                 logger.info(f"Generated explanation for {analysis_data.get('symbol', 'unknown')} "
                           f"({explanation['method']}, {explanation['generation_time']:.2f}s)")
-                
+
                 return explanation
-            
+
         except Exception as e:
             logger.error(f"Error generating explanation: {str(e)}")
-        
+
         return None
-    
+
     def explain_prediction_batch(self, 
                                analysis_results: List[Union[Dict[str, Any], 'AnalyticsResults']], 
                                detail_level: str = 'standard',
                                user=None) -> List[Optional[Dict[str, Any]]]:
         """
         Generate explanations for multiple analysis results.
-        
+
         Args:
             analysis_results: List of analysis result dicts or model instances
             detail_level: Detail level for all explanations
             user: User instance for personalization (optional)
-            
+
         Returns:
             List of explanation results (same order as input)
         """
         explanations = []
-        
+
         for analysis_result in analysis_results:
             explanation = self.explain_prediction_single(analysis_result, detail_level, user)
             explanations.append(explanation)
-        
+
         return explanations
-    
+
     def build_indicator_explanation(self, 
                                   indicator_name: str, 
                                   indicator_result: Any, 
@@ -131,13 +131,13 @@ class ExplanationService:
                                   context: Dict[str, Any] = None) -> str:
         """
         Build explanation for a specific technical indicator.
-        
+
         Args:
             indicator_name: Name of the indicator
             indicator_result: Raw indicator calculation result
             weighted_score: Weighted contribution to final score
             context: Additional context information
-            
+
         Returns:
             Human-readable explanation string
         """
@@ -146,12 +146,12 @@ class ExplanationService:
                 indicator_name, 
                 f"{indicator_name} technical analysis indicator"
             )
-            
+
             # Add weighted score context
             score_impact = "positive" if weighted_score > 0 else "negative" if weighted_score < 0 else "neutral"
-            
+
             explanation = f"{base_explanation}. Current reading shows {score_impact} impact (weighted score: {weighted_score:.2f})"
-            
+
             # Add specific indicator details based on type
             if indicator_name == 'rsi14' and isinstance(indicator_result, (int, float)):
                 if indicator_result > 70:
@@ -160,24 +160,24 @@ class ExplanationService:
                     explanation += f". RSI at {indicator_result:.1f} suggests oversold conditions"
                 else:
                     explanation += f". RSI at {indicator_result:.1f} indicates neutral momentum"
-            
+
             elif indicator_name == 'sma50vs200':
                 if weighted_score > 0:
                     explanation += ". 50-day SMA above 200-day SMA (golden cross pattern)"
                 elif weighted_score < 0:
                     explanation += ". 50-day SMA below 200-day SMA (death cross pattern)"
-            
+
             return explanation
-            
+
         except Exception as e:
             logger.error(f"Error building indicator explanation for {indicator_name}: {str(e)}")
             return f"{indicator_name}: Unable to generate detailed explanation"
-    
+
     def _prepare_analysis_data(self, analysis_result: Union[Dict[str, Any], 'AnalyticsResults']) -> Dict[str, Any]:
         """Convert analysis result to standardized dictionary format."""
         if isinstance(analysis_result, dict):
             return analysis_result
-        
+
         # Handle AnalyticsResults model instance
         try:
             return {
@@ -205,7 +205,7 @@ class ExplanationService:
         except Exception as e:
             logger.error(f"Error preparing analysis data: {str(e)}")
             return {'error': 'Failed to prepare analysis data'}
-    
+
     def _generate_llm_explanation(self, analysis_data: Dict[str, Any], detail_level: str) -> Optional[Dict[str, Any]]:
         """Generate explanation using local LLaMA model."""
         try:
@@ -214,7 +214,7 @@ class ExplanationService:
                 detail_level=detail_level,
                 explanation_type='technical_analysis'
             )
-            
+
             if llm_result and 'content' in llm_result:
                 return {
                     'content': llm_result['content'],
@@ -225,39 +225,39 @@ class ExplanationService:
                     'risk_factors': self._extract_risk_factors(analysis_data),
                     'recommendation': self._determine_recommendation(analysis_data.get('score_0_10', 0))
                 }
-                
+
         except Exception as e:
             logger.error(f"Error generating LLM explanation: {str(e)}")
-        
+
         return None
-    
+
     def _generate_template_explanation(self, analysis_data: Dict[str, Any], detail_level: str) -> Dict[str, Any]:
         """Generate explanation using template fallback."""
         try:
             symbol = analysis_data.get('symbol', 'Unknown')
             score = analysis_data.get('score_0_10', 0)
             weighted_scores = analysis_data.get('weighted_scores', {})
-            
+
             # Determine recommendation
             recommendation = self._determine_recommendation(score)
-            
+
             # Find top contributing indicators
             top_indicators = sorted(
                 [(k, v) for k, v in weighted_scores.items() if v != 0],
                 key=lambda x: abs(x[1]),
                 reverse=True
             )[:3]
-            
+
             if detail_level == 'summary':
                 content = f"{symbol} receives a {score:.1f}/10 analysis score, suggesting a {recommendation} position. "
                 if top_indicators:
                     indicator_names = [k.replace('w_', '') for k, v in top_indicators]
                     content += f"Key factors: {', '.join(indicator_names[:2])}."
-                
+
             elif detail_level == 'detailed':
                 content = f"Comprehensive analysis of {symbol} yields a score of {score:.1f}/10, indicating a {recommendation} recommendation.\n\n"
                 content += "Technical Indicator Analysis:\n"
-                
+
                 for indicator, weight in top_indicators:
                     indicator_name = indicator.replace('w_', '')
                     explanation = self.build_indicator_explanation(
@@ -266,10 +266,10 @@ class ExplanationService:
                         weight
                     )
                     content += f"• {explanation}\n"
-                
+
                 content += f"\nOverall Assessment: The combined technical indicators support a {recommendation} stance "
                 content += f"with moderate confidence based on current market conditions."
-                
+
             else:  # standard
                 content = f"{symbol} analysis shows {score:.1f}/10 score ({recommendation}). "
                 if top_indicators:
@@ -277,7 +277,7 @@ class ExplanationService:
                     impact = "positive" if top_indicators[0][1] > 0 else "negative"
                     content += f"Primary driver: {top_indicator} showing {impact} impact. "
                 content += "Consider market conditions and risk tolerance before trading."
-            
+
             return {
                 'content': content,
                 'confidence_score': 0.7,  # Lower confidence for template-based
@@ -287,7 +287,7 @@ class ExplanationService:
                 'risk_factors': self._extract_risk_factors(analysis_data),
                 'recommendation': recommendation
             }
-            
+
         except Exception as e:
             logger.error(f"Error generating template explanation: {str(e)}")
             return {
@@ -299,7 +299,7 @@ class ExplanationService:
                 'risk_factors': [],
                 'recommendation': 'HOLD'
             }
-    
+
     def _determine_recommendation(self, score: float) -> str:
         """Determine investment recommendation based on score."""
         if score >= 7:
@@ -308,52 +308,52 @@ class ExplanationService:
             return 'HOLD'
         else:
             return 'SELL'
-    
+
     def _extract_indicators_explained(self, analysis_data: Dict[str, Any]) -> List[str]:
         """Extract list of indicators that were analyzed."""
         weighted_scores = analysis_data.get('weighted_scores', {})
         return [k.replace('w_', '') for k, v in weighted_scores.items() if v != 0]
-    
+
     def _extract_risk_factors(self, analysis_data: Dict[str, Any]) -> List[str]:
         """Extract risk factors based on analysis results."""
         risk_factors = []
         weighted_scores = analysis_data.get('weighted_scores', {})
-        
+
         # Check for high volatility
         bb_width = weighted_scores.get('w_bbwidth20', 0)
         if abs(bb_width) > 0.5:
             risk_factors.append('High volatility detected')
-        
+
         # Check for overbought/oversold conditions
         rsi_score = weighted_scores.get('w_rsi14', 0)
         if rsi_score < -0.3:
             risk_factors.append('Potential oversold conditions')
         elif rsi_score > 0.3:
             risk_factors.append('Potential overbought conditions')
-        
+
         # Check for trend weakness
         sma_score = weighted_scores.get('w_sma50vs200', 0)
         if abs(sma_score) < 0.1:
             risk_factors.append('Uncertain trend direction')
-        
+
         return risk_factors[:3]  # Limit to top 3 risk factors
-    
+
     def _create_cache_key(self, analysis_data: Dict[str, Any], detail_level: str, user=None) -> str:
         """Create cache key for explanation."""
         symbol = analysis_data.get('symbol', 'unknown')
         score = analysis_data.get('score_0_10', 0)
         user_id = user.id if user else 'anonymous'
-        
+
         # Include key weighted scores in cache key for specificity
         weighted_scores = analysis_data.get('weighted_scores', {})
         key_scores = []
         for key in ['w_sma50vs200', 'w_rsi14', 'w_macd12269']:
             if key in weighted_scores:
                 key_scores.append(f"{key}_{weighted_scores[key]:.2f}")
-        
+
         cache_data = f"{symbol}_{score:.1f}_{detail_level}_{user_id}_{'_'.join(key_scores)}"
         return f"explanation_{hash(cache_data)}"
-    
+
     def get_service_status(self) -> Dict[str, Any]:
         """Get current service status."""
         return {

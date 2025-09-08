@@ -31,9 +31,9 @@ def quality_dashboard(request):
     try:
         quality_service = get_code_quality_service()
         dashboard_data = quality_service.get_quality_dashboard()
-        
+
         return Response(dashboard_data)
-        
+
     except Exception as e:
         logger.error(f"Error getting quality dashboard: {str(e)}")
         return Response(
@@ -72,19 +72,19 @@ def analyze_project(request):
     try:
         include_patterns = request.data.get('include_patterns', ['**/*.py'])
         export_report = request.data.get('export_report', False)
-        
+
         quality_service = get_code_quality_service()
-        
+
         logger.info(f"Starting project analysis requested by {request.user}")
         analysis_results = quality_service.analyze_project(include_patterns)
-        
+
         # Export detailed report if requested
         export_path = None
         if export_report:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             export_path = f"./code_quality_report_{timestamp}.json"
             quality_service.export_analysis_report(analysis_results, export_path)
-        
+
         # Return summary (not full detailed results to avoid large response)
         summary_response = {
             'analysis_summary': {
@@ -97,9 +97,9 @@ def analyze_project(request):
             'export_path': export_path,
             'analyzed_by': request.user.username
         }
-        
+
         return Response(summary_response)
-        
+
     except Exception as e:
         logger.error(f"Error analyzing project: {str(e)}")
         return Response(
@@ -129,37 +129,37 @@ def analyze_file(request):
     """
     try:
         file_path = request.GET.get('file_path')
-        
+
         if not file_path:
             return Response(
                 {'error': 'file_path parameter is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         quality_service = get_code_quality_service()
-        
+
         # Construct full path
         full_path = os.path.join(quality_service.project_root, file_path)
-        
+
         if not os.path.exists(full_path):
             return Response(
                 {'error': f'File not found: {file_path}'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         if not full_path.endswith('.py'):
             return Response(
                 {'error': 'Only Python files can be analyzed'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         analysis_result = quality_service.get_quality_report(full_path)
-        
+
         return Response({
             'file_analysis': analysis_result,
             'analyzed_by': request.user.username
         })
-        
+
     except Exception as e:
         logger.error(f"Error analyzing file: {str(e)}")
         return Response(
@@ -180,10 +180,10 @@ def quality_metrics(request):
     """
     try:
         quality_service = get_code_quality_service()
-        
+
         # Run quick analysis for metrics
         project_analysis = quality_service.analyze_project(['Analytics/**/*.py'])  # Focus on Analytics
-        
+
         # Extract key metrics
         metrics = {
             'overall_quality_score': project_analysis['average_quality_score'],
@@ -194,9 +194,9 @@ def quality_metrics(request):
             'quality_level': _get_quality_level(project_analysis['average_quality_score']),
             'last_updated': project_analysis['analyzed_at']
         }
-        
+
         return Response(metrics)
-        
+
     except Exception as e:
         logger.error(f"Error getting quality metrics: {str(e)}")
         return Response(
@@ -217,19 +217,19 @@ def quality_recommendations(request):
     """
     try:
         quality_service = get_code_quality_service()
-        
+
         # Get dashboard data which includes recommendations
         dashboard_data = quality_service.get_quality_dashboard()
-        
+
         recommendations_response = {
             'recommendations': dashboard_data['recommendations'],
             'quality_score': dashboard_data['current_quality_score'],
             'priority_areas': _get_priority_areas(dashboard_data),
             'generated_at': dashboard_data['generated_at']
         }
-        
+
         return Response(recommendations_response)
-        
+
     except Exception as e:
         logger.error(f"Error getting quality recommendations: {str(e)}")
         return Response(
@@ -250,7 +250,7 @@ def quality_service_status(request):
     """
     try:
         quality_service = get_code_quality_service()
-        
+
         return Response({
             'service_status': 'active',
             'project_root': str(quality_service.project_root),
@@ -273,7 +273,7 @@ def quality_service_status(request):
                 'quality_scoring': True
             }
         })
-        
+
     except Exception as e:
         return Response(
             {'error': f'Failed to get service status: {str(e)}'},
@@ -296,18 +296,18 @@ def _get_quality_level(score: float) -> str:
 def _get_priority_areas(dashboard_data: dict) -> list[str]:
     """Extract priority areas from dashboard data."""
     priority_areas = []
-    
+
     issue_distribution = dashboard_data.get('issue_distribution', {})
     top_issues = dashboard_data.get('top_issue_types', [])
-    
+
     # High priority if many critical errors
     if issue_distribution.get('error', 0) > 5:
         priority_areas.append('Critical Error Resolution')
-    
+
     # Check top issue types
     if top_issues:
         top_issue_type = top_issues[0][0] if top_issues[0][1] > 10 else None
-        
+
         if top_issue_type:
             if 'complexity' in top_issue_type:
                 priority_areas.append('Code Complexity Reduction')
@@ -317,8 +317,8 @@ def _get_priority_areas(dashboard_data: dict) -> list[str]:
                 priority_areas.append('Code Formatting')
             elif 'function_too_long' in top_issue_type:
                 priority_areas.append('Function Refactoring')
-    
+
     if not priority_areas:
         priority_areas = ['General Code Quality Maintenance']
-    
+
     return priority_areas

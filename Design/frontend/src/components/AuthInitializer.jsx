@@ -39,7 +39,7 @@ const AuthInitializer = ({ children }) => {
       }
       
       // Get valid tokens after cleanup
-      const { accessToken, refreshToken, hasValidTokens, hasExpiredTokens } = getValidTokensFromStorage();
+      const { accessToken, hasExpiredTokens } = getValidTokensFromStorage();
       
       if (hasExpiredTokens) {
         authLogger.info('Found expired tokens, clearing auth state');
@@ -67,7 +67,7 @@ const AuthInitializer = ({ children }) => {
     if (!isInitialized) {
       initializeAuth();
     }
-  }, [dispatch, isInitialized]); // Removed token and user from dependencies to prevent duplicate initialization
+  }, [dispatch, isInitialized, user]); // Include user dependency for proper hook behavior
 
   useEffect(() => {
     // Handle successful validation

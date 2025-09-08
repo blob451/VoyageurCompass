@@ -129,8 +129,8 @@ def sync_watchlist(request):
         validated_symbols = []
         for symbol in symbols[:50]:  # Limit to 50 symbols
             try:
-                validated_symbol = yahoo_finance_service.validate_symbol(symbol)
-                validated_symbols.append(validated_symbol)
+                if yahoo_finance_service.validate_symbol(symbol):
+                    validated_symbols.append(symbol.upper())
             except ValueError as e:
                 logger.warning(f"Invalid symbol {symbol}: {str(e)}")
         

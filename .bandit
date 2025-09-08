@@ -1,0 +1,6 @@
+exclude_dirs: ['*/tests/*', '*/migrations/*', '*/venv/*', '*/env/*']
+skips: ['B101', 'B601']
+
+# Skip common false positives:
+# B101: Test for use of assert
+# B601: Paramiko/subprocess security issues (if test environments need this)

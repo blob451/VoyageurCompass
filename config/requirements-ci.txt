@@ -1,0 +1,106 @@
+# VoyageurCompass CI/CD Dependencies
+# Minimal lightweight dependencies for CI pipeline testing
+# Excludes heavy ML packages for faster CI execution
+
+# Web Framework & API
+Django==5.2.5
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.5.0
+drf-spectacular==0.27.2
+
+# Database
+psycopg2-binary==2.9.10
+dj-database-url==2.3.0
+
+# Task Queue & Background Processing (Lightweight for CI)
+celery==5.5.3
+django-celery-beat==2.8.1
+redis==5.2.1
+django-redis==6.0.0
+
+# Supporting Libraries
+amqp==5.3.1
+asgiref==3.9.1
+billiard==4.2.1
+kombu==5.5.4
+vine==5.1.0
+cron-descriptor==1.4.5
+django-timezone-field==7.1
+
+# Configuration & Environment
+django-environ==0.11.2
+python-dotenv==1.1.1
+python-dateutil==2.9.0.post0
+pytz==2025.2
+tzdata==2025.2
+
+# Authentication & Security
+PyJWT==2.10.1
+sentry-sdk[django]==1.40.0
+
+# Data Processing & Financial APIs
+requests==2.32.4
+urllib3==2.5.0
+certifi==2025.8.3
+charset-normalizer==3.4.2
+yfinance==0.2.65
+multitasking==0.0.12
+
+# Data Science (Lightweight - numpy only for basic operations)
+pandas==2.3.1
+numpy>=1.17.3,<2.0
+
+# Static Files & Web Serving
+whitenoise==6.9.0
+
+# HTML/XML Processing
+beautifulsoup4==4.13.4
+lxml==6.0.0
+html5lib==1.1
+soupsieve==2.7
+webencodings==0.5.1
+
+# Utilities
+attrs==25.3.0
+idna==3.10
+inflection==0.5.1
+jsonschema==4.25.0
+jsonschema-specifications==2025.4.1
+packaging==25.0
+platformdirs==4.3.8
+referencing==0.36.2
+rpds-py==0.26.0
+six==1.17.0
+sqlparse==0.5.3
+typing_extensions==4.14.1
+uritemplate==4.2.0
+frozendict==2.4.6
+PyYAML==6.0.2
+
+# Testing Framework (CI-specific)
+pytest==8.4.1
+pytest-cov==6.2.1
+pytest-django==4.11.1
+coverage==7.10.2
+iniconfig==2.1.0
+pluggy==1.6.0
+
+# Code Quality Tools (for CI linting)
+flake8==7.1.1
+black==24.10.0
+isort==5.13.2
+colorama==0.4.6
+
+# System monitoring for Analytics service (CI-compatible version)
+psutil==7.0.0
+
+# Additional pytest packages used in CI workflows
+# (added dynamically in CI, but listed for reference)
+# pytest-xdist (for parallel testing)
+
+# Basic Machine Learning (for TF-IDF and caching functionality)
+scikit-learn==1.5.2
+
+# Note: PyTorch and transformers are excluded to save CI time and resources
+# ML functionality will use fallback methods in CI environment

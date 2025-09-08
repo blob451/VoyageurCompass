@@ -13,7 +13,7 @@ import {
   logout
 } from '../features/auth/authSlice';
 import { useValidateTokenQuery } from '../features/api/apiSlice';
-import { isTokenExpired, getValidTokensFromStorage } from '../utils/tokenValidation';
+import { isTokenExpired } from '../utils/tokenValidation';
 
 const ProtectedRoute = () => {
   const dispatch = useDispatch();

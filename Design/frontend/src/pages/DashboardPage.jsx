@@ -184,7 +184,7 @@ const DashboardPage = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container component="main" role="main" aria-label="Dashboard main content" maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" gutterBottom>
           Welcome back, {user?.username || 'Investor'}!

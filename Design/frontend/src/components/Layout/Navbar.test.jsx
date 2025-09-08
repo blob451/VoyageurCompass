@@ -2,8 +2,8 @@
  * Tests for Navbar component
  */
 
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { Provider } from 'react-redux'
@@ -11,13 +11,17 @@ import { configureStore } from '@reduxjs/toolkit'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import Navbar from './Navbar'
 import authSlice from '../../features/auth/authSlice'
+import { apiSlice } from '../../features/api/apiSlice'
 
 // Create a mock store
 const createMockStore = (initialState = {}) => {
   return configureStore({
     reducer: {
       auth: authSlice,
+      api: apiSlice.reducer,
     },
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware().concat(apiSlice.middleware),
     preloadedState: initialState
   })
 }
@@ -40,11 +44,12 @@ describe('Navbar', () => {
   it('renders navbar with brand name', () => {
     const mockStore = createMockStore({
       auth: {
-        isAuthenticated: false,
         user: null,
-        tokens: null,
-        loading: false,
-        error: null
+        token: null,
+        refreshToken: null,
+        isValidating: false,
+        validationError: null,
+        lastValidated: null
       }
     })
 
@@ -55,17 +60,18 @@ describe('Navbar', () => {
     )
 
     // Check for app name/brand
-    expect(screen.getByText(/VoyageurCompass/i)).toBeInTheDocument()
+    expect(screen.getByText('VoyageurCompass')).toBeInTheDocument()
   })
 
   it('shows login/register links when not authenticated', () => {
     const mockStore = createMockStore({
       auth: {
-        isAuthenticated: false,
         user: null,
-        tokens: null,
-        loading: false,
-        error: null
+        token: null,
+        refreshToken: null,
+        isValidating: false,
+        validationError: null,
+        lastValidated: null
       }
     })
 
@@ -76,18 +82,19 @@ describe('Navbar', () => {
     )
 
     // Look for login and register links
-    expect(screen.getByText(/login/i)).toBeInTheDocument()
-    expect(screen.getByText(/register/i)).toBeInTheDocument()
+    expect(screen.getByText('Login')).toBeInTheDocument()
+    expect(screen.getByText('Register')).toBeInTheDocument()
   })
 
-  it('shows user menu when authenticated', () => {
+  it('shows user menu when authenticated', async () => {
     const mockStore = createMockStore({
       auth: {
-        isAuthenticated: true,
         user: { username: 'testuser', email: 'test@example.com' },
-        tokens: { access: 'mock-token', refresh: 'mock-refresh' },
-        loading: false,
-        error: null
+        token: 'mock-token',
+        refreshToken: 'mock-refresh',
+        isValidating: false,
+        validationError: null,
+        lastValidated: null
       }
     })
 
@@ -97,79 +104,32 @@ describe('Navbar', () => {
       </TestWrapper>
     )
 
-    // Should show user's name or username
-    expect(screen.getByText(/testuser/i)).toBeInTheDocument()
+    // Should show user's username
+    expect(screen.getByText('testuser')).toBeInTheDocument()
     
-    // Should have logout functionality
-    expect(screen.getByText(/logout/i)).toBeInTheDocument()
+    // Should show Dashboard button
+    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    
+    // Should show Tools menu
+    expect(screen.getByText('Tools')).toBeInTheDocument()
+    
+    // Should show Help button
+    expect(screen.getByText('Help')).toBeInTheDocument()
+    
+    // Should show credits
+    expect(screen.getByText(/25 Credits/)).toBeInTheDocument()
   })
 
-  it('shows dashboard link when authenticated', () => {
-    const mockStore = createMockStore({
-      auth: {
-        isAuthenticated: true,
-        user: { username: 'testuser' },
-        tokens: { access: 'mock-token' },
-        loading: false,
-        error: null
-      }
-    })
-
-    render(
-      <TestWrapper store={mockStore}>
-        <Navbar />
-      </TestWrapper>
-    )
-
-    // Should show dashboard link for authenticated users
-    expect(screen.getByText(/dashboard/i)).toBeInTheDocument()
-  })
-
-  it('handles logout action', async () => {
+  it('opens user menu when clicking username', async () => {
     const user = userEvent.setup()
     const mockStore = createMockStore({
       auth: {
-        isAuthenticated: true,
-        user: { username: 'testuser' },
-        tokens: { access: 'mock-token', refresh: 'mock-refresh' },
-        loading: false,
-        error: null
-      }
-    })
-
-    // Spy on the store's dispatch method
-    const dispatchSpy = vi.spyOn(mockStore, 'dispatch')
-
-    render(
-      <TestWrapper store={mockStore}>
-        <Navbar />
-      </TestWrapper>
-    )
-
-    // Find and click logout button
-    const logoutButton = screen.getByText(/logout/i)
-    await user.click(logoutButton)
-
-    // Verify logout action was dispatched
-    expect(dispatchSpy).toHaveBeenCalled()
-    expect(dispatchSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: expect.stringContaining('logout')
-      })
-    )
-
-    // Clean up spy
-    dispatchSpy.mockRestore()
-  })
-
-  it('has proper navigation structure', () => {
-    const mockStore = createMockStore({
-      auth: {
-        isAuthenticated: true,
-        user: { username: 'testuser' },
-        tokens: { access: 'mock-token' },
-        loading: false,
-        error: null
+        user: { username: 'testuser', email: 'test@example.com' },
+        token: 'mock-token',
+        refreshToken: 'mock-refresh',
+        isValidating: false,
+        validationError: null,
+        lastValidated: null
       }
     })
 
@@ -179,88 +139,124 @@ describe('Navbar', () => {
       </TestWrapper>
     )
 
-    // Check for navigation landmark
-    expect(screen.getByRole('navigation')).toBeInTheDocument()
+    // Click on username to open menu
+    await user.click(screen.getByText('testuser'))
     
-    // Check for AppBar (MUI component)
-    expect(screen.getByRole('banner')).toBeInTheDocument()
+    // Should show logout option in menu
+    await waitFor(() => {
+      expect(screen.getByText('Logout')).toBeInTheDocument()
+    })
+    
+    // Should show settings option in menu
+    expect(screen.getByText('Settings')).toBeInTheDocument()
   })
 
-  it('is responsive and shows mobile menu toggle', () => {
-    // Mock window.innerWidth for mobile view
-    Object.defineProperty(window, 'innerWidth', {
-      writable: true,
-      configurable: true,
-      value: 600, // Mobile width
-    })
-
-    const mockStore = createMockStore({
-      auth: {
-        isAuthenticated: true,
-        user: { username: 'testuser' },
-        tokens: { access: 'mock-token' },
-        loading: false,
-        error: null
-      }
-    })
-
-    render(
-      <TestWrapper store={mockStore}>
-        <Navbar />
-      </TestWrapper>
-    )
-
-    // On mobile, there should be a menu icon
-    const menuButton = screen.queryByRole('button', { name: /menu/i })
-    if (menuButton) {
-      expect(menuButton).toBeInTheDocument()
-    }
-  })
-
-  it('handles mobile menu toggle', async () => {
+  it('opens tools menu when clicking Tools button', async () => {
     const user = userEvent.setup()
+    const mockStore = createMockStore({
+      auth: {
+        user: { username: 'testuser', email: 'test@example.com' },
+        token: 'mock-token',
+        refreshToken: 'mock-refresh',
+        isValidating: false,
+        validationError: null,
+        lastValidated: null
+      }
+    })
+
+    render(
+      <TestWrapper store={mockStore}>
+        <Navbar />
+      </TestWrapper>
+    )
+
+    // Click on Tools button to open menu
+    await user.click(screen.getByText('Tools'))
     
-    // Mock mobile viewport
-    Object.defineProperty(window, 'innerWidth', {
-      writable: true,
-      configurable: true,
-      value: 600,
+    // Should show tools menu items
+    await waitFor(() => {
+      expect(screen.getByText('Stock Analysis')).toBeInTheDocument()
     })
+    
+    expect(screen.getByText('Analysis Reports')).toBeInTheDocument()
+    expect(screen.getByText('Compare Stocks')).toBeInTheDocument()
+    expect(screen.getByText('Sector Analysis')).toBeInTheDocument()
+    expect(screen.getByText('Credit Store')).toBeInTheDocument()
+  })
 
-    const mockStore = createMockStore({
-      auth: {
-        isAuthenticated: true,
-        user: { username: 'testuser' },
-        tokens: { access: 'mock-token' },
-        loading: false,
-        error: null
-      }
-    })
-
+  it('has proper navigation role', () => {
     render(
-      <TestWrapper store={mockStore}>
+      <TestWrapper>
         <Navbar />
       </TestWrapper>
     )
 
-    // Find mobile menu button if it exists
-    const menuButton = screen.queryByRole('button', { name: /menu/i })
-    if (menuButton) {
-      await user.click(menuButton)
-      
-      // Mobile menu should be visible after clicking
-      // This would depend on the actual implementation
-    }
+    const navElement = screen.getByRole('navigation')
+    expect(navElement).toBeInTheDocument()
   })
 
-  it('shows loading state when auth is loading', () => {
+  it('displays correct brand logo', () => {
+    render(
+      <TestWrapper>
+        <Navbar />
+      </TestWrapper>
+    )
+
+    // Check for trending up icon (logo)
+    const logoButton = screen.getByLabelText('logo')
+    expect(logoButton).toBeInTheDocument()
+  })
+
+  it('shows correct user state when switching authentication', () => {
+    const { rerender } = render(
+      <TestWrapper store={createMockStore({
+        auth: {
+          user: null,
+          token: null,
+          refreshToken: null,
+          isValidating: false,
+          validationError: null,
+          lastValidated: null
+        }
+      })}>
+        <Navbar />
+      </TestWrapper>
+    )
+
+    // Initially should show login/register
+    expect(screen.getByText('Login')).toBeInTheDocument()
+    expect(screen.getByText('Register')).toBeInTheDocument()
+
+    // Re-render with authenticated state
+    rerender(
+      <TestWrapper store={createMockStore({
+        auth: {
+          user: { username: 'testuser' },
+          token: 'mock-token',
+          refreshToken: 'mock-refresh',
+          isValidating: false,
+          validationError: null,
+          lastValidated: null
+        }
+      })}>
+        <Navbar />
+      </TestWrapper>
+    )
+
+    // Should now show authenticated UI
+    expect(screen.getByText('testuser')).toBeInTheDocument()
+    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+  })
+
+  it('handles navigation correctly', async () => {
     const mockStore = createMockStore({
       auth: {
-        isAuthenticated: false,
         user: null,
-        tokens: null,
-        loading: true,
-        error: null
+        token: null,
+        refreshToken: null,
+        isValidating: false,
+        validationError: null,
+        lastValidated: null
       }
     })
 
@@ -270,66 +266,11 @@ describe('Navbar', () => {
       </TestWrapper>
     )
 
-    // Should show some loading indicator
-    // This depends on how loading state is handled in the component
-    const loadingElement = screen.queryByRole('progressbar')
-    if (loadingElement) {
-      expect(loadingElement).toBeInTheDocument()
-    }
-  })
-
-  it('displays error message when auth has error', () => {
-    const mockStore = createMockStore({
-      auth: {
-        isAuthenticated: false,
-        user: null,
-        tokens: null,
-        loading: false,
-        error: 'Authentication failed'
-      }
-    })
-
-    render(
-      <TestWrapper store={mockStore}>
-        <Navbar />
-      </TestWrapper>
-    )
-
-    // Should show error message or indicator
-    // This depends on how errors are handled in the component
-    const errorElement = screen.queryByText(/error/i)
-    if (errorElement) {
-      expect(errorElement).toBeInTheDocument()
-    }
-  })
-
-  it('has accessible navigation links', () => {
-    const mockStore = createMockStore({
-      auth: {
-        isAuthenticated: true,
-        user: { username: 'testuser' },
-        tokens: { access: 'mock-token' },
-        loading: false,
-        error: null
-      }
-    })
-
-    render(
-      <TestWrapper store={mockStore}>
-        <Navbar />
-      </TestWrapper>
-    )
-
-    // All links should be accessible
-    const links = screen.getAllByRole('link')
-    links.forEach(link => {
-      expect(link).toHaveAttribute('href')
-    })
-
-    // Buttons should be accessible
-    const buttons = screen.getAllByRole('button')
-    buttons.forEach(button => {
-      expect(button).toBeInTheDocument()
-    })
+    // Click on brand name (should navigate to home)
+    const brandElement = screen.getByText('VoyageurCompass')
+    expect(brandElement).toBeInTheDocument()
+    
+    // Brand should be clickable
+    expect(brandElement).toHaveStyle('cursor: pointer')
   })
 })

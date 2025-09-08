@@ -125,7 +125,7 @@ const SentimentExplanation = ({
     });
     
     try {
-      const result = await generateExplanation({
+      await generateExplanation({
         analysisId,
         detailLevel
       }).unwrap();

@@ -110,7 +110,7 @@ export const isValidTokenFormat = (token) => {
     atob(parts[0].replace(/-/g, '+').replace(/_/g, '/'));
     atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 };

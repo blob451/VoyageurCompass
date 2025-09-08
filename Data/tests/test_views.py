@@ -61,7 +61,7 @@ class StockViewSetTestCase(APITestCase):
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsInstance(response.data, list)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data), 30)  # Expect 30 days of price data
     
     def test_search_stocks(self):
         """Test stock search functionality."""
@@ -444,14 +444,19 @@ class MarketViewsTestCase(APITestCase):
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('success_count', response.data)
-        self.assertIn('failed_count', response.data)
+        self.assertIn('failure_count', response.data)
         
         # Verify response structure with real data
         self.assertIsInstance(response.data['success_count'], int)
-        self.assertIsInstance(response.data['failed_count'], int)
+        self.assertIsInstance(response.data['failure_count'], int)
     
     def test_bulk_price_update(self):
         """Test bulk price update endpoint using real stock data."""
+        # Make user admin for bulk price update permission
+        self.user.is_staff = True
+        self.user.is_superuser = True
+        self.user.save()
+        
         self.client.force_authenticate(user=self.user)
         url = reverse('data:bulk-price-update')
         response = self.client.post(url)

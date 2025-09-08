@@ -300,10 +300,10 @@ class Stock(models.Model):
     
     # Basic identification
     symbol = models.CharField(
-        max_length=10, 
+        max_length=20, 
         unique=True, 
         db_index=True,
-        help_text="Stock ticker symbol (e.g., AAPL, MSFT)"
+        help_text="Stock ticker symbol (e.g., AAPL, MSFT). Extended length supports test symbols."
     )
     short_name = models.CharField(
         max_length=100, 
@@ -889,8 +889,12 @@ class PortfolioHolding(models.Model):
     
     def save(self, *args, **kwargs):
         """Calculate derived fields and update portfolio value."""
-        self.cost_basis = self.quantity * self.average_price
-        self.current_value = self.quantity * self.current_price
+        # Ensure consistent Decimal type for all calculations
+        quantity_decimal = Decimal(str(self.quantity))
+        current_price_decimal = Decimal(str(self.current_price))
+        
+        self.cost_basis = quantity_decimal * self.average_price
+        self.current_value = quantity_decimal * current_price_decimal
         self.unrealized_gain_loss = self.current_value - self.cost_basis
         
         if self.cost_basis > 0:

@@ -64,24 +64,24 @@ urlpatterns = [
     path('user/<str:symbol>/latest/', get_user_latest_analysis, name='user_latest_analysis'),
     path('analysis/<int:analysis_id>/', get_analysis_by_id, name='get_analysis_by_id'),
     path('sentiment/<str:symbol>/', stock_sentiment, name='stock_sentiment'),
-    
+
     # Explanation endpoints
     path('explain/<int:analysis_id>/', generate_explanation, name='generate_explanation'),
     path('explain/status/', explanation_service_status, name='explain_status'),
     path('explanation/<int:analysis_id>/', get_explanation, name='get_explanation'),
     path('explanation-status/', explanation_service_status, name='explanation_status'),
-    
+
     # Enhanced LLM endpoints
     path('llm/explain/', generate_explanation, name='llm_explain'),
     path('llm/status/', explanation_service_status, name='llm_status'),
-    
+
     # Async Processing endpoints
     path('async/batch-analyze/', batch_analyze, name='batch_analyze'),
     path('async/batch-explain/', batch_explain, name='batch_explain'),
     path('async/task/<str:task_id>/', get_task_status, name='get_task_status'),
     path('async/batch/<str:batch_id>/', get_batch_status, name='get_batch_status'),
     path('async/performance/', async_performance, name='async_performance'),
-    
+
     # Fine-Tuning endpoints
     path('finetuning/generate-dataset/', generate_dataset, name='generate_dataset'),
     path('finetuning/start/', start_finetuning, name='start_finetuning'),
@@ -91,7 +91,7 @@ urlpatterns = [
     path('finetuning/models/', list_models, name='list_models'),
     path('finetuning/export/', export_dataset, name='export_dataset'),
     path('finetuning/status/', finetuning_status, name='finetuning_status'),
-    
+
     # Monitoring endpoints
     path('monitoring/health/', system_health, name='system_health'),
     path('monitoring/dashboard/', performance_dashboard, name='performance_dashboard'),
@@ -101,7 +101,7 @@ urlpatterns = [
     path('monitoring/metrics/', available_metrics, name='available_metrics'),
     path('monitoring/record-metric/', record_metric, name='record_metric'),
     path('monitoring/status/', monitoring_status, name='monitoring_status'),
-    
+
     # Code Quality endpoints
     path('quality/dashboard/', quality_dashboard, name='quality_dashboard'),
     path('quality/analyze/', analyze_project, name='analyze_project'),

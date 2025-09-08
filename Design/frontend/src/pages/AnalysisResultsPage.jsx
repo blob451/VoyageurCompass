@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -230,7 +230,6 @@ const AnalysisResultsPage = () => {
                 
                 if (isSentiment) {
                   const sentimentLabel = indicator.raw?.label;
-                  const sentimentScore = indicator.raw?.sentiment;
                   const newsCount = indicator.raw?.newsCount;
                   sentimentIcon = getSentimentIcon(sentimentLabel);
                   indicatorName = 'NEWS SENTIMENT';
@@ -301,7 +300,7 @@ const AnalysisResultsPage = () => {
                 </TableHead>
                 <TableBody>
                   {Object.entries(analysisData.weighted_scores)
-                    .filter(([key, value]) => value !== null && value !== undefined)
+                    .filter(([, value]) => value !== null && value !== undefined)
                     .sort(([,a], [,b]) => parseFloat(b) - parseFloat(a))
                     .map(([key, value]) => {
                       const displayValue = parseFloat(value);

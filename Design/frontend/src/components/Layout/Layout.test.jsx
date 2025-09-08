@@ -3,7 +3,7 @@
  * Comprehensive testing for layout structure, accessibility, and responsive behaviour.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { Provider } from 'react-redux'
@@ -11,6 +11,15 @@ import { configureStore } from '@reduxjs/toolkit'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import Layout from './Layout'
 import authSlice from '../../features/auth/authSlice'
+
+// Mock the Outlet component since Layout uses React Router's Outlet
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    Outlet: () => <div data-testid="outlet-content">Outlet Content</div>
+  }
+})
 
 // Mock Redux store configuration
 const createMockStore = (initialState = {}) => {
@@ -37,110 +46,79 @@ const TestWrapper = ({ children, store = createMockStore() }) => (
 )
 
 describe('Layout', () => {
-  it('renders layout with navbar and children', () => {
+  it('renders layout with navbar and outlet content', () => {
     const mockStore = createMockStore({
       auth: {
-        isAuthenticated: true,
         user: { username: 'testuser', email: 'test@example.com' },
-        tokens: { access: 'mock-token', refresh: 'mock-refresh' },
-        loading: false,
-        error: null
+        token: 'mock-token',
+        refreshToken: 'mock-refresh',
+        isValidating: false,
+        validationError: null,
+        lastValidated: null
       }
     })
 
     render(
       <TestWrapper store={mockStore}>
-        <Layout>
-          <div data-testid="test-content">Test Content</div>
-        </Layout>
+        <Layout />
       </TestWrapper>
     )
 
     // Verify navigation bar renders correctly
     expect(screen.getByRole('navigation')).toBeInTheDocument()
     
-    // Verify child components render properly
-    expect(screen.getByTestId('test-content')).toBeInTheDocument()
-    expect(screen.getByText('Test Content')).toBeInTheDocument()
+    // Verify outlet content renders properly
+    expect(screen.getByTestId('outlet-content')).toBeInTheDocument()
+    expect(screen.getByText('Outlet Content')).toBeInTheDocument()
   })
 
   it('renders layout when user is not authenticated', () => {
     const mockStore = createMockStore({
       auth: {
-        isAuthenticated: false,
         user: null,
-        tokens: null,
-        loading: false,
-        error: null
+        token: null,
+        refreshToken: null,
+        isValidating: false,
+        validationError: null,
+        lastValidated: null
       }
     })
 
     render(
       <TestWrapper store={mockStore}>
-        <Layout>
-          <div data-testid="test-content">Test Content</div>
-        </Layout>
+        <Layout />
       </TestWrapper>
     )
 
-    // Navigation bar should render with unauthenticated user interface
+    // Should still render the navigation and outlet
     expect(screen.getByRole('navigation')).toBeInTheDocument()
-    
-    // Content should still render
-    expect(screen.getByTestId('test-content')).toBeInTheDocument()
+    expect(screen.getByTestId('outlet-content')).toBeInTheDocument()
   })
 
-  it('has correct semantic structure', () => {
-    const mockStore = createMockStore({
-      auth: {
-        isAuthenticated: true,
-        user: { username: 'testuser' },
-        tokens: { access: 'mock-token' },
-        loading: false,
-        error: null
-      }
-    })
-
+  it('renders footer with copyright information', () => {
     render(
-      <TestWrapper store={mockStore}>
-        <Layout>
-          <div data-testid="main-content">Main Content</div>
-        </Layout>
+      <TestWrapper>
+        <Layout />
       </TestWrapper>
     )
 
-    // Check for semantic HTML elements
-    expect(screen.getByRole('navigation')).toBeInTheDocument()
-    expect(screen.getByRole('main')).toBeInTheDocument()
+    // Verify footer content
+    expect(screen.getByText(/© 2025 Voyageur Compass. All rights reserved./)).toBeInTheDocument()
   })
 
-  it('renders complete layout structure', () => {
-    const mockStore = createMockStore({
-      auth: {
-        isAuthenticated: true,
-        user: { username: 'testuser' },
-        tokens: { access: 'mock-token' },
-        loading: false,
-        error: null
-      }
-    })
-
+  it('has proper accessibility structure', () => {
     render(
-      <TestWrapper store={mockStore}>
-        <Layout>
-          <div data-testid="layout-content">Content</div>
-        </Layout>
+      <TestWrapper>
+        <Layout />
       </TestWrapper>
     )
 
-    // Check that the layout contains all expected semantic regions
-    expect(screen.getByRole('navigation')).toBeInTheDocument()
-    expect(screen.getByRole('main')).toBeInTheDocument()
-    expect(screen.getByTestId('layout-content')).toBeInTheDocument()
-    
-    // Verify content is properly nested within main region
+    // Check for main content area
     const mainElement = screen.getByRole('main')
-    const contentElement = screen.getByTestId('layout-content')
-    expect(mainElement).toContainElement(contentElement)
+    expect(mainElement).toBeInTheDocument()
+
+    // Check for navigation
+    const navElement = screen.getByRole('navigation')
+    expect(navElement).toBeInTheDocument()
   })
 })

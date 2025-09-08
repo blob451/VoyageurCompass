@@ -1,0 +1,80 @@
+# VoyageurCompass Core Dependencies
+# Essential packages required to run the application
+
+# Web Framework & API
+Django==5.2.5
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.5.0
+drf-spectacular==0.27.2
+
+# Database
+psycopg2-binary==2.9.10
+dj-database-url==2.3.0
+
+# Task Queue & Background Processing
+celery==5.5.3
+django-celery-beat==2.8.1
+redis==5.2.1
+django-redis==6.0.0
+
+# Supporting Libraries
+amqp==5.3.1
+asgiref==3.9.1
+billiard==4.2.1
+kombu==5.5.4
+vine==5.1.0
+cron-descriptor==1.4.5
+django-timezone-field==7.1
+
+# Configuration & Environment
+django-environ==0.11.2
+python-dotenv==1.1.1
+python-dateutil==2.9.0.post0
+pytz==2025.2
+tzdata==2025.2
+
+# Authentication & Security
+PyJWT==2.10.1
+sentry-sdk[django]==1.40.0
+
+# Data Processing & Financial APIs
+requests==2.32.4
+urllib3==2.5.0
+certifi==2025.8.3
+charset-normalizer==3.4.2
+yfinance==0.2.65
+multitasking==0.0.12
+
+# Data Science (Lightweight)
+pandas==2.3.1
+numpy>=1.17.3,<2.0
+
+# Static Files & Web Serving
+whitenoise==6.9.0
+
+# HTML/XML Processing
+beautifulsoup4==4.13.4
+lxml==6.0.0
+html5lib==1.1
+soupsieve==2.7
+webencodings==0.5.1
+
+# Utilities
+attrs==25.3.0
+idna==3.10
+inflection==0.5.1
+jsonschema==4.25.0
+jsonschema-specifications==2025.4.1
+packaging==25.0
+platformdirs==4.3.8
+referencing==0.36.2
+rpds-py==0.26.0
+six==1.17.0
+sqlparse==0.5.3
+typing_extensions==4.14.1
+uritemplate==4.2.0
+
+# Task Processing
+frozendict==2.4.6
+PyYAML==6.0.2

@@ -20,15 +20,15 @@ class IntegratedPredictionService:
     Service that integrates technical analysis with dynamic ML predictions.
     Uses TA indicators to dynamically weight and adjust LSTM predictions.
     """
-    
+
     def __init__(self):
         """Initialize integrated prediction service."""
         self.ta_engine = TechnicalAnalysisEngine()
         self.dynamic_predictor = DynamicTAPredictor()
         self.lstm_service = UniversalLSTMAnalyticsService()
-        
+
         logger.info("Integrated Prediction Service initialized")
-    
+
     def predict_with_ta_context(
         self,
         symbol: str,
@@ -37,12 +37,12 @@ class IntegratedPredictionService:
     ) -> Dict[str, Any]:
         """
         Generate prediction with full TA context and dynamic weighting.
-        
+
         Args:
             symbol: Stock symbol
             horizon: Prediction horizon ('1d', '7d', '30d')
             include_analysis: Whether to include full TA analysis
-            
+
         Returns:
             Comprehensive prediction with TA context
         """
@@ -53,31 +53,31 @@ class IntegratedPredictionService:
                 'timestamp': datetime.now().isoformat(),
                 'success': False
             }
-            
+
             # Step 1: Get base LSTM prediction
             logger.info(f"Getting LSTM prediction for {symbol}")
             lstm_result = self.lstm_service.predict_stock_price(symbol, horizon=horizon)
-            
+
             if not lstm_result:
                 logger.warning(f"No LSTM prediction available for {symbol}")
                 result['error'] = "LSTM prediction unavailable"
                 return result
-            
+
             current_price = lstm_result.get('current_price', 0)
             base_prediction = lstm_result.get('predicted_price', current_price)
-            
+
             # Step 2: Perform technical analysis (without LSTM to avoid recursion)
             if include_analysis:
                 logger.info(f"Performing technical analysis for {symbol}")
                 ta_result = self._get_ta_indicators(symbol)
-                
+
                 if ta_result and ta_result.get('success'):
                     indicators = ta_result.get('indicators', {})
-                    
+
                     # Step 3: Calculate dynamic weights from TA indicators
                     logger.info(f"Calculating dynamic weights for {symbol}")
                     ta_weights = self.dynamic_predictor.calculate_dynamic_weights(indicators)
-                    
+
                     # Step 4: Apply dynamic weighting to prediction
                     logger.info(f"Applying TA weights to prediction for {symbol}")
                     weighted_result = self.dynamic_predictor.weighted_prediction(
@@ -85,10 +85,10 @@ class IntegratedPredictionService:
                         ta_weights=ta_weights,
                         current_price=current_price
                     )
-                    
+
                     # Step 5: Get indicator importance ranking
                     indicator_importance = self.dynamic_predictor.get_indicator_importance(indicators)
-                    
+
                     # Combine results
                     result.update({
                         'success': True,
@@ -106,7 +106,7 @@ class IntegratedPredictionService:
                         'top_indicators': indicator_importance[:5],  # Top 5 most important
                         'sector': lstm_result.get('sector_name', 'Unknown')
                     })
-                    
+
                     # Add detailed breakdown if requested
                     if include_analysis:
                         result['detailed_analysis'] = {
@@ -117,7 +117,7 @@ class IntegratedPredictionService:
                                 'base_confidence': lstm_result.get('confidence', 0.5)
                             }
                         }
-                    
+
                     logger.info(f"Integrated prediction for {symbol}: ${weighted_result['predicted_price']:.2f} "
                                f"({weighted_result['price_change_pct']:+.2f}%), confidence: {weighted_result['confidence']:.2f}")
                 else:
@@ -147,9 +147,9 @@ class IntegratedPredictionService:
                     'confidence': lstm_result.get('confidence', 0.5),
                     'sector': lstm_result.get('sector_name', 'Unknown')
                 })
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Error in integrated prediction for {symbol}: {str(e)}")
             return {
@@ -158,14 +158,14 @@ class IntegratedPredictionService:
                 'success': False,
                 'error': str(e)
             }
-    
+
     def _get_ta_indicators(self, symbol: str) -> Optional[Dict[str, Any]]:
         """
         Get technical indicators without triggering LSTM prediction.
-        
+
         Args:
             symbol: Stock symbol
-            
+
         Returns:
             TA indicators and scores
         """
@@ -174,45 +174,45 @@ class IntegratedPredictionService:
             # to avoid circular dependency
             from Analytics.engine import ta_engine as ta_module
             original_weights = ta_module.TechnicalAnalysisEngine.WEIGHTS.copy()
-            
+
             # Set prediction weight to 0 to skip LSTM
             ta_module.TechnicalAnalysisEngine.WEIGHTS['prediction'] = 0.0
-            
+
             # Perform analysis
             analysis = self.ta_engine.analyze_stock(symbol)
-            
+
             # Restore original weights
             ta_module.TechnicalAnalysisEngine.WEIGHTS = original_weights
-            
+
             if analysis:
                 # Remove prediction indicator to avoid recursion
                 indicators = analysis.get('indicators', {}).copy()
                 indicators.pop('prediction', None)  # Remove prediction indicator
-                
+
                 return {
                     'success': True,
                     'indicators': indicators,
                     'composite_score': analysis.get('composite_score', 5.0)
                 }
-            
+
             return None
-            
+
         except Exception as e:
             logger.error(f"Error getting TA indicators for {symbol}: {str(e)}")
             return None
-    
+
     def _format_indicators(self, indicators: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
         """
         Format indicators for output.
-        
+
         Args:
             indicators: Raw indicator results
-            
+
         Returns:
             Formatted indicator dictionary
         """
         formatted = {}
-        
+
         for name, result in indicators.items():
             if hasattr(result, 'score'):
                 formatted[name] = {
@@ -222,9 +222,9 @@ class IntegratedPredictionService:
                 }
             elif isinstance(result, dict):
                 formatted[name] = result
-        
+
         return formatted
-    
+
     def batch_predict(
         self,
         symbols: list,
@@ -232,16 +232,16 @@ class IntegratedPredictionService:
     ) -> Dict[str, Dict[str, Any]]:
         """
         Generate predictions for multiple symbols.
-        
+
         Args:
             symbols: List of stock symbols
             horizon: Prediction horizon
-            
+
         Returns:
             Dictionary mapping symbols to predictions
         """
         results = {}
-        
+
         for symbol in symbols:
             logger.info(f"Processing batch prediction for {symbol}")
             results[symbol] = self.predict_with_ta_context(
@@ -249,7 +249,7 @@ class IntegratedPredictionService:
                 horizon, 
                 include_analysis=False  # Skip detailed analysis for batch
             )
-        
+
         return results
 
 
@@ -260,8 +260,8 @@ _integrated_predictor_instance = None
 def get_integrated_predictor() -> IntegratedPredictionService:
     """Get or create singleton integrated predictor instance."""
     global _integrated_predictor_instance
-    
+
     if _integrated_predictor_instance is None:
         _integrated_predictor_instance = IntegratedPredictionService()
-    
+
     return _integrated_predictor_instance

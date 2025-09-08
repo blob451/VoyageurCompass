@@ -56,19 +56,19 @@ def batch_analyze(request):
         symbols = request.data.get('symbols', [])
         detail_level = request.data.get('detail_level', 'standard')
         months = request.data.get('months', 6)
-        
+
         if not symbols:
             return Response(
                 {'error': 'No symbols provided'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         if len(symbols) > 20:
             return Response(
                 {'error': 'Maximum 20 symbols allowed per batch'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Prepare analysis requests
         analysis_requests = []
         for symbol in symbols:
@@ -77,23 +77,23 @@ def batch_analyze(request):
                 'months': months,
                 'user': request.user
             })
-        
+
         # Get async processing pipeline
         async_pipeline = get_async_processing_pipeline()
-        
+
         # Define processing function
         def process_single_analysis(req):
             symbol = req['symbol']
             months = req['months']
             user = req['user']
-            
+
             # Run technical analysis
             ta_engine = TechnicalAnalysisEngine()
             analysis_result = ta_engine.analyze_stock(symbol, months=months, user=user)
-            
+
             if not analysis_result:
                 return None
-            
+
             # Get enhanced explanation if requested
             if detail_level != 'summary':
                 hybrid_coordinator = get_hybrid_analysis_coordinator()
@@ -101,19 +101,19 @@ def batch_analyze(request):
                     analysis_data=analysis_result,
                     detail_level=detail_level
                 )
-                
+
                 if explanation_result:
                     analysis_result['explanation'] = explanation_result
-            
+
             return analysis_result
-        
+
         # Process batch
         batch_result = async_pipeline.process_batch_analysis(
             analysis_requests,
             process_single_analysis,
             f"batch_analyze_{request.user.id}_{int(datetime.now().timestamp())}"
         )
-        
+
         return Response({
             'batch_id': batch_result['batch_id'],
             'results': batch_result['results'],
@@ -124,7 +124,7 @@ def batch_analyze(request):
             'success_rate': batch_result['success_rate'],
             'completed_at': batch_result['completed_at']
         })
-        
+
     except Exception as e:
         return Response(
             {'error': f'Batch analysis failed: {str(e)}'},
@@ -168,28 +168,28 @@ def batch_explain(request):
     try:
         analysis_data_list = request.data.get('analysis_data_list', [])
         detail_level = request.data.get('detail_level', 'standard')
-        
+
         if not analysis_data_list:
             return Response(
                 {'error': 'No analysis data provided'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         if len(analysis_data_list) > 15:
             return Response(
                 {'error': 'Maximum 15 analyses allowed per batch'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Get async processing pipeline
         async_pipeline = get_async_processing_pipeline()
-        
+
         # Process batch explanations
         batch_result = async_pipeline.process_sentiment_explanation_batch(
             analysis_data_list,
             detail_level
         )
-        
+
         return Response({
             'batch_id': batch_result['batch_id'],
             'explanations': batch_result['results'],
@@ -200,7 +200,7 @@ def batch_explain(request):
             'success_rate': batch_result['success_rate'],
             'completed_at': batch_result['completed_at']
         })
-        
+
     except Exception as e:
         return Response(
             {'error': f'Batch explanation failed: {str(e)}'},
@@ -230,15 +230,15 @@ def get_task_status(request, task_id):
     try:
         async_pipeline = get_async_processing_pipeline()
         task_status_data = async_pipeline.get_task_status(task_id)
-        
+
         if not task_status_data:
             return Response(
                 {'error': 'Task not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         return Response(task_status_data)
-        
+
     except Exception as e:
         return Response(
             {'error': f'Failed to get task status: {str(e)}'},
@@ -268,12 +268,12 @@ def get_batch_status(request, batch_id):
     try:
         async_pipeline = get_async_processing_pipeline()
         batch_status_data = async_pipeline.get_batch_status(batch_id)
-        
+
         if 'error' in batch_status_data:
             return Response(batch_status_data, status=status.HTTP_404_NOT_FOUND)
-        
+
         return Response(batch_status_data)
-        
+
     except Exception as e:
         return Response(
             {'error': f'Failed to get batch status: {str(e)}'},
@@ -294,9 +294,9 @@ def async_performance(request):
     try:
         async_pipeline = get_async_processing_pipeline()
         performance_summary = async_pipeline.get_performance_summary()
-        
+
         return Response(performance_summary)
-        
+
     except Exception as e:
         return Response(
             {'error': f'Failed to get performance metrics: {str(e)}'},

@@ -54,39 +54,39 @@ def generate_dataset(request):
         num_samples = request.data.get('num_samples', 1000)
         include_sentiment = request.data.get('include_sentiment', True)
         quality_threshold = request.data.get('quality_threshold', 0.7)
-        
+
         # Validate parameters
         if not isinstance(num_samples, int) or num_samples < 1 or num_samples > 10000:
             return Response(
                 {'error': 'num_samples must be between 1 and 10000'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         if not isinstance(quality_threshold, (int, float)) or not 0 <= quality_threshold <= 1:
             return Response(
                 {'error': 'quality_threshold must be between 0.0 and 1.0'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Get fine-tuning manager
         finetuning_manager = get_finetuning_manager()
-        
+
         # Generate dataset
         logger.info(f"User {request.user} requested dataset generation: {num_samples} samples")
-        
+
         dataset_metadata = finetuning_manager.generate_enhanced_dataset(
             num_samples=num_samples,
             include_sentiment=include_sentiment,
             quality_threshold=quality_threshold
         )
-        
+
         return Response({
             'message': 'Dataset generated successfully',
             'dataset_metadata': dataset_metadata,
             'generated_by': request.user.username,
             'generated_at': datetime.now().isoformat()
         })
-        
+
     except Exception as e:
         logger.error(f"Dataset generation failed for user {request.user}: {str(e)}")
         return Response(
@@ -129,31 +129,31 @@ def start_finetuning(request):
         dataset_path = request.data.get('dataset_path')
         job_name = request.data.get('job_name')
         config_overrides = request.data.get('config_overrides', {})
-        
+
         if not dataset_path:
             return Response(
                 {'error': 'dataset_path is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Get fine-tuning manager
         finetuning_manager = get_finetuning_manager()
-        
+
         # Start fine-tuning job
         logger.info(f"User {request.user} started fine-tuning job: {job_name or 'auto-generated'}")
-        
+
         job_info = finetuning_manager.start_fine_tuning_job(
             dataset_path=dataset_path,
             job_name=job_name,
             config_overrides=config_overrides
         )
-        
+
         return Response({
             'message': 'Fine-tuning job started successfully',
             'job_info': job_info,
             'started_by': request.user.username
         })
-        
+
     except Exception as e:
         logger.error(f"Fine-tuning job start failed for user {request.user}: {str(e)}")
         return Response(
@@ -184,15 +184,15 @@ def get_job_status(request, job_id):
     try:
         finetuning_manager = get_finetuning_manager()
         job_status = finetuning_manager.get_job_status(job_id)
-        
+
         if not job_status:
             return Response(
                 {'error': 'Job not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         return Response(job_status)
-        
+
     except Exception as e:
         return Response(
             {'error': f'Failed to get job status: {str(e)}'},
@@ -213,9 +213,9 @@ def list_jobs(request):
     try:
         finetuning_manager = get_finetuning_manager()
         jobs_info = finetuning_manager.list_jobs()
-        
+
         return Response(jobs_info)
-        
+
     except Exception as e:
         return Response(
             {'error': f'Failed to list jobs: {str(e)}'},
@@ -236,12 +236,12 @@ def list_datasets(request):
     try:
         finetuning_manager = get_finetuning_manager()
         datasets = finetuning_manager.list_datasets()
-        
+
         return Response({
             'datasets': datasets,
             'total_count': len(datasets)
         })
-        
+
     except Exception as e:
         return Response(
             {'error': f'Failed to list datasets: {str(e)}'},
@@ -262,12 +262,12 @@ def list_models(request):
     try:
         finetuning_manager = get_finetuning_manager()
         models = finetuning_manager.list_models()
-        
+
         return Response({
             'models': models,
             'total_count': len(models)
         })
-        
+
     except Exception as e:
         return Response(
             {'error': f'Failed to list models: {str(e)}'},
@@ -306,28 +306,28 @@ def export_dataset(request):
     try:
         dataset_path = request.data.get('dataset_path')
         export_format = request.data.get('format', 'jsonl')
-        
+
         if not dataset_path:
             return Response(
                 {'error': 'dataset_path is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         if export_format not in ['jsonl', 'csv', 'huggingface']:
             return Response(
                 {'error': 'format must be one of: jsonl, csv, huggingface'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Get fine-tuning manager
         finetuning_manager = get_finetuning_manager()
-        
+
         # Export dataset
         export_path = finetuning_manager.export_dataset_for_external_training(
             dataset_path=dataset_path,
             format=export_format
         )
-        
+
         return Response({
             'message': 'Dataset exported successfully',
             'export_path': export_path,
@@ -335,7 +335,7 @@ def export_dataset(request):
             'exported_by': request.user.username,
             'exported_at': datetime.now().isoformat()
         })
-        
+
     except Exception as e:
         logger.error(f"Dataset export failed for user {request.user}: {str(e)}")
         return Response(
@@ -356,12 +356,12 @@ def finetuning_status(request):
     """
     try:
         from Analytics.services.financial_fine_tuner import FINE_TUNING_AVAILABLE
-        
+
         finetuning_manager = get_finetuning_manager()
         jobs_info = finetuning_manager.list_jobs()
         datasets = finetuning_manager.list_datasets()
         models = finetuning_manager.list_models()
-        
+
         return Response({
             'fine_tuning_available': FINE_TUNING_AVAILABLE,
             'dependencies_installed': FINE_TUNING_AVAILABLE,
@@ -392,7 +392,7 @@ def finetuning_status(request):
                 'bitsandbytes'
             ] if not FINE_TUNING_AVAILABLE else None
         })
-        
+
     except Exception as e:
         return Response(
             {'error': f'Failed to get system status: {str(e)}'},

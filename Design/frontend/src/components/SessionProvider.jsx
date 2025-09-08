@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout, selectCurrentToken, selectCurrentUser } from '../features/auth/authSlice';
@@ -45,7 +45,7 @@ const SessionProvider = ({ children }) => {
         sessionManager.cleanup();
       }
     };
-  }, [token, user, isInitialized]);
+  }, [token, user, isInitialized, handleLogout]);
 
   // Handle page visibility changes
   useEffect(() => {
@@ -66,13 +66,13 @@ const SessionProvider = ({ children }) => {
     );
 
     return cleanup;
-  }, [token]);
+  }, [token, handleLogout]);
 
   // Handle page unload (browser close/refresh)
   useEffect(() => {
     if (!token) return;
 
-    const cleanup = handlePageUnload((event) => {
+    const cleanup = handlePageUnload(() => {
       // Call logout API in background (best effort)
       try {
         const refreshToken = localStorage.getItem('refreshToken');
@@ -92,9 +92,9 @@ const SessionProvider = ({ children }) => {
     });
 
     return cleanup;
-  }, [token]);
+  }, [token, handleLogout]);
 
-  const handleLogout = async (reason = 'manual') => {
+  const handleLogout = useCallback(async (reason = 'manual') => {
     try {
       setShowWarning(false);
       
@@ -127,7 +127,7 @@ const SessionProvider = ({ children }) => {
         state: { reason: 'error' } 
       });
     }
-  };
+  }, [logoutApi, dispatch, navigate]);
 
   const handleExtendSession = () => {
     console.log('Extending session');

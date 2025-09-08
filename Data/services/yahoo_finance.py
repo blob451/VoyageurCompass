@@ -556,6 +556,7 @@ class YahooFinanceService:
         return {
             'is_open': is_open,
             'current_time': now.isoformat(),
+            'timezone': 'America/New_York',
             'market_hours': {
                 'open': '09:30 EST',
                 'close': '16:00 EST'

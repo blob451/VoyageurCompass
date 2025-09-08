@@ -50,12 +50,10 @@ import {
   Visibility,
   Psychology
 } from '@mui/icons-material';
-import { useSelector } from 'react-redux';
 import { useAnalyzeStockMutation, useGetUserAnalysisHistoryQuery, useGetUserLatestAnalysisQuery } from '../features/api/apiSlice';
-import { analysisLogger, performanceUtils } from '../utils/logger';
+import { analysisLogger } from '../utils/logger';
 
 const StockSearchPage = () => {
-  const { user } = useSelector((state) => state.auth);
   const location = useLocation();
   const navigate = useNavigate();
   const [searchTicker, setSearchTicker] = useState('');
@@ -73,7 +71,7 @@ const StockSearchPage = () => {
   const [analysisPhase, setAnalysisPhase] = useState('idle'); // 'idle' | 'confirming' | 'syncing' | 'analyzing' | 'completed' | 'failed'
   
   // RTK Query hooks
-  const [analyzeStock, { isLoading: analyzing }] = useAnalyzeStockMutation();
+  const [analyzeStock] = useAnalyzeStockMutation();
   const { data: analysisHistoryData, refetch: refetchHistory } = useGetUserAnalysisHistoryQuery({ limit: 10 });
 
   // Mock recent searches for demonstration
@@ -97,7 +95,7 @@ const StockSearchPage = () => {
   const autoAnalyze = location.state?.autoAnalyze;
   
   // Query for latest analysis if coming from dashboard (but not auto-analyzing)
-  const { data: latestAnalysisData, isLoading: loadingLatestAnalysis } = useGetUserLatestAnalysisQuery(
+  const { data: latestAnalysisData } = useGetUserLatestAnalysisQuery(
     dashboardTicker, 
     { skip: !dashboardTicker || autoAnalyze }
   );
@@ -208,7 +206,7 @@ const StockSearchPage = () => {
       setAnalysisPhase('failed');
       console.error('Analysis error:', err);
     }
-  }, [searchTicker, userCredits, analyzeStock, refetchHistory, analysisHistoryData]);
+  }, [searchTicker, userCredits, analyzeStock, refetchHistory, analysisHistoryData, analysisPhase, includeExplanation]);
 
   // Handle navigation from dashboard
   useEffect(() => {

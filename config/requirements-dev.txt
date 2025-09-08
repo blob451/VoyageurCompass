@@ -1,0 +1,31 @@
+# VoyageurCompass Development Dependencies
+# Tools for testing, linting, and development
+
+# Include base requirements
+-r requirements-base.txt
+
+# Testing Framework
+pytest==8.4.1
+pytest-cov==6.2.1
+pytest-django==4.11.1
+coverage==7.10.2
+
+# Code Quality & Linting Tools
+flake8==7.1.1
+black==24.10.0
+isort==5.13.2
+
+# Testing Utilities & Interactive Tools
+iniconfig==2.1.0
+pluggy==1.6.0
+click==8.2.1
+click-didyoumean==0.3.1
+click-plugins==1.1.1.2
+click-repl==0.3.0
+colorama==0.4.6
+prompt_toolkit==3.0.51
+Pygments==2.19.2
+wcwidth==0.2.13
+
+# Cron Job Testing
+python-crontab==3.3.0

@@ -33,7 +33,7 @@ import {
   useGenerateExplanationMutation, 
   useGetExplanationQuery 
 } from '../features/api/apiSlice';
-import { explanationLogger, performanceUtils } from '../utils/logger';
+import { explanationLogger } from '../utils/logger';
 
 const TechnicalExplanation = ({ 
   analysisId, 
@@ -91,7 +91,7 @@ const TechnicalExplanation = ({
 
   const getTopIndicators = (indicators, count = 5) => {
     return Object.entries(indicators)
-      .filter(([key, indicator]) => key !== 'sentiment')
+      .filter(([key]) => key !== 'sentiment')
       .map(([key, indicator]) => ({
         key,
         name: key.toUpperCase(),
@@ -104,7 +104,7 @@ const TechnicalExplanation = ({
 
   const getTopContributors = (weightedScores, count = 5) => {
     return Object.entries(weightedScores)
-      .filter(([key, value]) => value !== null && value !== undefined)
+      .filter(([, value]) => value !== null && value !== undefined)
       .map(([key, value]) => ({
         key,
         name: key.replace('w_', '').toUpperCase(),
@@ -124,7 +124,7 @@ const TechnicalExplanation = ({
     });
     
     try {
-      const result = await generateExplanation({
+      await generateExplanation({
         analysisId,
         detailLevel
       }).unwrap();

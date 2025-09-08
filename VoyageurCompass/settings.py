@@ -13,7 +13,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import environ
 import os
 import sys
-import json
 from pathlib import Path
 from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
@@ -21,6 +20,7 @@ from django.core.exceptions import ImproperlyConfigured
 # Conditional Sentry import with error handling
 try:
     import sentry_sdk
+
     SENTRY_AVAILABLE = True
 except ImportError:
     SENTRY_AVAILABLE = False
@@ -38,7 +38,7 @@ env = environ.Env(
 )
 
 # Load environment variables from .env file
-env_file = os.path.join(BASE_DIR, '.env')
+env_file = os.path.join(BASE_DIR, ".env")
 if os.path.exists(env_file):
     environ.Env.read_env(env_file)
 
@@ -46,169 +46,164 @@ if os.path.exists(env_file):
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG', default=False)
+DEBUG = env("DEBUG", default=False)
 
 # SECURITY: Enforce secret key in production
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-dev-only-key-replace-in-production')
-if not DEBUG and SECRET_KEY == 'django-insecure-dev-only-key-replace-in-production':
+SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-only-key-replace-in-production")
+if not DEBUG and SECRET_KEY == "django-insecure-dev-only-key-replace-in-production":
     raise ImproperlyConfigured(
         "SECRET_KEY must be set in environment for production. "
-        "Generate with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'"
+        "Generate with: python -c 'from django.core.management.utils import get_random_secret_key; "
+        "print(get_random_secret_key())'"
     )
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
-APP_ENV = env('APP_ENV', default='development')
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+APP_ENV = env("APP_ENV", default="development")
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     # Third-party applications
-    'rest_framework',
-    'rest_framework_simplejwt',
-    'corsheaders',
-    'drf_spectacular',
-    'django_celery_beat',
-    
+    "rest_framework",
+    "rest_framework_simplejwt",
+    "corsheaders",
+    "drf_spectacular",
+    "django_celery_beat",
     # VoyageurCompass applications
-    'Analytics',
-    'Core',
-    'Data',
-    'Design',
+    "Analytics",
+    "Core",
+    "Data",
+    "Design",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Static file serving middleware
-    'Core.middleware.CustomCorsMiddleware',  # Custom CORS middleware with preflight support
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'Core.backends.BlacklistCheckMiddleware',  # JWT token blacklist verification
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'Core.middleware.RequestLoggingMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Static file serving middleware
+    "Core.middleware.CustomCorsMiddleware",  # Custom CORS middleware with preflight support
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "Core.backends.BlacklistCheckMiddleware",  # JWT token blacklist verification
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "Core.middleware.RequestLoggingMiddleware",
 ]
 
-ROOT_URLCONF = 'VoyageurCompass.urls'
+ROOT_URLCONF = "VoyageurCompass.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-                'django.template.context_processors.media',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "django.template.context_processors.media",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'VoyageurCompass.wsgi.application'
+WSGI_APPLICATION = "VoyageurCompass.wsgi.application"
 
 
 # Database Configuration
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('DB_NAME', default='voyageur_compass_db'),
-        'USER': env('DB_USER', default='voyageur_user'),
-        'PASSWORD': env('DB_PASSWORD', default='ab727492Z'),
-        'HOST': env('DB_HOST', default='localhost'),
-        'PORT': env('DB_PORT', default='5433'),
-        
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DB_NAME", default="voyageur_compass_db"),
+        "USER": env("DB_USER", default="voyageur_user"),
+        "PASSWORD": env("DB_PASSWORD", default="ab727492Z"),
+        "HOST": env("DB_HOST", default="localhost"),
+        "PORT": env("DB_PORT", default="5433"),
         # Connection Management Settings
-        'CONN_MAX_AGE': 600,
-        'CONN_HEALTH_CHECKS': True,
-        
+        "CONN_MAX_AGE": 600,
+        "CONN_HEALTH_CHECKS": True,
         # Database Optimization Settings
-        'OPTIONS': {
-            'connect_timeout': 10,
-            'options': '-c statement_timeout=30000',
-            'isolation_level': 2,
-            'client_encoding': 'UTF8',
+        "OPTIONS": {
+            "connect_timeout": 10,
+            "options": "-c statement_timeout=30000",
+            "isolation_level": 2,
+            "client_encoding": "UTF8",
         },
-        
         # Transaction Settings - Disabled for performance (use selective transactions instead)
-        'ATOMIC_REQUESTS': False,
+        "ATOMIC_REQUESTS": False,
     }
 }
+
 
 # Database engine validation - enforce PostgreSQL usage
 def checkDatabaseEngine():
     """Enforce PostgreSQL database engine usage."""
-    if ('sqlite' in DATABASES['default']['ENGINE'].lower()
-            and 'test' not in sys.argv
-            and 'pytest' not in sys.modules):
-        raise ImproperlyConfigured(
-            "SQLite is not allowed! Configure PostgreSQL in DATABASES setting."
-        )
+    if "sqlite" in DATABASES["default"]["ENGINE"].lower() and "test" not in sys.argv and "pytest" not in sys.modules:
+        raise ImproperlyConfigured("SQLite is not allowed! Configure PostgreSQL in DATABASES setting.")
+
+
 checkDatabaseEngine()
 
 # Test database configuration - PostgreSQL for consistency
-if 'test' in sys.argv or 'pytest' in sys.modules:
+if "test" in sys.argv or "pytest" in sys.modules:
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': env('TEST_DB_NAME', default='test_voyageur_compass_db'),
-            'USER': env('TEST_DB_USER', default='voyageur_user'),
-            'PASSWORD': env('TEST_DB_PASSWORD', default='ab727492Z'),
-            'HOST': env('TEST_DB_HOST', default='localhost'),
-            'PORT': env('TEST_DB_PORT', default='5433'),
-            'OPTIONS': {
-                'connect_timeout': 10,
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("TEST_DB_NAME", default="test_voyageur_compass_db"),
+            "USER": env("TEST_DB_USER", default="voyageur_user"),
+            "PASSWORD": env("TEST_DB_PASSWORD", default="ab727492Z"),
+            "HOST": env("TEST_DB_HOST", default="localhost"),
+            "PORT": env("TEST_DB_PORT", default="5433"),
+            "OPTIONS": {
+                "connect_timeout": 10,
             },
-            'TEST': {
-                'NAME': 'test_voyageur_compass_db',
-            }
+            "TEST": {
+                "NAME": "test_voyageur_compass_db",
+            },
         }
     }
 
 # Redis Cache Configuration
-REDIS_HOST = env('REDIS_HOST', default='redis')
-REDIS_PORT = env('REDIS_PORT', default='6379')
-REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'
+REDIS_HOST = env("REDIS_HOST", default="redis")
+REDIS_PORT = env("REDIS_PORT", default="6379")
+REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
 CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': REDIS_URL,
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'CONNECTION_POOL_KWARGS': {
-                'max_connections': 50,
-                'retry_on_timeout': True,
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_URL,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {
+                "max_connections": 50,
+                "retry_on_timeout": True,
             },
-            'SOCKET_CONNECT_TIMEOUT': 5,
-            'SOCKET_TIMEOUT': 5,
-            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
-            'IGNORE_EXCEPTIONS': True,
+            "SOCKET_CONNECT_TIMEOUT": 5,
+            "SOCKET_TIMEOUT": 5,
+            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+            "IGNORE_EXCEPTIONS": True,
         },
-        'KEY_PREFIX': 'voyageur',
-        'TIMEOUT': 300,
+        "KEY_PREFIX": "voyageur",
+        "TIMEOUT": 300,
     }
 }
 
 # Celery Configuration
-CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://redis:6379/1')
-CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='redis://redis:6379/2')
-CELERY_ACCEPT_CONTENT = ['application/json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = 'America/Vancouver'
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://redis:6379/1")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://redis:6379/2")
+CELERY_ACCEPT_CONTENT = ["application/json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "America/Vancouver"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60
 CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60
@@ -219,101 +214,98 @@ CELERY_BEAT_SCHEDULE = {}
 
 # Authentication Backends
 AUTHENTICATION_BACKENDS = [
-    'Core.backends.EmailOrUsernameModelBackend',  # Custom backend for email/username login
-    'django.contrib.auth.backends.ModelBackend',  # Fallback to default Django backend
+    "Core.backends.EmailOrUsernameModelBackend",  # Custom backend for email/username login
+    "django.contrib.auth.backends.ModelBackend",  # Fallback to default Django backend
 ]
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-        'OPTIONS': {
-            'min_length': 10,
-        }
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {
+            "min_length": 10,
+        },
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
 
 # Internationalization
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'America/Vancouver'
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "America/Vancouver"
 USE_I18N = True
 USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'Design' / 'staticfiles'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "Design" / "staticfiles"
 # Only add static dir if it exists
-staticDir = BASE_DIR / 'Design' / 'static'
+staticDir = BASE_DIR / "Design" / "static"
 STATICFILES_DIRS = [staticDir] if staticDir.exists() else []
 
 # WhiteNoise Configuration for static file compression
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 WHITENOISE_COMPRESS_OFFLINE = True
 WHITENOISE_COMPRESSION_QUALITY = 85
 
 # Media files (User uploads)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'Design' / 'media'
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "Design" / "media"
 
 # Default primary key field type
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
     ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
     ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",
+        "user": "1000/hour",
     },
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 
 # JWT Settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': False,
-    
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'VERIFYING_KEY': None,
-    'AUDIENCE': None,
-    'ISSUER': None,
-    
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-    
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
-    'TOKEN_TYPE_CLAIM': 'token_type',
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": False,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "VERIFYING_KEY": None,
+    "AUDIENCE": None,
+    "ISSUER": None,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "TOKEN_TYPE_CLAIM": "token_type",
 }
 
 
@@ -330,85 +322,92 @@ if DEBUG:
         "http://127.0.0.1:3003",
     ]
 else:
-    # Production: explicit origin configuration required
-    corsOrigins = env.list('CORS_ALLOWED_ORIGINS', default=[])
-    if not corsOrigins:
-        raise ImproperlyConfigured(
-            "CORS_ALLOWED_ORIGINS must be set in production!"
-        )
+    # Production/CI: explicit origin configuration or CI defaults
+    corsOrigins = env.list("CORS_ALLOWED_ORIGINS", default=[])
+    # Allow CI/CD to run without CORS_ALLOWED_ORIGINS by checking for CI environment
+    if not corsOrigins and not env.bool("CI", default=False):
+        raise ImproperlyConfigured("CORS_ALLOWED_ORIGINS must be set in production!")
+    # For CI environment, use safe defaults for testing
+    if env.bool("CI", default=False) and not corsOrigins:
+        corsOrigins = [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        ]
 
 CORS_ALLOWED_ORIGINS = corsOrigins
 
 # CSRF Configuration
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=corsOrigins)
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=corsOrigins)
 
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
 ]
 
 CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]
 
 
 # API Documentation Settings
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Voyageur Compass API',
-    'DESCRIPTION': 'Financial market analysis and portfolio management API',
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-    'SWAGGER_UI_SETTINGS': {
-        'deepLinking': True,
-        'persistAuthorization': True,
-        'displayOperationId': True,
+    "TITLE": "Voyageur Compass API",
+    "DESCRIPTION": "Financial market analysis and portfolio management API",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+        "displayOperationId": True,
     },
-    'COMPONENT_SPLIT_REQUEST': True,
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
 
 # Security configuration with mandatory header enforcement
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
-SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 # CSRF cookie security
-CSRF_COOKIE_SECURE = env('CSRF_COOKIE_SECURE', default=not DEBUG)
-CSRF_COOKIE_SAMESITE = 'Strict'
+CSRF_COOKIE_SECURE = env("CSRF_COOKIE_SECURE", default=not DEBUG)
+CSRF_COOKIE_SAMESITE = "Strict"
 CSRF_COOKIE_HTTPONLY = True
 
 if not DEBUG:
     # HTTPS enforcement
-    SECURE_SSL_REDIRECT = env('SECURE_SSL_REDIRECT', default=True)
-    SESSION_COOKIE_SECURE = env('SESSION_COOKIE_SECURE', default=True)
-    
+    SECURE_SSL_REDIRECT = env("SECURE_SSL_REDIRECT", default=True)
+    SESSION_COOKIE_SECURE = env("SESSION_COOKIE_SECURE", default=True)
+
     # HSTS settings
-    SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=31536000)  # 1 year
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31536000)  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
-    
+
     # Proxy headers for nginx
     USE_X_FORWARDED_HOST = True
     USE_X_FORWARDED_PORT = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
     # Session security
-    SESSION_COOKIE_SAMESITE = 'Strict'
+    SESSION_COOKIE_SAMESITE = "Strict"
     SESSION_COOKIE_AGE = 86400  # 24 hours
     SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
@@ -417,28 +416,28 @@ SESSION_COOKIE_HTTPONLY = True
 
 
 # Structured Logging Configuration
-LOG_LEVEL = env('LOG_LEVEL', default='INFO')
+LOG_LEVEL = env("LOG_LEVEL", default="INFO")
 
 # Logging directory structure configuration
-LOGS_BASE_DIR = BASE_DIR / 'Temp' / 'logs'
+LOGS_BASE_DIR = BASE_DIR / "Temp" / "logs"
 LOG_DIRS = {
-    'web_analysis': LOGS_BASE_DIR / 'web_analysis' / 'current',
-    'web_analysis_archived': LOGS_BASE_DIR / 'web_analysis' / 'archived',
-    'model_training_universal': LOGS_BASE_DIR / 'model_training' / 'universal_lstm',
-    'model_training_individual': LOGS_BASE_DIR / 'model_training' / 'individual_lstm',
-    'model_training_sentiment': LOGS_BASE_DIR / 'model_training' / 'sentiment',
-    'data_collection_stock': LOGS_BASE_DIR / 'data_collection' / 'stock_data',
-    'data_collection_sector': LOGS_BASE_DIR / 'data_collection' / 'sector_data',
-    'data_collection_errors': LOGS_BASE_DIR / 'data_collection' / 'errors',
-    'system_django': LOGS_BASE_DIR / 'system' / 'django',
-    'system_celery': LOGS_BASE_DIR / 'system' / 'celery',
-    'system_api': LOGS_BASE_DIR / 'system' / 'api',
-    'analytics_technical': LOGS_BASE_DIR / 'analytics' / 'technical',
-    'analytics_sentiment': LOGS_BASE_DIR / 'analytics' / 'sentiment',
-    'analytics_portfolio': LOGS_BASE_DIR / 'analytics' / 'portfolio',
-    'security_auth': LOGS_BASE_DIR / 'security' / 'auth',
-    'security_failed': LOGS_BASE_DIR / 'security' / 'failed_attempts',
-    'security_api': LOGS_BASE_DIR / 'security' / 'api_security',
+    "web_analysis": LOGS_BASE_DIR / "web_analysis" / "current",
+    "web_analysis_archived": LOGS_BASE_DIR / "web_analysis" / "archived",
+    "model_training_universal": LOGS_BASE_DIR / "model_training" / "universal_lstm",
+    "model_training_individual": LOGS_BASE_DIR / "model_training" / "individual_lstm",
+    "model_training_sentiment": LOGS_BASE_DIR / "model_training" / "sentiment",
+    "data_collection_stock": LOGS_BASE_DIR / "data_collection" / "stock_data",
+    "data_collection_sector": LOGS_BASE_DIR / "data_collection" / "sector_data",
+    "data_collection_errors": LOGS_BASE_DIR / "data_collection" / "errors",
+    "system_django": LOGS_BASE_DIR / "system" / "django",
+    "system_celery": LOGS_BASE_DIR / "system" / "celery",
+    "system_api": LOGS_BASE_DIR / "system" / "api",
+    "analytics_technical": LOGS_BASE_DIR / "analytics" / "technical",
+    "analytics_sentiment": LOGS_BASE_DIR / "analytics" / "sentiment",
+    "analytics_portfolio": LOGS_BASE_DIR / "analytics" / "portfolio",
+    "security_auth": LOGS_BASE_DIR / "security" / "auth",
+    "security_failed": LOGS_BASE_DIR / "security" / "failed_attempts",
+    "security_api": LOGS_BASE_DIR / "security" / "api_security",
 }
 
 # Ensure all log directories exist
@@ -446,186 +445,187 @@ for log_dir in LOG_DIRS.values():
     log_dir.mkdir(parents=True, exist_ok=True)
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
         },
-        'simple': {
-            'format': '{levelname} {asctime} {message}',
-            'style': '{',
+        "simple": {
+            "format": "{levelname} {asctime} {message}",
+            "style": "{",
         },
-        'security': {
-            'format': '{levelname} {asctime} {module} {funcName} {lineno} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-        'django_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIRS['system_django'] / 'django.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'celery_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIRS['system_celery'] / 'celery.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'api_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIRS['system_api'] / 'api.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'data_collection_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIRS['data_collection_stock'] / 'stock_data.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'data_errors_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIRS['data_collection_errors'] / 'errors.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'analytics_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIRS['analytics_technical'] / 'technical_analysis.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'sentiment_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIRS['analytics_sentiment'] / 'sentiment_analysis.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'security_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIRS['security_auth'] / 'auth.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 10,
-            'formatter': 'security',
-        },
-        'security_failed_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIRS['security_failed'] / 'failed_attempts.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 10,
-            'formatter': 'security',
-        },
-        'model_training_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIRS['model_training_universal'] / 'universal_lstm.log',
-            'maxBytes': 52428800,  # 50MB
-            'backupCount': 3,
-            'formatter': 'verbose',
+        "security": {
+            "format": "{levelname} {asctime} {module} {funcName} {lineno} {message}",
+            "style": "{",
         },
     },
-    'loggers': {
-        'django': {
-            'handlers': ['console', 'django_file'],
-            'level': LOG_LEVEL,
-            'propagate': False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
         },
-        'django.server': {
-            'handlers': ['console', 'api_file'],
-            'level': 'INFO',
-            'propagate': False,
+        "django_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIRS["system_django"] / "django.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "formatter": "verbose",
         },
-        'django.request': {
-            'handlers': ['console', 'api_file'],
-            'level': 'WARNING',
-            'propagate': False,
+        "celery_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIRS["system_celery"] / "celery.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "formatter": "verbose",
         },
-        'django.security': {
-            'handlers': ['console', 'security_file'],
-            'level': 'WARNING',
-            'propagate': False,
+        "api_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIRS["system_api"] / "api.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "formatter": "verbose",
         },
-        'celery': {
-            'handlers': ['console', 'celery_file'],
-            'level': LOG_LEVEL,
-            'propagate': False,
+        "data_collection_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIRS["data_collection_stock"] / "stock_data.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "formatter": "verbose",
         },
-        'celery.task': {
-            'handlers': ['console', 'celery_file'],
-            'level': LOG_LEVEL,
-            'propagate': False,
+        "data_errors_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIRS["data_collection_errors"] / "errors.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "formatter": "verbose",
         },
-        'Data': {
-            'handlers': ['console', 'data_collection_file'],
-            'level': LOG_LEVEL,
-            'propagate': False,
+        "analytics_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIRS["analytics_technical"] / "technical_analysis.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "formatter": "verbose",
         },
-        'Analytics': {
-            'handlers': ['console', 'analytics_file'],
-            'level': LOG_LEVEL,
-            'propagate': False,
+        "sentiment_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIRS["analytics_sentiment"] / "sentiment_analysis.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "formatter": "verbose",
         },
-        'Analytics.engine.sentiment': {
-            'handlers': ['console', 'sentiment_file'],
-            'level': LOG_LEVEL,
-            'propagate': False,
+        "security_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIRS["security_auth"] / "auth.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "formatter": "security",
         },
-        'Analytics.ml': {
-            'handlers': ['console', 'model_training_file'],
-            'level': LOG_LEVEL,
-            'propagate': False,
+        "security_failed_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIRS["security_failed"] / "failed_attempts.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "formatter": "security",
         },
-        'Core.auth': {
-            'handlers': ['console', 'security_file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'Core.failed_attempts': {
-            'handlers': ['console', 'security_failed_file'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'data_collection_errors': {
-            'handlers': ['console', 'data_errors_file'],
-            'level': 'ERROR',
-            'propagate': False,
+        "model_training_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIRS["model_training_universal"] / "universal_lstm.log",
+            "maxBytes": 52428800,  # 50MB
+            "backupCount": 3,
+            "formatter": "verbose",
         },
     },
-    'root': {
-        'handlers': ['console'],
-        'level': LOG_LEVEL,
+    "loggers": {
+        "django": {
+            "handlers": ["console", "django_file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": ["console", "api_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console", "api_file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console", "security_file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "celery": {
+            "handlers": ["console", "celery_file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "celery.task": {
+            "handlers": ["console", "celery_file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "Data": {
+            "handlers": ["console", "data_collection_file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "Analytics": {
+            "handlers": ["console", "analytics_file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "Analytics.engine.sentiment": {
+            "handlers": ["console", "sentiment_file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "Analytics.ml": {
+            "handlers": ["console", "model_training_file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "Core.auth": {
+            "handlers": ["console", "security_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "Core.failed_attempts": {
+            "handlers": ["console", "security_failed_file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "data_collection_errors": {
+            "handlers": ["console", "data_errors_file"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": LOG_LEVEL,
     },
 }
 
 # Sentry Error Tracking
-SENTRY_DSN = env('SENTRY_DSN', default=None)
+SENTRY_DSN = env("SENTRY_DSN", default=None)
 if SENTRY_AVAILABLE and SENTRY_DSN:
+
     def before_send(event, hint):
         """Data sanitisation filter for Sentry events."""
         # List of sensitive keys to redact
-        sensitive_keys = ['password', 'token', 'secret', 'api_key', 'private_key', 'ssn']
-        
+        sensitive_keys = ["password", "token", "secret", "api_key", "private_key", "ssn"]
+
         def redact_dict(d):
             """Recursive sensitive key redaction."""
             if not isinstance(d, dict):
                 return d
             for key in list(d.keys()):
                 if any(sensitive in str(key).lower() for sensitive in sensitive_keys):
-                    d[key] = '[REDACTED]'
+                    d[key] = "[REDACTED]"
                 elif isinstance(d[key], dict):
                     redact_dict(d[key])
                 elif isinstance(d[key], list):
@@ -633,7 +633,7 @@ if SENTRY_AVAILABLE and SENTRY_DSN:
                         if isinstance(item, dict):
                             redact_dict(item)
             return d
-        
+
         if isinstance(event, dict):
             event = redact_dict(event.copy())
         return event
@@ -646,52 +646,69 @@ if SENTRY_AVAILABLE and SENTRY_DSN:
             sentry_sdk.integrations.django.DjangoIntegration(),
             sentry_sdk.integrations.redis.RedisIntegration(),
         ],
-        traces_sample_rate=float(env('SENTRY_TRACES_SAMPLE_RATE', default='0.1')),
+        traces_sample_rate=float(env("SENTRY_TRACES_SAMPLE_RATE", default="0.1")),
         environment=APP_ENV,
-        release=env('APP_VERSION', default='unknown'),
+        release=env("APP_VERSION", default="unknown"),
     )
 
 
 # Custom Settings for VoyageurCompass
-YAHOO_FINANCE_API_TIMEOUT = int(env('YAHOO_FINANCE_API_TIMEOUT', default=30))
-DATA_REFRESH_INTERVAL = int(env('DATA_REFRESH_INTERVAL', default=3600))
+YAHOO_FINANCE_API_TIMEOUT = int(env("YAHOO_FINANCE_API_TIMEOUT", default=30))
+DATA_REFRESH_INTERVAL = int(env("DATA_REFRESH_INTERVAL", default=3600))
 
 # Stock synchronization settings
-STOCK_DATA_SYNC_THRESHOLD_SECONDS = int(env('STOCK_DATA_SYNC_THRESHOLD_SECONDS', default=3600))
+STOCK_DATA_SYNC_THRESHOLD_SECONDS = int(env("STOCK_DATA_SYNC_THRESHOLD_SECONDS", default=3600))
 
 # Local LLM Configuration
-OLLAMA_HOST = env('OLLAMA_HOST', default='localhost')
-OLLAMA_PORT = int(env('OLLAMA_PORT', default=11434))
-OLLAMA_MODEL = env('OLLAMA_MODEL', default='llama3.1:70b')
+OLLAMA_HOST = env("OLLAMA_HOST", default="localhost")
+OLLAMA_PORT = int(env("OLLAMA_PORT", default=11434))
+OLLAMA_MODEL = env("OLLAMA_MODEL", default="llama3.1:70b")
 
 # LLM Performance Optimization
-OLLAMA_PRIMARY_MODEL = env('OLLAMA_PRIMARY_MODEL', default='llama3.1:8b')
-OLLAMA_DETAILED_MODEL = env('OLLAMA_DETAILED_MODEL', default='llama3.1:70b')
-OLLAMA_PERFORMANCE_MODE = env.bool('OLLAMA_PERFORMANCE_MODE', default=True)
-OLLAMA_GENERATION_TIMEOUT = int(env('OLLAMA_GENERATION_TIMEOUT', default=60))  # Increased from 45
-OLLAMA_GPU_LAYERS = int(env('OLLAMA_GPU_LAYERS', default=-1))  # -1 = use all available
+OLLAMA_PRIMARY_MODEL = env("OLLAMA_PRIMARY_MODEL", default="llama3.1:8b")
+OLLAMA_DETAILED_MODEL = env("OLLAMA_DETAILED_MODEL", default="llama3.1:70b")
+OLLAMA_PERFORMANCE_MODE = env.bool("OLLAMA_PERFORMANCE_MODE", default=True)
+OLLAMA_GENERATION_TIMEOUT = int(env("OLLAMA_GENERATION_TIMEOUT", default=60))  # Increased from 45
+OLLAMA_GPU_LAYERS = int(env("OLLAMA_GPU_LAYERS", default=-1))  # -1 = use all available
 
 # Connection retry configuration
-OLLAMA_RETRY_ATTEMPTS = int(env('OLLAMA_RETRY_ATTEMPTS', default=3))
-OLLAMA_RETRY_DELAY = int(env('OLLAMA_RETRY_DELAY', default=1))
+OLLAMA_RETRY_ATTEMPTS = int(env("OLLAMA_RETRY_ATTEMPTS", default=3))
+OLLAMA_RETRY_DELAY = int(env("OLLAMA_RETRY_DELAY", default=1))
 
 # Explainability Settings
-EXPLAINABILITY_ENABLED = env.bool('EXPLAINABILITY_ENABLED', default=True)
-EXPLANATION_CACHE_TTL = int(env('EXPLANATION_CACHE_TTL', default=300))  # 5 minutes
-EXPLANATION_TIMEOUT = int(env('EXPLANATION_TIMEOUT', default=60))  # 60 seconds
-EXPLANATION_MAX_RETRIES = int(env('EXPLANATION_MAX_RETRIES', default=2))
+EXPLAINABILITY_ENABLED = env.bool("EXPLAINABILITY_ENABLED", default=True)
+EXPLANATION_CACHE_TTL = int(env("EXPLANATION_CACHE_TTL", default=300))  # 5 minutes
+EXPLANATION_TIMEOUT = int(env("EXPLANATION_TIMEOUT", default=60))  # 60 seconds
+EXPLANATION_MAX_RETRIES = int(env("EXPLANATION_MAX_RETRIES", default=2))
 
 # Stock Market Settings
-TRENDING_STOCKS = env.list('TRENDING_STOCKS', default=[
-    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM',
-    'V', 'JNJ', 'WMT', 'PG', 'UNH', 'DIS', 'HD', 'MA'
-])
+TRENDING_STOCKS = env.list(
+    "TRENDING_STOCKS",
+    default=[
+        "AAPL",
+        "MSFT",
+        "GOOGL",
+        "AMZN",
+        "TSLA",
+        "META",
+        "NVDA",
+        "JPM",
+        "V",
+        "JNJ",
+        "WMT",
+        "PG",
+        "UNH",
+        "DIS",
+        "HD",
+        "MA",
+    ],
+)
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5 MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB
 
 # Temp directory for processing files
-TEMP_DIR = BASE_DIR / 'Temp'
+TEMP_DIR = BASE_DIR / "Temp"
 if not TEMP_DIR.exists():
     TEMP_DIR.mkdir(parents=True, exist_ok=True)

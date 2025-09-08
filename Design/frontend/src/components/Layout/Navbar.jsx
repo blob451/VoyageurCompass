@@ -97,7 +97,7 @@ const Navbar = () => {
   };
 
   return (
-    <AppBar position="static" sx={{ bgcolor: '#1a1a2e' }}>
+    <AppBar position="static" component="nav" role="navigation" sx={{ bgcolor: '#1a1a2e' }}>
       <Toolbar>
         <IconButton
           edge="start"

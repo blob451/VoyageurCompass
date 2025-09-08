@@ -27,15 +27,15 @@ logger = logging.getLogger(__name__)
 def retry_database_operation(operation, max_retries=3, base_delay=0.1):
     """
     Retry database operation with exponential backoff to handle concurrency issues.
-    
+
     Args:
         operation: Callable that performs the database operation
         max_retries: Maximum number of retry attempts
         base_delay: Base delay in seconds for exponential backoff
-        
+
     Returns:
         Result of the operation
-        
+
     Raises:
         Exception: If all retries are exhausted
     """
@@ -44,7 +44,7 @@ def retry_database_operation(operation, max_retries=3, base_delay=0.1):
             return operation()
         except (OperationalError, Exception) as e:
             error_msg = str(e).lower()
-            
+
             # Check if it's a concurrency-related error
             if any(keyword in error_msg for keyword in [
                 'could not serialize access due to concurrent update',
@@ -66,7 +66,7 @@ def retry_database_operation(operation, max_retries=3, base_delay=0.1):
                 # Non-concurrency error, don't retry
                 logger.error(f"Non-retryable database error: {error_msg}")
                 raise
-    
+
     # This should never be reached
     raise Exception("Unexpected retry logic error")
 
@@ -114,66 +114,66 @@ def retry_database_operation(operation, max_retries=3, base_delay=0.1):
 def generate_explanation(request, analysis_id):
     """
     Generate explanation for a specific analysis result.
-    
+
     Path Parameters:
         analysis_id: Analysis result ID
-    
+
     Query Parameters:
         detail_level: Explanation detail level (summary/standard/detailed, default: standard)
-    
+
     Returns:
         Generated explanation with metadata
     """
     detail_level = request.query_params.get('detail_level', 'standard')
-    
+
     # Validate detail level
     if detail_level not in ['summary', 'standard', 'detailed']:
         return Response(
             {'error': 'detail_level must be one of: summary, standard, detailed'},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
+
     try:
         # Get the analysis result and ensure it belongs to the user
         analysis_result = AnalyticsResults.objects.filter(
             id=analysis_id,
             user=request.user
         ).select_related('stock').first()
-        
+
         if not analysis_result:
             return Response(
                 {'error': 'Analysis not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         logger.info(f"Generating explanation for analysis {analysis_id} ({analysis_result.stock.symbol})")
-        
+
         # Get explanation service
         explanation_service = get_explanation_service()
-        
+
         # Detailed logging for debugging
         logger.info(f"[EXPLAIN] Processing explanation request for analysis {analysis_id}")
         logger.info(f"[EXPLAIN] Detail level: {detail_level}")
         logger.info(f"[EXPLAIN] Service enabled flag: {explanation_service.enabled}")
-        
+
         try:
             llm_available = explanation_service.llm_service.is_available()
             logger.info(f"[EXPLAIN] LLM service available: {llm_available}")
         except Exception as e:
             logger.error(f"[EXPLAIN] Error checking LLM availability: {str(e)}", exc_info=True)
             llm_available = False
-        
+
         if not explanation_service.is_enabled():
             logger.error(f"[EXPLAIN] Service not enabled - enabled: {explanation_service.enabled}, llm_available: {llm_available}")
             return Response(
                 {'error': 'Explanation service not available'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
-        
+
         # Check if explanation already exists for this detail level
         existing_explanations = analysis_result.explanations_json or {}
         existing_levels = existing_explanations.get('levels', {})
-        
+
         if detail_level in existing_levels:
             # Return existing explanation for this detail level
             logger.info(f"[EXPLAIN] Returning existing {detail_level} explanation for analysis {analysis_id}")
@@ -197,47 +197,47 @@ def generate_explanation(request, analysis_id):
                     detail_level=detail_level,
                     user=request.user
                 )
-                
+
                 if explanation_result:
                     logger.info(f"[EXPLAIN] Explanation generated successfully - method: {explanation_result.get('method')}, length: {len(explanation_result.get('content', ''))}")
                 else:
                     logger.error(f"[EXPLAIN] Explanation generation returned None for analysis {analysis_id}")
-                    
+
             except Exception as exp_error:
                 logger.error(f"[EXPLAIN] Exception during explanation generation: {str(exp_error)}", exc_info=True)
                 explanation_result = None
-        
+
         if not explanation_result:
             logger.error(f"[EXPLAIN] Failed to generate explanation for analysis {analysis_id}")
             return Response(
                 {'error': 'Failed to generate explanation'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+
         # Update the database with explanation using retry mechanism for concurrency
         def save_explanation():
             # Refresh the analysis_result to get latest state
             analysis_result.refresh_from_db()
-            
+
             # Check if explanation for this detail level needs to be saved
             existing_explanations = analysis_result.explanations_json or {}
             levels = existing_explanations.get('levels', {})
-            
+
             # Generate new explanation if this detail level doesn't exist or method changed
             needs_new_explanation = (
                 detail_level not in levels or 
                 analysis_result.explanation_method != explanation_result.get('method')
             )
-            
+
             if needs_new_explanation:
                 with transaction.atomic():
                     # Use select_for_update to prevent concurrent modifications
                     locked_result = AnalyticsResults.objects.select_for_update().get(id=analysis_id, user=request.user)
-                    
+
                     # Refresh existing explanations and double-check after acquiring lock
                     current_explanations = locked_result.explanations_json or {}
                     current_levels = current_explanations.get('levels', {})
-                    
+
                     if detail_level not in current_levels or locked_result.explanation_method != explanation_result.get('method'):
                         # Update the levels with new explanation
                         current_levels[detail_level] = {
@@ -246,7 +246,7 @@ def generate_explanation(request, analysis_id):
                             'generated_at': datetime.now().isoformat(),
                             'word_count': explanation_result.get('word_count', 0)
                         }
-                        
+
                         # Update the full explanations_json structure
                         locked_result.explanations_json = {
                             'levels': current_levels,
@@ -255,7 +255,7 @@ def generate_explanation(request, analysis_id):
                             'recommendation': explanation_result.get('recommendation', 'HOLD'),
                             'current_level': detail_level
                         }
-                        
+
                         # Update other fields (keep narrative_text for backward compatibility with latest)
                         locked_result.explanation_method = explanation_result.get('method', 'unknown')
                         locked_result.explanation_version = '1.0'
@@ -268,14 +268,14 @@ def generate_explanation(request, analysis_id):
                         logger.info(f"[DB SAVE] Explanation for {detail_level} level already exists for analysis {analysis_id}")
             else:
                 logger.info(f"[DB SAVE] Explanation for {detail_level} level already exists for analysis {analysis_id}")
-        
+
         # Execute the save operation with retry logic
         try:
             retry_database_operation(save_explanation, max_retries=3, base_delay=0.1)
         except Exception as e:
             logger.error(f"Failed to save explanation after retries: {str(e)}")
             # Continue execution - explanation generation was successful, only save failed
-        
+
         response_data = {
             'success': True,
             'analysis_id': analysis_id,
@@ -292,10 +292,10 @@ def generate_explanation(request, analysis_id):
                 'recommendation': explanation_result.get('recommendation', 'HOLD')
             }
         }
-        
+
         logger.info(f"Explanation generated successfully for analysis {analysis_id}")
         return Response(response_data)
-        
+
     except Exception as e:
         logger.error(f"Error in generate_explanation: {str(e)}", exc_info=True)
         logger.error(f"Explanation generation failed for analysis {analysis_id}: {str(e)}")
@@ -325,19 +325,19 @@ def generate_explanation(request, analysis_id):
 def explanation_service_status(request):
     """
     Get explanation service status.
-    
+
     Returns:
         Current status of explanation service and LLM availability
     """
     try:
         explanation_service = get_explanation_service()
         status_data = explanation_service.get_service_status()
-        
+
         return Response({
             'success': True,
             'status': status_data
         })
-        
+
     except Exception as e:
         logger.error(f"Error getting explanation service status: {str(e)}")
         return Response(
@@ -388,39 +388,39 @@ def explanation_service_status(request):
 def get_explanation(request, analysis_id):
     """
     Get explanation for an existing analysis result.
-    
+
     Path Parameters:
         analysis_id: Analysis result ID
-    
+
     Query Parameters:
         detail_level: Detail level to retrieve (summary/standard/detailed, default: latest)
-    
+
     Returns:
         Existing explanation data if available
     """
     detail_level = request.query_params.get('detail_level', None)
-    
+
     try:
         # Get the analysis result and ensure it belongs to the user
         analysis_result = AnalyticsResults.objects.filter(
             id=analysis_id,
             user=request.user
         ).select_related('stock').first()
-        
+
         if not analysis_result:
             return Response(
                 {'error': 'Analysis not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         # Get explanations data
         explanations_json = analysis_result.explanations_json or {}
         levels = explanations_json.get('levels', {})
-        
+
         # Determine which explanation content to return
         explanation_content = None
         used_level = None
-        
+
         if detail_level and detail_level in levels:
             # Return specific detail level if requested and available
             level_data = levels[detail_level]
@@ -443,9 +443,9 @@ def get_explanation(request, analysis_id):
             # Fallback to narrative_text for backward compatibility
             explanation_content = analysis_result.narrative_text
             used_level = 'legacy'
-        
+
         has_explanation = bool(explanation_content)
-        
+
         response_data = {
             'success': True,
             'analysis_id': analysis_id,
@@ -454,7 +454,7 @@ def get_explanation(request, analysis_id):
             'detail_level_returned': used_level,
             'detail_level_requested': detail_level
         }
-        
+
         if has_explanation:
             if used_level != 'legacy' and used_level in levels:
                 level_data = levels[used_level]
@@ -485,9 +485,9 @@ def get_explanation(request, analysis_id):
                     'structured_data': explanations_json,
                     'available_levels': list(levels.keys())
                 }
-        
+
         return Response(response_data)
-        
+
     except Exception as e:
         logger.error(f"Error retrieving explanation for analysis {analysis_id}: {str(e)}")
         return Response(

@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404
 from django.db import models  
 from django.db.models import Q
 from datetime import datetime, timedelta
+from decimal import Decimal
 from django.utils import timezone
 
 from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding
@@ -583,7 +584,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
                             {'error': 'Quantity must be a positive number'},
                             status=status.HTTP_400_BAD_REQUEST
                         )
-                    holding.quantity = quantity
+                    holding.quantity = Decimal(str(quantity))
                 except (ValueError, TypeError):
                     return Response(
                         {'error': 'Quantity must be a valid number'},
@@ -598,7 +599,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
                             {'error': 'Average price must be a positive number'},
                             status=status.HTTP_400_BAD_REQUEST
                         )
-                    holding.average_price = average_price
+                    holding.average_price = Decimal(str(average_price))
                 except (ValueError, TypeError):
                     return Response(
                         {'error': 'Average price must be a valid number'},

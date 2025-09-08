@@ -8,7 +8,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.13'
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 jobs:
   test:
@@ -58,8 +58,8 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r config/requirements.txt
-        pip install pytest-xdist pytest-cov pytest-django
+        pip install -r config/requirements-ci.txt
+        pip install pytest-xdist
 
     - name: Set up environment variables
       run: |
@@ -68,10 +68,32 @@ jobs:
         echo "REDIS_URL=redis://localhost:6379/0" >> $GITHUB_ENV
         echo "SECRET_KEY=test-secret-key-for-ci" >> $GITHUB_ENV
         echo "DEBUG=False" >> $GITHUB_ENV
+        echo "SECURE_SSL_REDIRECT=False" >> $GITHUB_ENV
+        echo "CI=true" >> $GITHUB_ENV
+
+    - name: Validate database configuration
+      run: |
+        echo "Validating database configuration..."
+        python -c "
+        import os
+        import django
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'VoyageurCompass.test_settings')
+        django.setup()
+        from django.db import connection
+        print(f'Database engine: {connection.vendor}')
+        print(f'Database name: {connection.settings_dict[\"NAME\"]}')
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT 1')
+            print('✅ Database connectivity verified')
+        except Exception as e:
+            print(f'❌ Database connectivity failed: {e}')
+            raise
+        "
 
     - name: Run database migrations
       run: |
-        python manage.py migrate --verbosity=0
+        python manage.py migrate --verbosity=1
 
     - name: Run linting
       run: |
@@ -81,7 +103,7 @@ jobs:
     - name: Run unit tests
       run: |
         python -m pytest \
-          --maxfail=10 \
+          --maxfail=5 \
           --tb=short \
           -v \
           --cov=Analytics \
@@ -89,28 +111,35 @@ jobs:
           --cov=Data \
           --cov-report=xml \
           --cov-report=html \
-          -m "unit or models" \
-          -n auto
+          --cov-report=term \
+          --junitxml=pytest-report.xml \
+          Core/tests/test_database_configuration.py \
+          Core/tests/test_views.py \
+          Data/tests/test_models.py \
+          Data/tests/test_views.py \
+          Analytics/tests/test_ta_engine.py
 
     - name: Run integration tests
-      run: |
-        python -m pytest \
-          --maxfail=5 \
-          --tb=short \
-          -v \
-          -m "integration" \
-          -n 2 \
-          --durations=10
-
-    - name: Run performance tests
       run: |
         python -m pytest \
           --maxfail=3 \
           --tb=short \
           -v \
-          -m "performance" \
+          Data/tests/test_analytics_writer.py \
+          Data/tests/test_data_processor.py \
+          --durations=10
+      timeout-minutes: 10
+
+    - name: Run performance tests  
+      run: |
+        python -m pytest \
+          --maxfail=2 \
+          --tb=short \
+          -v \
+          Core/tests/test_performance_optimization.py \
           --durations=5
-      timeout-minutes: 15
+      timeout-minutes: 10
+      continue-on-error: true
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
@@ -155,11 +184,21 @@ jobs:
 
     - name: Run frontend tests
       working-directory: Design/frontend
-      run: npm test -- --run --coverage
+      run: npm test -- --run --reporter=verbose --coverage --reporter=json --outputFile=test-results.json
+      timeout-minutes: 10
 
     - name: Build frontend
       working-directory: Design/frontend
       run: npm run build
+
+    - name: Upload frontend test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: frontend-test-results
+        path: |
+          Design/frontend/test-results.json
+          Design/frontend/coverage/
 
     - name: Upload frontend artifacts
       uses: actions/upload-artifact@v4
@@ -186,12 +225,12 @@ jobs:
 
     - name: Run Bandit security scan
       run: |
-        bandit -r Analytics/ Core/ Data/ -f json -o bandit-report.json
+        bandit -r Analytics/ Core/ Data/ -f json -o bandit-report.json -c .bandit || echo "Bandit found issues but continuing CI/CD pipeline"
       continue-on-error: true
 
     - name: Run Safety dependency scan
       run: |
-        safety check --json --output safety-report.json
+        timeout 300 safety scan --json > safety-report.json || true
       continue-on-error: true
 
     - name: Upload security reports

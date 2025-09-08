@@ -143,6 +143,7 @@ class MarketStatusSerializer(serializers.Serializer):
     
     is_open = serializers.BooleanField()
     current_time = serializers.DateTimeField()
+    timezone = serializers.CharField()
     market_hours = serializers.DictField()
     indicators = serializers.DictField()
     next_open = serializers.DateTimeField()

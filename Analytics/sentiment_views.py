@@ -78,7 +78,7 @@ class SentimentThrottle(UserRateThrottle):
 def stock_sentiment(request, symbol):
     """
     Get sentiment analysis for a specific stock.
-    
+
     This endpoint analyzes recent news articles to determine market sentiment.
     Results are cached for 5 minutes unless refresh is requested.
     """
@@ -86,24 +86,24 @@ def stock_sentiment(request, symbol):
         symbol = symbol.upper()
         days = int(request.GET.get('days', 90))
         refresh = request.GET.get('refresh', 'false').lower() == 'true'
-        
+
         # Check cache first
         sentiment_analyzer = get_sentiment_analyzer()
         cache_key = sentiment_analyzer.generateCacheKey(symbol=symbol, days=days)
-        
+
         if not refresh:
             cached_result = sentiment_analyzer.getCachedSentiment(
                 cache_key, symbol, is_recent=(days <= 30)
             )
             if cached_result:
                 return Response(cached_result)
-        
+
         # Get sentiment analyzer
         sentiment_analyzer = get_sentiment_analyzer()
-        
+
         # Fetch news
         news_items = yahoo_finance_service.fetchNewsForStock(symbol, days=days, max_items=50)
-        
+
         if not news_items:
             result = {
                 'symbol': symbol,
@@ -114,24 +114,24 @@ def stock_sentiment(request, symbol):
                 'message': 'No news articles found for analysis'
             }
             return Response(result)
-        
+
         # Prepare texts for analysis
         texts = []
         for article in news_items:
             text = yahoo_finance_service.preprocessNewsText(article)
             if text:
                 texts.append(text)
-        
+
         # Analyze sentiment
         sentiments = sentiment_analyzer.analyzeSentimentBatch(texts[:30])
         aggregated = sentiment_analyzer.aggregateSentiment(sentiments)
-        
+
         # Get the most recent analysis result from database if available
         try:
             latest_analysis = AnalyticsResults.objects.filter(
                 stock__symbol=symbol
             ).latest('as_of')
-            
+
             db_sentiment = {
                 'dbSentimentScore': latest_analysis.sentimentScore,
                 'dbSentimentLabel': latest_analysis.sentimentLabel,
@@ -139,7 +139,7 @@ def stock_sentiment(request, symbol):
             }
         except AnalyticsResults.DoesNotExist:
             db_sentiment = {}
-        
+
         # Build response
         result = {
             'symbol': symbol,
@@ -161,14 +161,14 @@ def stock_sentiment(request, symbol):
             ],
             **db_sentiment
         }
-        
+
         # Cache result with appropriate TTL
         sentiment_analyzer.setCachedSentiment(
             cache_key, result, symbol, is_recent=(days <= 30)
         )
-        
+
         return Response(result)
-        
+
     except Stock.DoesNotExist:
         return Response({
             'error': f'Stock {symbol} not found'

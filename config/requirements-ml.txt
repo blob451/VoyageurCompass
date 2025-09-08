@@ -1,0 +1,22 @@
+# VoyageurCompass Machine Learning Dependencies
+# Heavy ML/AI packages for sentiment analysis and LSTM models
+# Only install when ML features are needed
+
+# Include base requirements
+-r requirements-base.txt
+
+# PyTorch Ecosystem (CPU version - very heavy downloads ~2GB+)
+torch==2.6.0
+torchvision==0.21.0
+torchaudio==2.6.0
+
+# Transformers & NLP (FinBERT sentiment analysis)
+transformers==4.36.0
+accelerate==0.25.0
+sentencepiece==0.1.99
+
+# Advanced Machine Learning
+scikit-learn==1.5.2
+
+# Local LLM Integration (Ollama)
+ollama==0.3.3

@@ -224,7 +224,7 @@ export const performanceUtils = {
   
   // Wrapper for timing operations
   timeOperation: async (operation, operationName) => {
-    const startTime = performanceTracker.start(operationName);
+    performanceTracker.start(operationName);
     try {
       const result = await operation();
       const duration = performanceTracker.end(operationName);
