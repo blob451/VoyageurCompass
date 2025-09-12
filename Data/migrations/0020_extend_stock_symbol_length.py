@@ -6,13 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('Data', '0019_add_explanation_fields'),
+        ("Data", "0019_add_explanation_fields"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='stock',
-            name='symbol',
-            field=models.CharField(db_index=True, help_text='Stock ticker symbol (e.g., AAPL, MSFT). Extended length supports test symbols.', max_length=20, unique=True),
+            model_name="stock",
+            name="symbol",
+            field=models.CharField(
+                db_index=True,
+                help_text="Stock ticker symbol (e.g., AAPL, MSFT). Extended length supports test symbols.",
+                max_length=20,
+                unique=True,
+            ),
         ),
     ]

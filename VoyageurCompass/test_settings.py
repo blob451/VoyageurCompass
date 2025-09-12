@@ -1,6 +1,6 @@
 """
-Test-specific Django settings for VoyageurCompass project.
-Conditionally utilises PostgreSQL in CI environment, SQLite locally for optimised speed.
+Test-specific Django settings configuration for VoyageurCompass project.
+Conditionally utilises PostgreSQL in CI environment with SQLite optimisation for local testing performance.
 """
 
 from .settings import *  # noqa: F401,F403
@@ -17,14 +17,14 @@ if IS_CI_ENVIRONMENT and DATABASE_URL:
     DATABASES = {"default": dj_database_url.parse(DATABASE_URL)}
     # Database migrations enabled for comprehensive CI table creation
     MIGRATION_MODULES = {}
-    
+
     # Ensure proper database configuration for CI environment
     db_config = DATABASES["default"]
     if not db_config.get("USER"):
         # Set default user if not provided in DATABASE_URL
         db_config["USER"] = os.getenv("POSTGRES_USER", "voyageur_user")
     if not db_config.get("PASSWORD"):
-        db_config["PASSWORD"] = os.getenv("POSTGRES_PASSWORD", "ab727492Z")
+        db_config["PASSWORD"] = os.getenv("POSTGRES_PASSWORD", "test-ci-password")
     if not db_config.get("HOST"):
         db_config["HOST"] = os.getenv("POSTGRES_HOST", "localhost")
     if not db_config.get("PORT"):

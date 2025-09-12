@@ -6,17 +6,19 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('Data', '0013_analyticsresults'),
+        ("Data", "0013_analyticsresults"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='analyticsresults',
-            name='w_rel3y',
+            model_name="analyticsresults",
+            name="w_rel3y",
         ),
         migrations.AddField(
-            model_name='analyticsresults',
-            name='w_rel2y',
-            field=models.DecimalField(blank=True, decimal_places=6, help_text='Weighted Relative Strength 2Y score', max_digits=10, null=True),
+            model_name="analyticsresults",
+            name="w_rel2y",
+            field=models.DecimalField(
+                blank=True, decimal_places=6, help_text="Weighted Relative Strength 2Y score", max_digits=10, null=True
+            ),
         ),
     ]

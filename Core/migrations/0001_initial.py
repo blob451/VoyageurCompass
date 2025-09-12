@@ -15,41 +15,85 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='PasswordResetRequest',
+            name="PasswordResetRequest",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('reason', models.TextField(help_text='Reason for password reset request')),
-                ('status', models.CharField(choices=[('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected'), ('expired', 'Expired')], default='pending', max_length=20)),
-                ('admin_notes', models.TextField(blank=True, help_text='Notes from admin about this request')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='reset_requests', to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("reason", models.TextField(help_text="Reason for password reset request")),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("pending", "Pending"),
+                            ("approved", "Approved"),
+                            ("rejected", "Rejected"),
+                            ("expired", "Expired"),
+                        ],
+                        default="pending",
+                        max_length=20,
+                    ),
+                ),
+                ("admin_notes", models.TextField(blank=True, help_text="Notes from admin about this request")),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="reset_requests",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Password Reset Request',
-                'verbose_name_plural': 'Password Reset Requests',
-                'db_table': 'core_password_reset_request',
-                'ordering': ['-created_at'],
+                "verbose_name": "Password Reset Request",
+                "verbose_name_plural": "Password Reset Requests",
+                "db_table": "core_password_reset_request",
+                "ordering": ["-created_at"],
             },
         ),
         migrations.CreateModel(
-            name='UserSecurityProfile',
+            name="UserSecurityProfile",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('secret_question', models.CharField(help_text='Security question for password recovery', max_length=255)),
-                ('secret_answer_hash', models.CharField(help_text='Hashed answer to the security question', max_length=255)),
-                ('reset_token', models.UUIDField(blank=True, help_text='Temporary token for password reset', null=True)),
-                ('reset_token_created', models.DateTimeField(blank=True, help_text='When the reset token was created', null=True)),
-                ('failed_reset_attempts', models.IntegerField(default=0, help_text='Number of failed password reset attempts')),
-                ('last_reset_attempt', models.DateTimeField(blank=True, help_text='Last password reset attempt timestamp', null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='security_profile', to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "secret_question",
+                    models.CharField(help_text="Security question for password recovery", max_length=255),
+                ),
+                (
+                    "secret_answer_hash",
+                    models.CharField(help_text="Hashed answer to the security question", max_length=255),
+                ),
+                (
+                    "reset_token",
+                    models.UUIDField(blank=True, help_text="Temporary token for password reset", null=True),
+                ),
+                (
+                    "reset_token_created",
+                    models.DateTimeField(blank=True, help_text="When the reset token was created", null=True),
+                ),
+                (
+                    "failed_reset_attempts",
+                    models.IntegerField(default=0, help_text="Number of failed password reset attempts"),
+                ),
+                (
+                    "last_reset_attempt",
+                    models.DateTimeField(blank=True, help_text="Last password reset attempt timestamp", null=True),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "user",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="security_profile",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'User Security Profile',
-                'verbose_name_plural': 'User Security Profiles',
-                'db_table': 'core_user_security_profile',
+                "verbose_name": "User Security Profile",
+                "verbose_name_plural": "User Security Profiles",
+                "db_table": "core_user_security_profile",
             },
         ),
     ]

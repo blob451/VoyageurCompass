@@ -8,61 +8,121 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('Data', '0005_make_portfolio_user_required'),
+        ("Data", "0005_make_portfolio_user_required"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='PriceBar',
+            name="PriceBar",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('date', models.DateTimeField(db_index=True, help_text='Bar timestamp')),
-                ('interval', models.CharField(choices=[('1m', '1 Minute'), ('5m', '5 Minutes'), ('15m', '15 Minutes'), ('30m', '30 Minutes'), ('1h', '1 Hour'), ('1d', '1 Day'), ('1wk', '1 Week'), ('1mo', '1 Month')], default='1d', help_text='Time interval', max_length=5)),
-                ('open', models.DecimalField(decimal_places=2, max_digits=10, validators=[django.core.validators.MinValueValidator(0)])),
-                ('high', models.DecimalField(decimal_places=2, max_digits=10, validators=[django.core.validators.MinValueValidator(0)])),
-                ('low', models.DecimalField(decimal_places=2, max_digits=10, validators=[django.core.validators.MinValueValidator(0)])),
-                ('close', models.DecimalField(decimal_places=2, max_digits=10, validators=[django.core.validators.MinValueValidator(0)])),
-                ('volume', models.BigIntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)])),
-                ('dataSource', models.CharField(choices=[('yahoo', 'Yahoo Finance'), ('mock', 'Mock Data')], default='yahoo', help_text='Source of the price bar data', max_length=10)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("date", models.DateTimeField(db_index=True, help_text="Bar timestamp")),
+                (
+                    "interval",
+                    models.CharField(
+                        choices=[
+                            ("1m", "1 Minute"),
+                            ("5m", "5 Minutes"),
+                            ("15m", "15 Minutes"),
+                            ("30m", "30 Minutes"),
+                            ("1h", "1 Hour"),
+                            ("1d", "1 Day"),
+                            ("1wk", "1 Week"),
+                            ("1mo", "1 Month"),
+                        ],
+                        default="1d",
+                        help_text="Time interval",
+                        max_length=5,
+                    ),
+                ),
+                (
+                    "open",
+                    models.DecimalField(
+                        decimal_places=2, max_digits=10, validators=[django.core.validators.MinValueValidator(0)]
+                    ),
+                ),
+                (
+                    "high",
+                    models.DecimalField(
+                        decimal_places=2, max_digits=10, validators=[django.core.validators.MinValueValidator(0)]
+                    ),
+                ),
+                (
+                    "low",
+                    models.DecimalField(
+                        decimal_places=2, max_digits=10, validators=[django.core.validators.MinValueValidator(0)]
+                    ),
+                ),
+                (
+                    "close",
+                    models.DecimalField(
+                        decimal_places=2, max_digits=10, validators=[django.core.validators.MinValueValidator(0)]
+                    ),
+                ),
+                ("volume", models.BigIntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)])),
+                (
+                    "dataSource",
+                    models.CharField(
+                        choices=[("yahoo", "Yahoo Finance"), ("mock", "Mock Data")],
+                        default="yahoo",
+                        help_text="Source of the price bar data",
+                        max_length=10,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
             options={
-                'ordering': ['-date'],
+                "ordering": ["-date"],
             },
         ),
         migrations.AddField(
-            model_name='stock',
-            name='dataSource',
-            field=models.CharField(choices=[('yahoo', 'Yahoo Finance'), ('mock', 'Mock Data')], default='yahoo', help_text='Source of the stock data', max_length=10),
+            model_name="stock",
+            name="dataSource",
+            field=models.CharField(
+                choices=[("yahoo", "Yahoo Finance"), ("mock", "Mock Data")],
+                default="yahoo",
+                help_text="Source of the stock data",
+                max_length=10,
+            ),
         ),
         migrations.AddField(
-            model_name='stockprice',
-            name='dataSource',
-            field=models.CharField(choices=[('yahoo', 'Yahoo Finance'), ('mock', 'Mock Data')], default='yahoo', help_text='Source of the price data', max_length=10),
+            model_name="stockprice",
+            name="dataSource",
+            field=models.CharField(
+                choices=[("yahoo", "Yahoo Finance"), ("mock", "Mock Data")],
+                default="yahoo",
+                help_text="Source of the price data",
+                max_length=10,
+            ),
         ),
         migrations.AddIndex(
-            model_name='stock',
-            index=models.Index(fields=['dataSource', 'symbol'], name='Data_stock_dataSou_8c6a2e_idx'),
+            model_name="stock",
+            index=models.Index(fields=["dataSource", "symbol"], name="Data_stock_dataSou_8c6a2e_idx"),
         ),
         migrations.AddIndex(
-            model_name='stockprice',
-            index=models.Index(fields=['dataSource', 'stock', '-date'], name='Data_stockp_dataSou_391db6_idx'),
+            model_name="stockprice",
+            index=models.Index(fields=["dataSource", "stock", "-date"], name="Data_stockp_dataSou_391db6_idx"),
         ),
         migrations.AddField(
-            model_name='pricebar',
-            name='stock',
-            field=models.ForeignKey(help_text='Related stock', on_delete=django.db.models.deletion.CASCADE, related_name='priceBars', to='Data.stock'),
+            model_name="pricebar",
+            name="stock",
+            field=models.ForeignKey(
+                help_text="Related stock",
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="priceBars",
+                to="Data.stock",
+            ),
         ),
         migrations.AddIndex(
-            model_name='pricebar',
-            index=models.Index(fields=['stock', 'interval', '-date'], name='Data_priceb_stock_i_7a0e15_idx'),
+            model_name="pricebar",
+            index=models.Index(fields=["stock", "interval", "-date"], name="Data_priceb_stock_i_7a0e15_idx"),
         ),
         migrations.AddIndex(
-            model_name='pricebar',
-            index=models.Index(fields=['dataSource', 'stock', '-date'], name='Data_priceb_dataSou_16437b_idx'),
+            model_name="pricebar",
+            index=models.Index(fields=["dataSource", "stock", "-date"], name="Data_priceb_dataSou_16437b_idx"),
         ),
         migrations.AlterUniqueTogether(
-            name='pricebar',
-            unique_together={('stock', 'date', 'interval')},
+            name="pricebar",
+            unique_together={("stock", "date", "interval")},
         ),
     ]

@@ -8,19 +8,19 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('Data', '0004_populate_portfolio_users'),
+        ("Data", "0004_populate_portfolio_users"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='portfolio',
-            name='user',
+            model_name="portfolio",
+            name="user",
             field=models.ForeignKey(
-                help_text='Portfolio owner',
+                help_text="Portfolio owner",
                 on_delete=django.db.models.deletion.CASCADE,
-                related_name='portfolios',
-                to=settings.AUTH_USER_MODEL
+                related_name="portfolios",
+                to=settings.AUTH_USER_MODEL,
             ),
         ),
     ]

@@ -8,30 +8,37 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('Data', '0014_rename_rel3y_to_rel2y'),
+        ("Data", "0014_rename_rel3y_to_rel2y"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AlterUniqueTogether(
-            name='analyticsresults',
+            name="analyticsresults",
             unique_together=set(),
         ),
         migrations.AddField(
-            model_name='analyticsresults',
-            name='user',
-            field=models.ForeignKey(blank=True, help_text='User who initiated this analysis', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='analysis_results', to=settings.AUTH_USER_MODEL),
+            model_name="analyticsresults",
+            name="user",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="User who initiated this analysis",
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="analysis_results",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
         migrations.AlterUniqueTogether(
-            name='analyticsresults',
-            unique_together={('user', 'stock', 'as_of')},
+            name="analyticsresults",
+            unique_together={("user", "stock", "as_of")},
         ),
         migrations.AddIndex(
-            model_name='analyticsresults',
-            index=models.Index(fields=['user', '-as_of'], name='analytics_r_user_id_cd2d7e_idx'),
+            model_name="analyticsresults",
+            index=models.Index(fields=["user", "-as_of"], name="analytics_r_user_id_cd2d7e_idx"),
         ),
         migrations.AddIndex(
-            model_name='analyticsresults',
-            index=models.Index(fields=['user', 'stock', '-as_of'], name='analytics_r_user_id_325ad3_idx'),
+            model_name="analyticsresults",
+            index=models.Index(fields=["user", "stock", "-as_of"], name="analytics_r_user_id_325ad3_idx"),
         ),
     ]

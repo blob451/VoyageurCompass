@@ -7,52 +7,66 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('Data', '0018_analyticsresults_model_version_and_more'),
+        ("Data", "0018_analyticsresults_model_version_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='analyticsresults',
-            name='explained_at',
-            field=models.DateTimeField(blank=True, help_text='Timestamp when explanation was generated', null=True),
+            model_name="analyticsresults",
+            name="explained_at",
+            field=models.DateTimeField(blank=True, help_text="Timestamp when explanation was generated", null=True),
         ),
         migrations.AddField(
-            model_name='analyticsresults',
-            name='explanation_confidence',
-            field=models.FloatField(blank=True, help_text='Confidence score for generated explanation (0.0-1.0)', null=True),
+            model_name="analyticsresults",
+            name="explanation_confidence",
+            field=models.FloatField(
+                blank=True, help_text="Confidence score for generated explanation (0.0-1.0)", null=True
+            ),
         ),
         migrations.AddField(
-            model_name='analyticsresults',
-            name='explanation_method',
-            field=models.CharField(blank=True, choices=[('llm', 'LLM Generated'), ('template', 'Template Based'), ('hybrid', 'Hybrid Approach')], help_text='Method used to generate explanations', max_length=20, null=True),
+            model_name="analyticsresults",
+            name="explanation_method",
+            field=models.CharField(
+                blank=True,
+                choices=[("llm", "LLM Generated"), ("template", "Template Based"), ("hybrid", "Hybrid Approach")],
+                help_text="Method used to generate explanations",
+                max_length=20,
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='analyticsresults',
-            name='explanation_version',
-            field=models.CharField(blank=True, help_text='Version of explanation system used', max_length=20, null=True),
+            model_name="analyticsresults",
+            name="explanation_version",
+            field=models.CharField(
+                blank=True, help_text="Version of explanation system used", max_length=20, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='analyticsresults',
-            name='explanations_json',
-            field=models.JSONField(blank=True, default=dict, help_text='Structured explanation data: {indicators: {}, risks: [], recommendations: {}}'),
+            model_name="analyticsresults",
+            name="explanations_json",
+            field=models.JSONField(
+                blank=True,
+                default=dict,
+                help_text="Structured explanation data: {indicators: {}, risks: [], recommendations: {}}",
+            ),
         ),
         migrations.AddField(
-            model_name='analyticsresults',
-            name='narrative_language',
-            field=models.CharField(default='en', help_text='Language code for narrative text', max_length=5),
+            model_name="analyticsresults",
+            name="narrative_language",
+            field=models.CharField(default="en", help_text="Language code for narrative text", max_length=5),
         ),
         migrations.AddField(
-            model_name='analyticsresults',
-            name='narrative_text',
-            field=models.TextField(blank=True, help_text='Natural language explanation text', null=True),
+            model_name="analyticsresults",
+            name="narrative_text",
+            field=models.TextField(blank=True, help_text="Natural language explanation text", null=True),
         ),
         migrations.AddIndex(
-            model_name='analyticsresults',
-            index=models.Index(fields=['explained_at'], name='analytics_r_explain_337875_idx'),
+            model_name="analyticsresults",
+            index=models.Index(fields=["explained_at"], name="analytics_r_explain_337875_idx"),
         ),
         migrations.AddIndex(
-            model_name='analyticsresults',
-            index=models.Index(fields=['explanation_method'], name='analytics_r_explana_32f190_idx'),
+            model_name="analyticsresults",
+            index=models.Index(fields=["explanation_method"], name="analytics_r_explana_32f190_idx"),
         ),
     ]

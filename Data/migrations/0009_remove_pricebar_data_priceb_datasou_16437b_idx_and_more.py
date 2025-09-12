@@ -7,66 +7,90 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('Data', '0008_rename_datasource_to_data_source'),
+        ("Data", "0008_rename_datasource_to_data_source"),
     ]
 
     operations = [
         migrations.RemoveIndex(
-            model_name='pricebar',
-            name='Data_priceb_dataSou_16437b_idx',
+            model_name="pricebar",
+            name="Data_priceb_dataSou_16437b_idx",
         ),
         migrations.RemoveIndex(
-            model_name='stock',
-            name='Data_stock_dataSou_8c6a2e_idx',
+            model_name="stock",
+            name="Data_stock_dataSou_8c6a2e_idx",
         ),
         migrations.RemoveIndex(
-            model_name='stockprice',
-            name='Data_stockp_dataSou_391db6_idx',
+            model_name="stockprice",
+            name="Data_stockp_dataSou_391db6_idx",
         ),
         migrations.AddField(
-            model_name='stock',
-            name='sectorUpdatedAt',
-            field=models.DateTimeField(blank=True, help_text='Last time sector/industry data was updated', null=True),
+            model_name="stock",
+            name="sectorUpdatedAt",
+            field=models.DateTimeField(blank=True, help_text="Last time sector/industry data was updated", null=True),
         ),
         migrations.AlterField(
-            model_name='pricebar',
-            name='close',
-            field=models.DecimalField(decimal_places=2, help_text='Closing price for the time period', max_digits=10, validators=[django.core.validators.MinValueValidator(0)]),
+            model_name="pricebar",
+            name="close",
+            field=models.DecimalField(
+                decimal_places=2,
+                help_text="Closing price for the time period",
+                max_digits=10,
+                validators=[django.core.validators.MinValueValidator(0)],
+            ),
         ),
         migrations.AlterField(
-            model_name='pricebar',
-            name='high',
-            field=models.DecimalField(decimal_places=2, help_text='Highest price during the time period', max_digits=10, validators=[django.core.validators.MinValueValidator(0)]),
+            model_name="pricebar",
+            name="high",
+            field=models.DecimalField(
+                decimal_places=2,
+                help_text="Highest price during the time period",
+                max_digits=10,
+                validators=[django.core.validators.MinValueValidator(0)],
+            ),
         ),
         migrations.AlterField(
-            model_name='pricebar',
-            name='low',
-            field=models.DecimalField(decimal_places=2, help_text='Lowest price during the time period', max_digits=10, validators=[django.core.validators.MinValueValidator(0)]),
+            model_name="pricebar",
+            name="low",
+            field=models.DecimalField(
+                decimal_places=2,
+                help_text="Lowest price during the time period",
+                max_digits=10,
+                validators=[django.core.validators.MinValueValidator(0)],
+            ),
         ),
         migrations.AlterField(
-            model_name='pricebar',
-            name='open',
-            field=models.DecimalField(decimal_places=2, help_text='Opening price for the time period', max_digits=10, validators=[django.core.validators.MinValueValidator(0)]),
+            model_name="pricebar",
+            name="open",
+            field=models.DecimalField(
+                decimal_places=2,
+                help_text="Opening price for the time period",
+                max_digits=10,
+                validators=[django.core.validators.MinValueValidator(0)],
+            ),
         ),
         migrations.AlterField(
-            model_name='pricebar',
-            name='volume',
-            field=models.BigIntegerField(default=0, help_text='Trading volume during the time period', validators=[django.core.validators.MinValueValidator(0)]),
+            model_name="pricebar",
+            name="volume",
+            field=models.BigIntegerField(
+                default=0,
+                help_text="Trading volume during the time period",
+                validators=[django.core.validators.MinValueValidator(0)],
+            ),
         ),
         migrations.AddIndex(
-            model_name='pricebar',
-            index=models.Index(fields=['data_source', 'stock', '-date'], name='Data_priceb_data_so_433c68_idx'),
+            model_name="pricebar",
+            index=models.Index(fields=["data_source", "stock", "-date"], name="Data_priceb_data_so_433c68_idx"),
         ),
         migrations.AddIndex(
-            model_name='stock',
-            index=models.Index(fields=['data_source', 'symbol'], name='Data_stock_data_so_3352c2_idx'),
+            model_name="stock",
+            index=models.Index(fields=["data_source", "symbol"], name="Data_stock_data_so_3352c2_idx"),
         ),
         migrations.AddIndex(
-            model_name='stock',
-            index=models.Index(fields=['sectorUpdatedAt'], name='Data_stock_sectorU_93cc14_idx'),
+            model_name="stock",
+            index=models.Index(fields=["sectorUpdatedAt"], name="Data_stock_sectorU_93cc14_idx"),
         ),
         migrations.AddIndex(
-            model_name='stockprice',
-            index=models.Index(fields=['data_source', 'stock', '-date'], name='Data_stockp_data_so_7762eb_idx'),
+            model_name="stockprice",
+            index=models.Index(fields=["data_source", "stock", "-date"], name="Data_stockp_data_so_7762eb_idx"),
         ),
     ]

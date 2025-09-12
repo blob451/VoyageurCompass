@@ -3,19 +3,20 @@ Performance optimisation integration tests.
 Tests parallel execution, connection pooling, and query optimisation.
 """
 
-import pytest
+import statistics
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from django.test import TestCase, TransactionTestCase
-from django.contrib.auth import get_user_model
-from django.db import transaction
-from django.core.cache import cache
 from datetime import date, timedelta
-from django.utils import timezone
 from decimal import Decimal
-import statistics
 
-from Data.models import Stock, StockPrice, Portfolio, DataSector, DataIndustry
+import pytest
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.db import transaction
+from django.test import TestCase, TransactionTestCase
+from django.utils import timezone
+
+from Data.models import DataIndustry, DataSector, Portfolio, Stock, StockPrice
 
 User = get_user_model()
 
@@ -27,22 +28,15 @@ class ParallelExecutionTest(TransactionTestCase):
     def setUp(self):
         """Set up parallel execution test environment."""
         self.user = User.objects.create_user(
-            username='parallel_test_user',
-            email='parallel@test.com',
-            password='parallel_test_pass_123'
+            username="parallel_test_user", email="parallel@test.com", password="parallel_test_pass_123"
         )
 
         self.sector = DataSector.objects.create(
-            sectorKey='tech_parallel',
-            sectorName='Technology Parallel',
-            data_source='yahoo'
+            sectorKey="tech_parallel", sectorName="Technology Parallel", data_source="yahoo"
         )
 
         self.industry = DataIndustry.objects.create(
-            industryKey='software_parallel',
-            industryName='Software Parallel',
-            sector=self.sector,
-            data_source='yahoo'
+            industryKey="software_parallel", industryName="Software Parallel", sector=self.sector, data_source="yahoo"
         )
 
     def test_concurrent_database_operations(self):
@@ -63,57 +57,56 @@ class ParallelExecutionTest(TransactionTestCase):
                     with transaction.atomic():
                         # Create stock
                         stock = Stock.objects.create(
-                            symbol=f'PARALLEL_{thread_id:03d}',
-                            short_name=f'Parallel Test Stock {thread_id}',
-                            currency='USD',
-                            exchange='NYSE',
+                            symbol=f"PARALLEL_{thread_id:03d}",
+                            short_name=f"Parallel Test Stock {thread_id}",
+                            currency="USD",
+                            exchange="NYSE",
                             sector_id=self.sector,
-                            industry_id=self.industry
+                            industry_id=self.industry,
                         )
 
                         # Create price history
                         prices_to_create = []
                         for day in range(10):
-                            prices_to_create.append(StockPrice(
-                                stock=stock,
-                                date=date.today() - timedelta(days=day),
-                                open=Decimal('100.00') + day,
-                                high=Decimal('105.00') + day,
-                                low=Decimal('98.00') + day,
-                                close=Decimal('103.00') + day,
-                                volume=1000000 + (day * 1000)
-                            ))
+                            prices_to_create.append(
+                                StockPrice(
+                                    stock=stock,
+                                    date=date.today() - timedelta(days=day),
+                                    open=Decimal("100.00") + day,
+                                    high=Decimal("105.00") + day,
+                                    low=Decimal("98.00") + day,
+                                    close=Decimal("103.00") + day,
+                                    volume=1000000 + (day * 1000),
+                                )
+                            )
 
                         StockPrice.objects.bulk_create(prices_to_create)
 
                         execution_time = time.time() - start_time
                         execution_times.append(execution_time)
 
-                        return f'thread_{thread_id}_success'
+                        return f"thread_{thread_id}_success"
 
                 except Exception as e:
-                    if ('database table is locked' in str(e) and
-                            attempt < max_retries - 1):
+                    if "database table is locked" in str(e) and attempt < max_retries - 1:
                         # Exponential backoff
                         time.sleep(retry_delay * (attempt + 1))
                         continue
                     else:
-                        errors.append(f'thread_{thread_id}_error: {str(e)}')
+                        errors.append(f"thread_{thread_id}_error: {str(e)}")
                         return None
 
             return None
 
         # Execute concurrent operations with reduced concurrency for SQLite
         with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = [executor.submit(create_stock_with_prices, i)
-                      for i in range(1, 11)]
+            futures = [executor.submit(create_stock_with_prices, i) for i in range(1, 11)]
             results = [future.result() for future in as_completed(futures)]
 
         # Verify results
         successful_operations = [r for r in results if r is not None]
         self.assertEqual(
-            len(successful_operations), 10,
-            f"Expected 10 successful operations, got {len(successful_operations)}"
+            len(successful_operations), 10, f"Expected 10 successful operations, got {len(successful_operations)}"
         )
         self.assertEqual(len(errors), 0, f"Expected no errors, got: {errors}")
 
@@ -122,23 +115,15 @@ class ParallelExecutionTest(TransactionTestCase):
         max_execution_time = max(execution_times)
 
         self.assertLess(
-            avg_execution_time, 2.0,
-            f"Average execution time should be < 2s, got {avg_execution_time:.3f}s"
+            avg_execution_time, 2.0, f"Average execution time should be < 2s, got {avg_execution_time:.3f}s"
         )
-        self.assertLess(
-            max_execution_time, 5.0,
-            f"Max execution time should be < 5s, got {max_execution_time:.3f}s"
-        )
+        self.assertLess(max_execution_time, 5.0, f"Max execution time should be < 5s, got {max_execution_time:.3f}s")
 
         # Verify data integrity
-        parallel_stocks = Stock.objects.filter(
-            symbol__startswith='PARALLEL_'
-        ).count()
+        parallel_stocks = Stock.objects.filter(symbol__startswith="PARALLEL_").count()
         self.assertEqual(parallel_stocks, 10)
 
-        parallel_prices = StockPrice.objects.filter(
-            stock__symbol__startswith='PARALLEL_'
-        ).count()
+        parallel_prices = StockPrice.objects.filter(stock__symbol__startswith="PARALLEL_").count()
         self.assertEqual(parallel_prices, 100)  # 10 stocks * 10 prices each
 
         print("Concurrent operations completed:")
@@ -155,7 +140,7 @@ class ParallelExecutionTest(TransactionTestCase):
             start_time = time.time()
 
             # Execute queries that would benefit from connection pooling
-            Stock.objects.filter(symbol__startswith='PARALLEL_').count()
+            Stock.objects.filter(symbol__startswith="PARALLEL_").count()
             StockPrice.objects.filter(date=date.today()).count()
             Portfolio.objects.filter(user=self.user).count()
 
@@ -166,8 +151,7 @@ class ParallelExecutionTest(TransactionTestCase):
 
         # Execute parallel queries
         with ThreadPoolExecutor(max_workers=8) as executor:
-            futures = [executor.submit(test_database_query, i)
-                      for i in range(20)]
+            futures = [executor.submit(test_database_query, i) for i in range(20)]
             times = [future.result() for future in as_completed(futures)]
 
         # Analyze connection performance
@@ -175,14 +159,11 @@ class ParallelExecutionTest(TransactionTestCase):
         max_query_time = max(times)
 
         self.assertLess(
-            avg_query_time, 0.5,
-            f"Average query time should be < 0.5s with connection pooling, "
-            f"got {avg_query_time:.3f}s"
+            avg_query_time,
+            0.5,
+            f"Average query time should be < 0.5s with connection pooling, " f"got {avg_query_time:.3f}s",
         )
-        self.assertLess(
-            max_query_time, 1.0,
-            f"Max query time should be < 1s, got {max_query_time:.3f}s"
-        )
+        self.assertLess(max_query_time, 1.0, f"Max query time should be < 1s, got {max_query_time:.3f}s")
 
         print("Connection pool performance:")
         print("  20 parallel queries completed")
@@ -199,17 +180,14 @@ class ParallelExecutionTest(TransactionTestCase):
             start_time = time.time()
 
             # Set cache values
-            cache.set(f'test_key_{operation_id}', f'test_value_{operation_id}', 60)
+            cache.set(f"test_key_{operation_id}", f"test_value_{operation_id}", 60)
 
             # Get cache values
             for i in range(5):
-                cache.get(f'test_key_{operation_id}')
+                cache.get(f"test_key_{operation_id}")
 
             # Set multiple values
-            cache.set_many({
-                f'bulk_key_{operation_id}_{i}': f'bulk_value_{operation_id}_{i}'
-                for i in range(5)
-            }, 60)
+            cache.set_many({f"bulk_key_{operation_id}_{i}": f"bulk_value_{operation_id}_{i}" for i in range(5)}, 60)
 
             operation_time = time.time() - start_time
             cache_times.append(operation_time)
@@ -224,7 +202,9 @@ class ParallelExecutionTest(TransactionTestCase):
         # Analyze cache performance
         avg_cache_time = statistics.mean(times)
 
-        self.assertLess(avg_cache_time, 0.1, f"Average cache operation time should be < 0.1s, got {avg_cache_time:.3f}s")
+        self.assertLess(
+            avg_cache_time, 0.1, f"Average cache operation time should be < 0.1s, got {avg_cache_time:.3f}s"
+        )
 
         print("Cache performance under load:")
         print("  20 parallel cache operations completed")
@@ -240,88 +220,81 @@ class QueryOptimisationTest(TestCase):
         """Set up test data for query optimisation tests."""
         # Create user
         cls.user = User.objects.create_user(
-            username='query_opt_user',
-            email='queryopt@test.com',
-            password='query_opt_pass_123'
+            username="query_opt_user", email="queryopt@test.com", password="query_opt_pass_123"
         )
 
         # Create sector and industry
         cls.sector = DataSector.objects.create(
-            sectorKey='tech_query_opt',
-            sectorName='Technology Query Optimisation',
-            data_source='yahoo'
+            sectorKey="tech_query_opt", sectorName="Technology Query Optimisation", data_source="yahoo"
         )
 
         cls.industry = DataIndustry.objects.create(
-            industryKey='software_query_opt',
-            industryName='Software Query Optimisation',
+            industryKey="software_query_opt",
+            industryName="Software Query Optimisation",
             sector=cls.sector,
-            data_source='yahoo'
+            data_source="yahoo",
         )
 
         # Create test stocks with extensive price history
         stocks_to_create = []
         for i in range(50):
-            stocks_to_create.append(Stock(
-                symbol=f'QOPT_{i:03d}',
-                short_name=f'Query Optimisation Stock {i}',
-                currency='USD',
-                exchange='NASDAQ',
-                sector_id=cls.sector,
-                industry_id=cls.industry
-            ))
+            stocks_to_create.append(
+                Stock(
+                    symbol=f"QOPT_{i:03d}",
+                    short_name=f"Query Optimisation Stock {i}",
+                    currency="USD",
+                    exchange="NASDAQ",
+                    sector_id=cls.sector,
+                    industry_id=cls.industry,
+                )
+            )
 
         Stock.objects.bulk_create(stocks_to_create)
 
         # Create price data for performance testing
-        stocks = Stock.objects.filter(symbol__startswith='QOPT_')[:20]  # Limit for test performance
+        stocks = Stock.objects.filter(symbol__startswith="QOPT_")[:20]  # Limit for test performance
         prices_to_create = []
 
         for stock in stocks:
             for day in range(100):  # 100 days of price history per stock
-                prices_to_create.append(StockPrice(
-                    stock=stock,
-                    date=date.today() - timedelta(days=day),
-                    open=Decimal('100.00') + (day % 20),
-                    high=Decimal('105.00') + (day % 20),
-                    low=Decimal('98.00') + (day % 20),
-                    close=Decimal('103.00') + (day % 20),
-                    volume=1000000 + (day * 1000)
-                ))
+                prices_to_create.append(
+                    StockPrice(
+                        stock=stock,
+                        date=date.today() - timedelta(days=day),
+                        open=Decimal("100.00") + (day % 20),
+                        high=Decimal("105.00") + (day % 20),
+                        low=Decimal("98.00") + (day % 20),
+                        close=Decimal("103.00") + (day % 20),
+                        volume=1000000 + (day * 1000),
+                    )
+                )
 
         StockPrice.objects.bulk_create(prices_to_create)
 
     def test_complex_query_performance(self):
         """Test performance of complex database queries."""
-        from django.db.models import Avg, Max, Min, Count, Q
+        from django.db.models import Avg, Count, Max, Min, Q
 
         # Test 1: Complex aggregation query
         start_time = time.time()
 
         aggregation_results = StockPrice.objects.filter(
-            stock__symbol__startswith='QOPT_',
-            date__gte=date.today() - timedelta(days=30)
-        ).aggregate(
-            avg_close=Avg('close'),
-            max_high=Max('high'),
-            min_low=Min('low'),
-            total_volume=Count('volume')
-        )
+            stock__symbol__startswith="QOPT_", date__gte=date.today() - timedelta(days=30)
+        ).aggregate(avg_close=Avg("close"), max_high=Max("high"), min_low=Min("low"), total_volume=Count("volume"))
 
         aggregation_time = time.time() - start_time
 
-        self.assertIsNotNone(aggregation_results['avg_close'])
+        self.assertIsNotNone(aggregation_results["avg_close"])
         self.assertLess(aggregation_time, 2.0, f"Aggregation query should complete < 2s, took {aggregation_time:.3f}s")
 
         # Test 2: Complex join query with select_related
         start_time = time.time()
 
-        join_results = list(StockPrice.objects.select_related(
-            'stock__sector_id', 'stock__industry_id'
-        ).filter(
-            stock__symbol__startswith='QOPT_',
-            date__gte=date.today() - timedelta(days=7)
-        )[:100])
+        join_results = list(
+            StockPrice.objects.select_related("stock__sector_id", "stock__industry_id").filter(
+                stock__symbol__startswith="QOPT_", date__gte=date.today() - timedelta(days=7)
+            )[:100]
+        )
 
         join_time = time.time() - start_time
 
@@ -332,8 +305,7 @@ class QueryOptimisationTest(TestCase):
         start_time = time.time()
 
         complex_filter_results = Stock.objects.filter(
-            Q(symbol__startswith='QOPT_') | Q(short_name__icontains='Query'),
-            sector_id=self.sector
+            Q(symbol__startswith="QOPT_") | Q(short_name__icontains="Query"), sector_id=self.sector
         ).count()
 
         filter_time = time.time() - start_time
@@ -353,12 +325,12 @@ class QueryOptimisationTest(TestCase):
 
         bulk_stocks = [
             Stock(
-                symbol=f'BULK_PERF_{i:04d}',
-                short_name=f'Bulk Performance Stock {i}',
-                currency='USD',
-                exchange='NYSE',
+                symbol=f"BULK_PERF_{i:04d}",
+                short_name=f"Bulk Performance Stock {i}",
+                currency="USD",
+                exchange="NYSE",
                 sector_id=self.sector,
-                industry_id=self.industry
+                industry_id=self.industry,
             )
             for i in range(200)
         ]
@@ -369,19 +341,19 @@ class QueryOptimisationTest(TestCase):
         self.assertLess(bulk_create_time, 3.0, f"Bulk create should complete < 3s, took {bulk_create_time:.3f}s")
 
         # Test bulk_update performance
-        created_stocks = Stock.objects.filter(symbol__startswith='BULK_PERF_')
+        created_stocks = Stock.objects.filter(symbol__startswith="BULK_PERF_")
         for stock in created_stocks:
             stock.short_name = f"Updated {stock.short_name}"
 
         start_time = time.time()
-        Stock.objects.bulk_update(created_stocks, ['short_name'])
+        Stock.objects.bulk_update(created_stocks, ["short_name"])
         bulk_update_time = time.time() - start_time
 
         self.assertLess(bulk_update_time, 2.0, f"Bulk update should complete < 2s, took {bulk_update_time:.3f}s")
 
         # Test bulk_delete performance
         start_time = time.time()
-        deleted_count = Stock.objects.filter(symbol__startswith='BULK_PERF_').delete()[0]
+        deleted_count = Stock.objects.filter(symbol__startswith="BULK_PERF_").delete()[0]
         bulk_delete_time = time.time() - start_time
 
         self.assertEqual(deleted_count, 200)
@@ -407,7 +379,7 @@ class IntegrationTestSuitePerformanceTest(TransactionTestCase):
             self._test_portfolio_operations,
             self._test_stock_data_operations,
             self._test_analytics_operations,
-            self._test_api_operations
+            self._test_api_operations,
         ]
 
         operation_times = {}
@@ -420,11 +392,17 @@ class IntegrationTestSuitePerformanceTest(TransactionTestCase):
         total_suite_time = time.time() - suite_start_time
 
         # Performance targets
-        self.assertLess(total_suite_time, 300.0, f"Complete integration test suite should complete < 5 minutes, took {total_suite_time:.1f}s")
+        self.assertLess(
+            total_suite_time,
+            300.0,
+            f"Complete integration test suite should complete < 5 minutes, took {total_suite_time:.1f}s",
+        )
 
         # Individual operation targets
         for operation_name, operation_time in operation_times.items():
-            self.assertLess(operation_time, 60.0, f"{operation_name} should complete < 1 minute, took {operation_time:.1f}s")
+            self.assertLess(
+                operation_time, 60.0, f"{operation_name} should complete < 1 minute, took {operation_time:.1f}s"
+            )
 
         print("Integration test suite performance:")
         print(f"  Total suite time: {total_suite_time:.1f}s (target: < 300s)")
@@ -436,31 +414,25 @@ class IntegrationTestSuitePerformanceTest(TransactionTestCase):
         from django.contrib.auth import authenticate
 
         user = User.objects.create_user(
-            username='perf_auth_user',
-            email='perfauth@test.com',
-            password='perf_auth_pass_123'
+            username="perf_auth_user", email="perfauth@test.com", password="perf_auth_pass_123"
         )
 
         # Simulate authentication operations
         for _ in range(10):
-            authenticated_user = authenticate(username='perf_auth_user', password='perf_auth_pass_123')
+            authenticated_user = authenticate(username="perf_auth_user", password="perf_auth_pass_123")
             self.assertIsNotNone(authenticated_user)
 
     def _test_portfolio_operations(self):
         """Simulate portfolio operations."""
         user = User.objects.create_user(
-            username='perf_portfolio_user',
-            email='perfportfolio@test.com',
-            password='perf_portfolio_pass_123'
+            username="perf_portfolio_user", email="perfportfolio@test.com", password="perf_portfolio_pass_123"
         )
 
         # Create portfolios
         portfolios = []
         for i in range(5):
             portfolio = Portfolio.objects.create(
-                user=user,
-                name=f'Performance Test Portfolio {i}',
-                initial_value=Decimal('10000.00')
+                user=user, name=f"Performance Test Portfolio {i}", initial_value=Decimal("10000.00")
             )
             portfolios.append(portfolio)
 
@@ -470,18 +442,14 @@ class IntegrationTestSuitePerformanceTest(TransactionTestCase):
     def _test_stock_data_operations(self):
         """Simulate stock data operations."""
         sector = DataSector.objects.create(
-            sectorKey='tech_perf_ops',
-            sectorName='Technology Performance Operations',
-            data_source='yahoo'
+            sectorKey="tech_perf_ops", sectorName="Technology Performance Operations", data_source="yahoo"
         )
 
         # Create stocks and price data
         stocks = []
         for i in range(10):
             stock = Stock.objects.create(
-                symbol=f'PERF_OPS_{i:02d}',
-                short_name=f'Performance Operations Stock {i}',
-                sector_id=sector
+                symbol=f"PERF_OPS_{i:02d}", short_name=f"Performance Operations Stock {i}", sector_id=sector
             )
             stocks.append(stock)
 
@@ -489,41 +457,37 @@ class IntegrationTestSuitePerformanceTest(TransactionTestCase):
             StockPrice.objects.create(
                 stock=stock,
                 date=date.today(),
-                open=Decimal('100.00'),
-                high=Decimal('105.00'),
-                low=Decimal('98.00'),
-                close=Decimal('103.00'),
-                volume=1000000
+                open=Decimal("100.00"),
+                high=Decimal("105.00"),
+                low=Decimal("98.00"),
+                close=Decimal("103.00"),
+                volume=1000000,
             )
 
-        self.assertEqual(Stock.objects.filter(symbol__startswith='PERF_OPS_').count(), 10)
+        self.assertEqual(Stock.objects.filter(symbol__startswith="PERF_OPS_").count(), 10)
 
     def _test_analytics_operations(self):
         """Simulate analytics operations."""
         from Data.models import AnalyticsResults
 
         sector = DataSector.objects.create(
-            sectorKey='tech_perf_analytics',
-            sectorName='Technology Performance Analytics',
-            data_source='yahoo'
+            sectorKey="tech_perf_analytics", sectorName="Technology Performance Analytics", data_source="yahoo"
         )
 
         stock = Stock.objects.create(
-            symbol='PERF_ANALYTICS',
-            short_name='Performance Analytics Stock',
-            sector_id=sector
+            symbol="PERF_ANALYTICS", short_name="Performance Analytics Stock", sector_id=sector
         )
 
         # Create analytics results
         analytics_result = AnalyticsResults.objects.create(
             stock=stock,
             as_of=timezone.now(),
-            horizon='blend',
-            w_rsi14=Decimal('0.655'),
-            w_pricevs50=Decimal('0.148'),
-            w_sma50vs200=Decimal('0.145'),
-            w_macd12269=Decimal('0.085'),
-            composite_raw=Decimal('7.2')
+            horizon="blend",
+            w_rsi14=Decimal("0.655"),
+            w_pricevs50=Decimal("0.148"),
+            w_sma50vs200=Decimal("0.145"),
+            w_macd12269=Decimal("0.085"),
+            composite_raw=Decimal("7.2"),
         )
 
         self.assertIsNotNone(analytics_result)
@@ -534,9 +498,7 @@ class IntegrationTestSuitePerformanceTest(TransactionTestCase):
 
         client = APIClient()
         user = User.objects.create_user(
-            username='perf_api_user',
-            email='perfapi@test.com',
-            password='perf_api_pass_123'
+            username="perf_api_user", email="perfapi@test.com", password="perf_api_pass_123"
         )
         client.force_authenticate(user=user)
 
@@ -545,13 +507,14 @@ class IntegrationTestSuitePerformanceTest(TransactionTestCase):
 
         try:
             # Test various API endpoints
-            client.get(reverse('data:stock-list'))
-            client.get(reverse('data:portfolio-list'))
+            client.get(reverse("data:stock-list"))
+            client.get(reverse("data:portfolio-list"))
         except Exception:
             # Endpoints may not exist in test environment
             pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import unittest
+
     unittest.main()

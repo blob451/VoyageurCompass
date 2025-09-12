@@ -6,13 +6,14 @@ Tests UserSecurityProfile, PasswordResetRequest, and BlacklistedToken models.
 import uuid
 from datetime import timedelta
 
-# Removed mock imports - using real operations
-from django.test import TestCase
 from django.contrib.auth.models import User
-from django.utils import timezone
 from django.db import IntegrityError
 
-from Core.models import UserSecurityProfile, PasswordResetRequest, BlacklistedToken
+# Removed mock imports - using real operations
+from django.test import TestCase
+from django.utils import timezone
+
+from Core.models import BlacklistedToken, PasswordResetRequest, UserSecurityProfile
 
 
 class UserSecurityProfileTestCase(TestCase):

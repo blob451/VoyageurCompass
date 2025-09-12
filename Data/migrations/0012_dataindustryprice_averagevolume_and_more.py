@@ -6,158 +6,202 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('Data', '0011_dataindustry_datasectorprice_stock_industry_id_and_more'),
+        ("Data", "0011_dataindustry_datasectorprice_stock_industry_id_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='dataindustryprice',
-            name='averageVolume',
-            field=models.BigIntegerField(blank=True, help_text='Average daily volume', null=True),
+            model_name="dataindustryprice",
+            name="averageVolume",
+            field=models.BigIntegerField(blank=True, help_text="Average daily volume", null=True),
         ),
         migrations.AddField(
-            model_name='dataindustryprice',
-            name='averageVolume3months',
-            field=models.BigIntegerField(blank=True, help_text='3-month average daily volume', null=True),
+            model_name="dataindustryprice",
+            name="averageVolume3months",
+            field=models.BigIntegerField(blank=True, help_text="3-month average daily volume", null=True),
         ),
         migrations.AddField(
-            model_name='dataindustryprice',
-            name='fiftyDayAverage',
-            field=models.DecimalField(blank=True, decimal_places=6, help_text='50-day moving average', max_digits=20, null=True),
+            model_name="dataindustryprice",
+            name="fiftyDayAverage",
+            field=models.DecimalField(
+                blank=True, decimal_places=6, help_text="50-day moving average", max_digits=20, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='dataindustryprice',
-            name='fiftyTwoWeekChange',
-            field=models.DecimalField(blank=True, decimal_places=6, help_text='52-week change percentage', max_digits=10, null=True),
+            model_name="dataindustryprice",
+            name="fiftyTwoWeekChange",
+            field=models.DecimalField(
+                blank=True, decimal_places=6, help_text="52-week change percentage", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='dataindustryprice',
-            name='twoHundredDayAverage',
-            field=models.DecimalField(blank=True, decimal_places=6, help_text='200-day moving average', max_digits=20, null=True),
+            model_name="dataindustryprice",
+            name="twoHundredDayAverage",
+            field=models.DecimalField(
+                blank=True, decimal_places=6, help_text="200-day moving average", max_digits=20, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='datasectorprice',
-            name='averageVolume',
-            field=models.BigIntegerField(blank=True, help_text='Average daily volume', null=True),
+            model_name="datasectorprice",
+            name="averageVolume",
+            field=models.BigIntegerField(blank=True, help_text="Average daily volume", null=True),
         ),
         migrations.AddField(
-            model_name='datasectorprice',
-            name='averageVolume3months',
-            field=models.BigIntegerField(blank=True, help_text='3-month average daily volume', null=True),
+            model_name="datasectorprice",
+            name="averageVolume3months",
+            field=models.BigIntegerField(blank=True, help_text="3-month average daily volume", null=True),
         ),
         migrations.AddField(
-            model_name='datasectorprice',
-            name='fiftyDayAverage',
-            field=models.DecimalField(blank=True, decimal_places=6, help_text='50-day moving average', max_digits=20, null=True),
+            model_name="datasectorprice",
+            name="fiftyDayAverage",
+            field=models.DecimalField(
+                blank=True, decimal_places=6, help_text="50-day moving average", max_digits=20, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='datasectorprice',
-            name='fiftyTwoWeekChange',
-            field=models.DecimalField(blank=True, decimal_places=6, help_text='52-week change percentage', max_digits=10, null=True),
+            model_name="datasectorprice",
+            name="fiftyTwoWeekChange",
+            field=models.DecimalField(
+                blank=True, decimal_places=6, help_text="52-week change percentage", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='datasectorprice',
-            name='twoHundredDayAverage',
-            field=models.DecimalField(blank=True, decimal_places=6, help_text='200-day moving average', max_digits=20, null=True),
+            model_name="datasectorprice",
+            name="twoHundredDayAverage",
+            field=models.DecimalField(
+                blank=True, decimal_places=6, help_text="200-day moving average", max_digits=20, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='averageVolume',
-            field=models.BigIntegerField(blank=True, help_text='Average daily volume', null=True),
+            model_name="stock",
+            name="averageVolume",
+            field=models.BigIntegerField(blank=True, help_text="Average daily volume", null=True),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='averageVolume10days',
-            field=models.BigIntegerField(blank=True, help_text='10-day average volume', null=True),
+            model_name="stock",
+            name="averageVolume10days",
+            field=models.BigIntegerField(blank=True, help_text="10-day average volume", null=True),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='averageVolume3months',
-            field=models.BigIntegerField(blank=True, help_text='3-month average volume', null=True),
+            model_name="stock",
+            name="averageVolume3months",
+            field=models.BigIntegerField(blank=True, help_text="3-month average volume", null=True),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='beta',
-            field=models.DecimalField(blank=True, decimal_places=4, help_text='Beta coefficient', max_digits=6, null=True),
+            model_name="stock",
+            name="beta",
+            field=models.DecimalField(
+                blank=True, decimal_places=4, help_text="Beta coefficient", max_digits=6, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='currentPrice',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='Current trading price', max_digits=10, null=True),
+            model_name="stock",
+            name="currentPrice",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="Current trading price", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='dayHigh',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text="Day's high price", max_digits=10, null=True),
+            model_name="stock",
+            name="dayHigh",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="Day's high price", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='dayLow',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text="Day's low price", max_digits=10, null=True),
+            model_name="stock",
+            name="dayLow",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="Day's low price", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='fiftyDayAverage',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='50-day moving average', max_digits=10, null=True),
+            model_name="stock",
+            name="fiftyDayAverage",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="50-day moving average", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='fiftyTwoWeekChange',
-            field=models.DecimalField(blank=True, decimal_places=6, help_text='52-week change percentage', max_digits=10, null=True),
+            model_name="stock",
+            name="fiftyTwoWeekChange",
+            field=models.DecimalField(
+                blank=True, decimal_places=6, help_text="52-week change percentage", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='fiftyTwoWeekHigh',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='52-week high price', max_digits=10, null=True),
+            model_name="stock",
+            name="fiftyTwoWeekHigh",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="52-week high price", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='fiftyTwoWeekLow',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='52-week low price', max_digits=10, null=True),
+            model_name="stock",
+            name="fiftyTwoWeekLow",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="52-week low price", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='impliedVolatility',
-            field=models.DecimalField(blank=True, decimal_places=4, help_text='Implied volatility', max_digits=6, null=True),
+            model_name="stock",
+            name="impliedVolatility",
+            field=models.DecimalField(
+                blank=True, decimal_places=4, help_text="Implied volatility", max_digits=6, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='previousClose',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text="Previous day's closing price", max_digits=10, null=True),
+            model_name="stock",
+            name="previousClose",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="Previous day's closing price", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='regularMarketDayHigh',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='Regular market day high', max_digits=10, null=True),
+            model_name="stock",
+            name="regularMarketDayHigh",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="Regular market day high", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='regularMarketDayLow',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='Regular market day low', max_digits=10, null=True),
+            model_name="stock",
+            name="regularMarketDayLow",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="Regular market day low", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='regularMarketOpen',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='Regular market open price', max_digits=10, null=True),
+            model_name="stock",
+            name="regularMarketOpen",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="Regular market open price", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='regularMarketPreviousClose',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='Regular market previous close', max_digits=10, null=True),
+            model_name="stock",
+            name="regularMarketPreviousClose",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="Regular market previous close", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='regularMarketPrice',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='Regular market price', max_digits=10, null=True),
+            model_name="stock",
+            name="regularMarketPrice",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="Regular market price", max_digits=10, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='regularMarketVolume',
-            field=models.BigIntegerField(blank=True, help_text='Regular market volume', null=True),
+            model_name="stock",
+            name="regularMarketVolume",
+            field=models.BigIntegerField(blank=True, help_text="Regular market volume", null=True),
         ),
         migrations.AddField(
-            model_name='stock',
-            name='twoHundredDayAverage',
-            field=models.DecimalField(blank=True, decimal_places=2, help_text='200-day moving average', max_digits=10, null=True),
+            model_name="stock",
+            name="twoHundredDayAverage",
+            field=models.DecimalField(
+                blank=True, decimal_places=2, help_text="200-day moving average", max_digits=10, null=True
+            ),
         ),
     ]
