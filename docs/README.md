@@ -3,23 +3,23 @@
 A state-of-the-art financial analytics platform powered by AI-driven explanation generation, combining LLaMA 3.1 language models with FinBERT sentiment analysis for professional-grade investment insights.
 
 ## Project Status
-✅ **Production Ready** - Advanced LLM-FinBERT Integration Deployed
+**[PRODUCTION READY]** - Advanced LLM-FinBERT Integration Deployed
 
 ## AI-Enhanced Features
 
-### 🤖 Hybrid AI Explanation System
+### **Hybrid AI Explanation System**
 - **LLaMA 3.1 Integration**: 8B and 70B models via Ollama for technical analysis explanations
 - **FinBERT Sentiment Analysis**: Real-time market sentiment integration with confidence scoring
 - **Sentiment-Enhanced Prompts**: Context-aware prompt generation with technical-sentiment alignment
 - **Ensemble Architecture**: Multi-model consensus with 4 voting strategies for enhanced accuracy
 
-### 📊 Performance Achievements
+### **Performance Achievements**
 - **Sub-2 Second Response Times**: Optimized generation with intelligent caching
 - **Professional Quality**: Clear BUY/SELL/HOLD recommendations with technical analysis
 - **High Reliability**: Circuit breaker pattern with graceful degradation
 - **Quality Monitoring**: Real-time metrics for recommendation clarity and technical coverage
 
-### 🔬 Advanced Technical Analysis
+### **Advanced Technical Analysis**
 - **12+ Technical Indicators**: SMA crossovers, RSI, MACD, Bollinger Bands, volume analysis
 - **Complexity Scoring**: Intelligent model selection based on analysis complexity
 - **Dynamic Caching**: Sentiment-aware TTL with volatility-based adjustments
@@ -201,21 +201,21 @@ POST /api/analytics/explain/
 ### Project Structure
 ```
 VoyageurCompass/
-├── Analytics/
-│   ├── services/
-│   │   ├── local_llm_service.py          # Core LLM service
-│   │   ├── hybrid_analysis_coordinator.py # Sentiment integration
-│   │   ├── financial_explanation_ensemble.py # Multi-model ensemble
-│   │   └── financial_fine_tuner.py       # LoRA fine-tuning
-│   ├── management/commands/
-│   │   └── generate_financial_dataset.py # Training data generation
-│   └── tests/
-│       ├── test_hybrid_integration.py    # Integration tests
-│       └── test_performance_validation.py # Performance tests
-├── Data/                                 # Market data models
-├── Core/                                 # Core Django app
-├── frontend/                             # React frontend
-└── config/                              # Docker configuration
++-- Analytics/
+|   +-- services/
+|   |   +-- local_llm_service.py          # Core LLM service
+|   |   +-- hybrid_analysis_coordinator.py # Sentiment integration
+|   |   +-- financial_explanation_ensemble.py # Multi-model ensemble
+|   |   +-- financial_fine_tuner.py       # LoRA fine-tuning
+|   +-- management/commands/
+|   |   +-- generate_financial_dataset.py # Training data generation
+|   +-- tests/
+|       +-- test_hybrid_integration.py    # Integration tests
+|       +-- test_performance_validation.py # Performance tests
++-- Data/                                 # Market data models
++-- Core/                                 # Core Django app
++-- frontend/                             # React frontend
++-- config/                              # Docker configuration
 ```
 
 ### Testing
@@ -254,9 +254,9 @@ print(f"Training completed. Final BLEU: {results['final_bleu']:.3f}")
 
 ### AI Pipeline
 ```
-User Request → Technical Analysis → Sentiment Analysis → 
-Prompt Enhancement → Model Selection → Generation → 
-Quality Assessment → Response
+User Request -> Technical Analysis -> Sentiment Analysis -> 
+Prompt Enhancement -> Model Selection -> Generation -> 
+Quality Assessment -> Response
 ```
 
 ### Data Flow
@@ -270,11 +270,11 @@ Quality Assessment → Response
 
 ### Deployment Architecture
 ```
-Load Balancer → Django App Servers → 
-├── PostgreSQL (Market Data)
-├── Redis (Caching)
-├── Ollama (LLM Serving)
-└── FinBERT (Sentiment Analysis)
+Load Balancer -> Django App Servers -> 
++-- PostgreSQL (Market Data)
++-- Redis (Caching)
++-- Ollama (LLM Serving)
++-- FinBERT (Sentiment Analysis)
 ```
 
 ## Monitoring & Analytics

@@ -98,9 +98,15 @@ psutil==7.0.0
 # Additional pytest packages used in CI workflows
 # (added dynamically in CI, but listed for reference)
 # pytest-xdist (for parallel testing)
+# pytest-benchmark (for performance testing)
 
 # Basic Machine Learning (for TF-IDF and caching functionality)
 scikit-learn==1.5.2
 
+# Security scanning tools (CI-specific)
+bandit==2.0.0
+safety==4.0.1
+
 # Note: PyTorch and transformers are excluded to save CI time and resources
 # ML functionality will use fallback methods in CI environment
+# Analytics monitoring service and LSTM models work with fallbacks in CI
