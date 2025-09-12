@@ -17,20 +17,20 @@ class DesignModuleIntegrationTest(TestCase):
     def setUp(self):
         """Set up test environment with temporary directories."""
         self.client = Client()
-        
+
         # Create test user
         self.user = User.objects.create_user(
             username='integration_test_user',
             password='test_password_123',
             email='integration@test.com'
         )
-        
+
         # Create temporary directories for testing
         self.temp_dir = tempfile.mkdtemp()
         self.static_dir = os.path.join(self.temp_dir, 'static')
         self.media_dir = os.path.join(self.temp_dir, 'media')
         self.frontend_dir = os.path.join(self.temp_dir, 'Design', 'frontend', 'dist')
-        
+
         os.makedirs(self.static_dir, exist_ok=True)
         os.makedirs(self.media_dir, exist_ok=True)
         os.makedirs(self.frontend_dir, exist_ok=True)
@@ -50,14 +50,14 @@ class DesignModuleIntegrationTest(TestCase):
         # Create test static file
         test_css_path = os.path.join(self.static_dir, 'style.css')
         test_css_content = b'body { background-color: #f0f0f0; }'
-        
+
         with open(test_css_path, 'wb') as f:
             f.write(test_css_content)
-        
+
         with override_settings(STATICFILES_DIRS=[self.static_dir]):
             # Test file serving
             response = self.client.get('/design/static/style.css/')
-            
+
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.content, test_css_content)
             self.assertEqual(response['Content-Type'], 'text/css')
@@ -71,7 +71,7 @@ class DesignModuleIntegrationTest(TestCase):
         with override_settings(MEDIA_ROOT=self.media_dir):
             # Login user
             self.client.login(username='integration_test_user', password='test_password_123')
-            
+
             # Create test image file
             test_image_content = b'fake png content for testing'
             test_image = SimpleUploadedFile(
@@ -79,20 +79,20 @@ class DesignModuleIntegrationTest(TestCase):
                 test_image_content,
                 content_type="image/png"
             )
-            
+
             # Upload file
             response = self.client.post('/design/upload/', {'file': test_image})
-            
+
             self.assertEqual(response.status_code, 200)
-            
+
             response_data = json.loads(response.content)
             self.assertTrue(response_data['success'])
             self.assertEqual(response_data['filename'], 'test_upload.png')
-            
+
             # Verify file was saved
             uploaded_file_path = os.path.join(self.media_dir, 'uploads', 'test_upload.png')
             self.assertTrue(os.path.exists(uploaded_file_path))
-            
+
             # Verify file content
             with open(uploaded_file_path, 'rb') as f:
                 saved_content = f.read()
@@ -107,22 +107,22 @@ class DesignModuleIntegrationTest(TestCase):
             # Create test frontend assets
             js_asset_path = os.path.join(self.frontend_dir, 'app.js')
             css_asset_path = os.path.join(self.frontend_dir, 'app.css')
-            
+
             js_content = b'console.log("Integration test asset");'
             css_content = b'.integration-test { color: blue; }'
-            
+
             with open(js_asset_path, 'wb') as f:
                 f.write(js_content)
-            
+
             with open(css_asset_path, 'wb') as f:
                 f.write(css_content)
-            
+
             # Test JavaScript asset serving
             js_response = self.client.get('/design/assets/app.js')
             self.assertEqual(js_response.status_code, 200)
             self.assertEqual(js_response.content, js_content)
             self.assertEqual(js_response['Content-Type'], 'application/javascript')
-            
+
             # Test CSS asset serving
             css_response = self.client.get('/design/assets/app.css')
             self.assertEqual(css_response.status_code, 200)
@@ -143,13 +143,13 @@ class DesignModuleIntegrationTest(TestCase):
         ):
             # All directories should exist
             response = self.client.get('/design/health/')
-            
+
             self.assertEqual(response.status_code, 200)
-            
+
             response_data = json.loads(response.content)
             self.assertTrue(response_data['healthy'])
             self.assertEqual(response_data['module'], 'Design')
-            
+
             checks = response_data['checks']
             self.assertTrue(checks['static_directory'])
             self.assertTrue(checks['media_directory'])
@@ -158,18 +158,18 @@ class DesignModuleIntegrationTest(TestCase):
     def test_security_file_upload_validation(self):
         """Test security validation in file upload workflow."""
         self.client.login(username='integration_test_user', password='test_password_123')
-        
+
         # Test malicious file upload attempt
         malicious_file = SimpleUploadedFile(
             "malware.exe",
             b"MZ\x90\x00",  # PE header signature
             content_type="application/x-msdownload"
         )
-        
+
         response = self.client.post('/design/upload/', {'file': malicious_file})
-        
+
         self.assertEqual(response.status_code, 400)
-        
+
         response_data = json.loads(response.content)
         self.assertFalse(response_data['success'])
         self.assertIn('not allowed', response_data['error'])
@@ -182,7 +182,7 @@ class DesignModuleIntegrationTest(TestCase):
             '..\\..\\windows\\system32\\config\\sam',
             'valid/../../../sensitive/file'
         ]
-        
+
         for malicious_path in malicious_paths:
             with self.subTest(path=malicious_path):
                 response = self.client.get(f'/design/static/{malicious_path}/')
@@ -195,7 +195,7 @@ class DesignModuleIntegrationTest(TestCase):
         """Test file size limit enforcement in upload workflow."""
         with override_settings(MEDIA_ROOT=self.media_dir):
             self.client.login(username='integration_test_user', password='test_password_123')
-            
+
             # Create file exceeding size limit
             oversized_content = b'x' * (11 * 1024 * 1024)  # 11MB (exceeds 10MB limit)
             oversized_file = SimpleUploadedFile(
@@ -203,11 +203,11 @@ class DesignModuleIntegrationTest(TestCase):
                 oversized_content,
                 content_type="image/png"
             )
-            
+
             response = self.client.post('/design/upload/', {'file': oversized_file})
-            
+
             self.assertEqual(response.status_code, 400)
-            
+
             response_data = json.loads(response.content)
             self.assertFalse(response_data['success'])
             self.assertIn('size exceeds', response_data['error'])
@@ -220,9 +220,9 @@ class DesignModuleIntegrationTest(TestCase):
             b"fake content",
             content_type="image/png"
         )
-        
+
         response = self.client.post('/design/upload/', {'file': test_file})
-        
+
         # Should redirect to login
         self.assertEqual(response.status_code, 302)
         self.assertIn('/accounts/login/', response.url)
@@ -237,19 +237,19 @@ class DesignModuleIntegrationTest(TestCase):
             # Create test files
             static_file_path = os.path.join(self.static_dir, 'prod.css')
             frontend_asset_path = os.path.join(self.frontend_dir, 'prod.js')
-            
+
             with open(static_file_path, 'wb') as f:
                 f.write(b'.prod { color: red; }')
-            
+
             with open(frontend_asset_path, 'wb') as f:
                 f.write(b'console.log("production");')
-            
+
             # Test static file caching
             static_response = self.client.get('/design/static/prod.css/')
             self.assertEqual(static_response.status_code, 200)
             self.assertIn('Cache-Control', static_response)
             self.assertEqual(static_response['Cache-Control'], 'public, max-age=31536000')
-            
+
             # Test frontend asset caching
             asset_response = self.client.get('/design/assets/prod.js')
             self.assertEqual(asset_response.status_code, 200)

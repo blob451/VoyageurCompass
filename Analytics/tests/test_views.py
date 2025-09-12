@@ -2,14 +2,15 @@
 Basic functional tests for Analytics app API views.
 """
 
+from datetime import date, timedelta
+from decimal import Decimal
+
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase, APIClient
-from datetime import timedelta, date
-from decimal import Decimal
+from rest_framework.test import APIClient, APITestCase
 
-from Data.models import Stock, StockPrice, Portfolio, PortfolioHolding
+from Data.models import Portfolio, PortfolioHolding, Stock, StockPrice
 
 
 class AnalyticsAPITestCase(APITestCase):
@@ -20,19 +21,19 @@ class AnalyticsAPITestCase(APITestCase):
         """Set up immutable test data once for the entire test class."""
         # Create test stock with price history
         cls.stock = Stock.objects.create(
-            symbol='AAPL',
-            short_name='Apple Inc.',
-            long_name='Apple Inc.',
-            currency='USD',
-            exchange='NASDAQ',
-            sector='Technology',
+            symbol="AAPL",
+            short_name="Apple Inc.",
+            long_name="Apple Inc.",
+            currency="USD",
+            exchange="NASDAQ",
+            sector="Technology",
             market_cap=3000000000000,
             is_active=True,
-            data_source='yahoo'
+            data_source="yahoo",
         )
 
         # Create price history for technical analysis (immutable data)
-        base_price = Decimal('150.00')
+        base_price = Decimal("150.00")
         for i in range(30):
             price_date = date.today() - timedelta(days=i)
             price = base_price + Decimal(str(i % 10))  # Create some variation
@@ -40,38 +41,32 @@ class AnalyticsAPITestCase(APITestCase):
             StockPrice.objects.create(
                 stock=cls.stock,
                 date=price_date,
-                open=price - Decimal('1.00'),
-                high=price + Decimal('2.00'),
-                low=price - Decimal('2.00'),
+                open=price - Decimal("1.00"),
+                high=price + Decimal("2.00"),
+                low=price - Decimal("2.00"),
                 close=price,
                 adjusted_close=price,
                 volume=50000000 + (i * 100000),
-                data_source='yahoo'
+                data_source="yahoo",
             )
 
     def setUp(self):
         """Set up test-specific data."""
-        self.user = User.objects.create_user(
-            username='testuser',
-            password='testpass123'
-        )
+        self.user = User.objects.create_user(username="testuser", password="testpass123")
 
         # Create test portfolio (user-specific)
         self.portfolio = Portfolio.objects.create(
-            user=self.user,
-            name='Test Portfolio',
-            initial_value=Decimal('10000.00'),
-            current_value=Decimal('11000.00')
+            user=self.user, name="Test Portfolio", initial_value=Decimal("10000.00"), current_value=Decimal("11000.00")
         )
 
         # Create portfolio holding (user-specific)
         self.holding = PortfolioHolding.objects.create(
             portfolio=self.portfolio,
             stock=self.stock,  # Reference to class-level stock
-            quantity=Decimal('10'),
-            average_price=Decimal('145.00'),
-            current_price=Decimal('155.00'),
-            purchase_date=date.today() - timedelta(days=30)
+            quantity=Decimal("10"),
+            average_price=Decimal("145.00"),
+            current_price=Decimal("155.00"),
+            purchase_date=date.today() - timedelta(days=30),
         )
 
     def test_stock_analysis_valid_symbol(self):
@@ -79,22 +74,22 @@ class AnalyticsAPITestCase(APITestCase):
         # Authenticate the user for this endpoint
         self.client.force_authenticate(user=self.user)
 
-        url = reverse('analytics:analyze_stock', args=[self.stock.symbol])
+        url = reverse("analytics:analyze_stock", args=[self.stock.symbol])
         response = self.client.get(url)
 
         # Should return 200 OK or handle gracefully
         self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_404_NOT_FOUND])
 
         if response.status_code == status.HTTP_200_OK:
-            self.assertIn('symbol', response.data)
-            self.assertEqual(response.data['symbol'], 'AAPL')
+            self.assertIn("symbol", response.data)
+            self.assertEqual(response.data["symbol"], "AAPL")
 
     def test_stock_analysis_invalid_symbol(self):
         """Test stock analysis with invalid symbol."""
         # Authenticate the user for this endpoint
         self.client.force_authenticate(user=self.user)
 
-        url = reverse('analytics:analyze_stock', args=['INVALID'])
+        url = reverse("analytics:analyze_stock", args=["INVALID"])
         response = self.client.get(url)
 
         # Should return 404 Not Found or 400 Bad Request for invalid symbols
@@ -102,7 +97,7 @@ class AnalyticsAPITestCase(APITestCase):
 
     def test_portfolio_analysis_requires_auth(self):
         """Test that portfolio analysis requires authentication."""
-        url = reverse('analytics:analyze_portfolio', args=[self.portfolio.id])
+        url = reverse("analytics:analyze_portfolio", args=[self.portfolio.id])
         response = self.client.get(url)
 
         # Should require authentication
@@ -111,27 +106,23 @@ class AnalyticsAPITestCase(APITestCase):
     def test_portfolio_analysis_authenticated(self):
         """Test portfolio analysis with authentication."""
         self.client.force_authenticate(user=self.user)
-        url = reverse('analytics:analyze_portfolio', args=[self.portfolio.id])
+        url = reverse("analytics:analyze_portfolio", args=[self.portfolio.id])
         response = self.client.get(url)
 
         # Should handle request (may not be fully implemented yet)
-        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_404_NOT_FOUND, status.HTTP_501_NOT_IMPLEMENTED])
+        self.assertIn(
+            response.status_code, [status.HTTP_200_OK, status.HTTP_404_NOT_FOUND, status.HTTP_501_NOT_IMPLEMENTED]
+        )
 
     def test_portfolio_analysis_wrong_user(self):
         """Test that users cannot access other users' portfolio analysis."""
-        other_user = User.objects.create_user(
-            username='otheruser',
-            password='otherpass123'
-        )
+        other_user = User.objects.create_user(username="otheruser", password="otherpass123")
         other_portfolio = Portfolio.objects.create(
-            user=other_user,
-            name='Other Portfolio',
-            initial_value=Decimal('5000.00'),
-            current_value=Decimal('5000.00')
+            user=other_user, name="Other Portfolio", initial_value=Decimal("5000.00"), current_value=Decimal("5000.00")
         )
 
         self.client.force_authenticate(user=self.user)
-        url = reverse('analytics:analyze_portfolio', args=[other_portfolio.id])
+        url = reverse("analytics:analyze_portfolio", args=[other_portfolio.id])
         response = self.client.get(url)
 
         # Should not allow access to other user's portfolio
@@ -142,16 +133,19 @@ class AnalyticsAPITestCase(APITestCase):
         # Authenticate the user for this endpoint
         self.client.force_authenticate(user=self.user)
 
-        url = reverse('analytics:batch_analysis')
-        response = self.client.post(url, {'symbols': ['AAPL']}, format='json')
+        url = reverse("analytics:batch_analysis")
+        response = self.client.post(url, {"symbols": ["AAPL"]}, format="json")
 
         # Should handle request gracefully (may not be fully implemented)
-        self.assertIn(response.status_code, [
-            status.HTTP_200_OK, 
-            status.HTTP_400_BAD_REQUEST,
-            status.HTTP_404_NOT_FOUND, 
-            status.HTTP_501_NOT_IMPLEMENTED
-        ])
+        self.assertIn(
+            response.status_code,
+            [
+                status.HTTP_200_OK,
+                status.HTTP_400_BAD_REQUEST,
+                status.HTTP_404_NOT_FOUND,
+                status.HTTP_501_NOT_IMPLEMENTED,
+            ],
+        )
 
 
 class AnalyticsEngineIntegrationTestCase(APITestCase):
@@ -162,16 +156,16 @@ class AnalyticsEngineIntegrationTestCase(APITestCase):
         """Set up test data once per test class for integration tests."""
         # Create test stock with sufficient price history for analytics
         cls.stock = Stock.objects.create(
-            symbol='TEST',
-            short_name='Test Inc.',
-            sector='Technology',
+            symbol="TEST",
+            short_name="Test Inc.",
+            sector="Technology",
             market_cap=1000000000000,
             is_active=True,
-            data_source='yahoo'
+            data_source="yahoo",
         )
 
         # Create realistic price history for analytics engine
-        base_price = Decimal('100.00')
+        base_price = Decimal("100.00")
         for i in range(100):  # 100 days of data
             price_date = date.today() - timedelta(days=i)
             # Simulate some price movement
@@ -181,13 +175,13 @@ class AnalyticsEngineIntegrationTestCase(APITestCase):
             StockPrice.objects.create(
                 stock=cls.stock,
                 date=price_date,
-                open=current_price - Decimal('0.50'),
-                high=current_price + Decimal('1.00'),
-                low=current_price - Decimal('1.50'),
+                open=current_price - Decimal("0.50"),
+                high=current_price + Decimal("1.00"),
+                low=current_price - Decimal("1.50"),
                 close=current_price,
                 adjusted_close=current_price,
                 volume=1000000 + (i * 10000),
-                data_source='yahoo'
+                data_source="yahoo",
             )
 
     def setUp(self):
@@ -202,5 +196,5 @@ class AnalyticsEngineIntegrationTestCase(APITestCase):
         self.assertIsNotNone(engine)
 
         # Test that engine has expected methods
-        self.assertTrue(hasattr(engine, 'analyze_stock'))
-        self.assertTrue(callable(getattr(engine, 'analyze_stock')))
+        self.assertTrue(hasattr(engine, "analyze_stock"))
+        self.assertTrue(callable(getattr(engine, "analyze_stock")))

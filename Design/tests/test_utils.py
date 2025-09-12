@@ -20,7 +20,7 @@ class TestStaticFileHandler(TestCase):
             'style.css', 'script.js', 'image.png', 'font.woff2',
             'data.json', 'page.html', 'icon.svg'
         ]
-        
+
         for filename in valid_files:
             with self.subTest(filename=filename):
                 self.assertTrue(
@@ -34,7 +34,7 @@ class TestStaticFileHandler(TestCase):
             'malware.exe', 'script.php', 'config.conf',
             'database.db', 'archive.zip', 'binary.bin'
         ]
-        
+
         for filename in invalid_files:
             with self.subTest(filename=filename):
                 self.assertFalse(
@@ -51,7 +51,7 @@ class TestStaticFileHandler(TestCase):
             ('image.jpg', 'image/jpeg'),
             ('data.json', 'application/json')
         ]
-        
+
         for filename, expected_mime in mime_tests:
             with self.subTest(filename=filename):
                 actual_mime = StaticFileHandler.get_file_mime_type(filename)
@@ -65,7 +65,7 @@ class TestStaticFileHandler(TestCase):
             'images/logo.png',
             'fonts/regular.woff2'
         ]
-        
+
         for path in valid_paths:
             with self.subTest(path=path):
                 self.assertTrue(
@@ -81,7 +81,7 @@ class TestStaticFileHandler(TestCase):
             '/absolute/path',
             'valid/../unsafe/path'
         ]
-        
+
         for path in unsafe_paths:
             with self.subTest(path=path):
                 self.assertFalse(
@@ -94,14 +94,14 @@ class TestStaticFileHandler(TestCase):
         """Test static file path generation for valid paths."""
         test_path = 'css/style.css'
         expected_path = os.path.join('/test/static', test_path)
-        
+
         actual_path = StaticFileHandler.get_static_file_path(test_path)
         self.assertEqual(actual_path, expected_path)
 
     def test_get_static_file_path_invalid_raises_404(self):
         """Test static file path generation raises Http404 for unsafe paths."""
         unsafe_path = '../../../etc/passwd'
-        
+
         with self.assertRaises(Http404):
             StaticFileHandler.get_static_file_path(unsafe_path)
 
@@ -114,13 +114,13 @@ class TestMediaFileHandler(TestCase):
         # Create small test file
         file_content = b"Test file content"
         test_file = SimpleUploadedFile(
-            "test_image.png", 
-            file_content, 
+            "test_image.png",
+            file_content,
             content_type="image/png"
         )
-        
+
         is_valid, message = MediaFileHandler.validate_upload_file(test_file)
-        
+
         self.assertTrue(is_valid)
         self.assertEqual(message, "Valid file")
 
@@ -133,9 +133,9 @@ class TestMediaFileHandler(TestCase):
             oversized_content,
             content_type="image/png"
         )
-        
+
         is_valid, message = MediaFileHandler.validate_upload_file(large_file)
-        
+
         self.assertFalse(is_valid)
         self.assertIn("size exceeds", message)
 
@@ -147,9 +147,9 @@ class TestMediaFileHandler(TestCase):
             file_content,
             content_type="application/x-msdownload"
         )
-        
+
         is_valid, message = MediaFileHandler.validate_upload_file(malicious_file)
-        
+
         self.assertFalse(is_valid)
         self.assertIn("not allowed", message)
 
@@ -161,7 +161,7 @@ class TestMediaFileHandler(TestCase):
             ('file:with|unsafe*chars.doc', 'file_with_unsafe_chars.doc'),
             ('  spaced  file  .jpg  ', 'spaced  file  .jpg')
         ]
-        
+
         for unsafe, expected_safe in unsafe_filenames:
             with self.subTest(filename=unsafe):
                 safe_filename = MediaFileHandler.sanitize_filename(unsafe)
@@ -174,12 +174,12 @@ class TestFrontendAssetManager(TestCase):
     def setUp(self):
         """Set up real test files and directories."""
         self.file_factory = DesignTestFileFactory()
-        
+
         # Create real frontend directory structure
         self.base_dir = os.path.join(self.file_factory.temp_base, 'test_app')
         self.frontend_dist = os.path.join(self.base_dir, 'Design', 'frontend', 'dist')
         os.makedirs(self.frontend_dist, exist_ok=True)
-        
+
         # Create real asset files
         valid_types = ['js', 'css', 'map']
         for asset_type in valid_types:
@@ -191,7 +191,7 @@ class TestFrontendAssetManager(TestCase):
                     f.write('body { margin: 0; }')
                 elif asset_type == 'map':
                     f.write('{"version": 3, "sources": ["app.js"]}')
-    
+
     def tearDown(self):
         """Clean up test files."""
         self.file_factory.cleanup()
@@ -199,14 +199,14 @@ class TestFrontendAssetManager(TestCase):
     def test_get_asset_path_valid_types(self):
         """Test asset path generation for valid asset types with real files."""
         valid_types = ['js', 'css', 'map']
-        
+
         with override_settings(BASE_DIR=self.base_dir):
             for asset_type in valid_types:
                 with self.subTest(asset_type=asset_type):
                     asset_path = FrontendAssetManager.get_asset_path('app', asset_type)
                     expected_path = os.path.join(self.base_dir, 'Design', 'frontend', 'dist', f'app.{asset_type}')
                     self.assertEqual(asset_path, expected_path)
-                    
+
                     # Verify file actually exists
                     self.assertTrue(FileSystemTestUtilities.validate_file_exists(asset_path))
 
@@ -215,7 +215,7 @@ class TestFrontendAssetManager(TestCase):
         with override_settings(BASE_DIR=self.base_dir):
             with self.assertRaises(ValueError) as context:
                 FrontendAssetManager.get_asset_path('app', 'invalid')
-            
+
             self.assertIn("Unsupported asset type", str(context.exception))
 
     def test_get_asset_path_missing_file(self):
@@ -243,5 +243,5 @@ class TestFrontendAssetManager(TestCase):
             'css': 'text/css',
             'map': 'application/json'
         }
-        
+
         self.assertEqual(FrontendAssetManager.ASSET_TYPES, expected_mappings)

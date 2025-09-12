@@ -1,6 +1,7 @@
 import logging
-from django.test import TestCase
 from io import StringIO
+
+from django.test import TestCase
 
 
 class AnalyticsLoggingTestCase(TestCase):
@@ -9,7 +10,7 @@ class AnalyticsLoggingTestCase(TestCase):
     def setUp(self):
         self.log_stream = StringIO()
         self.handler = logging.StreamHandler(self.log_stream)
-        self.logger = logging.getLogger('Analytics')
+        self.logger = logging.getLogger("Analytics")
         self.logger.addHandler(self.handler)
         self.logger.setLevel(logging.INFO)
 
@@ -19,10 +20,10 @@ class AnalyticsLoggingTestCase(TestCase):
 
     def test_analyticsLoggerExists(self):
         """Test Analytics logger is configured and functional"""
-        self.logger.info('Analytics test log')
+        self.logger.info("Analytics test log")
 
         log_output = self.log_stream.getvalue()
-        self.assertIn('Analytics test log', log_output)
+        self.assertIn("Analytics test log", log_output)
 
     def test_analyticsLoggerLevel(self):
         """Test Analytics logger respects configured level"""

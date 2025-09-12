@@ -13,7 +13,7 @@ from django.conf import settings
 
 class DesignTestFileFactory:
     """Factory for creating real test files and file system operations."""
-    
+
     def __init__(self):
         """Initialize test file factory with temporary directories."""
         self.temp_base = tempfile.mkdtemp(prefix='design_test_')
@@ -24,11 +24,11 @@ class DesignTestFileFactory:
             'frontend': os.path.join(self.temp_base, 'frontend'),
             'temp': os.path.join(self.temp_base, 'temp'),
         }
-        
+
         # Create all test directories
         for dir_path in self.test_dirs.values():
             os.makedirs(dir_path, exist_ok=True)
-    
+
     def create_test_image(self, filename='test_image.jpg', size=(100, 100)):
         """Create real test image file."""
         try:
@@ -44,7 +44,7 @@ class DesignTestFileFactory:
             with open(image_path, 'wb') as f:
                 f.write(image_content)
             return image_path
-    
+
     def create_test_css(self, filename='styles.css'):
         """Create real CSS test file."""
         css_content = """
@@ -54,7 +54,7 @@ class DesignTestFileFactory:
             padding: 20px;
             background-color: #f5f5f5;
         }
-        
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -63,7 +63,7 @@ class DesignTestFileFactory:
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
+
         .header {
             color: #333;
             border-bottom: 2px solid #007bff;
@@ -74,14 +74,14 @@ class DesignTestFileFactory:
         with open(css_path, 'w', encoding='utf-8') as f:
             f.write(css_content)
         return css_path
-    
+
     def create_test_javascript(self, filename='app.js'):
         """Create real JavaScript test file."""
         js_content = """
         // Test JavaScript file for Design module
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Design module test JavaScript loaded');
-            
+
             // Test function
             function initializeApp() {
                 const container = document.querySelector('.container');
@@ -89,10 +89,10 @@ class DesignTestFileFactory:
                     container.classList.add('initialized');
                 }
             }
-            
+
             // Initialize application
             initializeApp();
-            
+
             // Test API call simulation
             function fetchTestData() {
                 return fetch('/api/test/')
@@ -105,7 +105,7 @@ class DesignTestFileFactory:
                         console.error('Error loading test data:', error);
                     });
             }
-            
+
             // Export for testing
             window.DesignTestModule = {
                 initializeApp,
@@ -117,7 +117,7 @@ class DesignTestFileFactory:
         with open(js_path, 'w', encoding='utf-8') as f:
             f.write(js_content)
         return js_path
-    
+
     def create_test_html(self, filename='index.html'):
         """Create real HTML test file."""
         html_content = """
@@ -159,7 +159,7 @@ class DesignTestFileFactory:
         with open(html_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
         return html_path
-    
+
     def create_uploaded_file(self, filename='upload.txt', content='Test file content'):
         """Create real uploaded file for testing."""
         return SimpleUploadedFile(
@@ -167,7 +167,7 @@ class DesignTestFileFactory:
             content.encode('utf-8') if isinstance(content, str) else content,
             content_type='text/plain'
         )
-    
+
     def create_test_pdf(self, filename='document.pdf'):
         """Create real PDF test file."""
         try:
@@ -185,25 +185,25 @@ class DesignTestFileFactory:
             with open(pdf_path, 'wb') as f:
                 f.write(pdf_content)
             return pdf_path
-    
+
     def create_large_file(self, filename='large_file.bin', size_mb=5):
         """Create large test file for size validation testing."""
         file_path = os.path.join(self.test_dirs['temp'], filename)
         size_bytes = size_mb * 1024 * 1024
-        
+
         with open(file_path, 'wb') as f:
             # Write in chunks to avoid memory issues
             chunk_size = 1024 * 1024  # 1MB chunks
             for _ in range(size_mb):
                 f.write(b'0' * chunk_size)
-        
+
         return file_path
-    
+
     def get_file_info(self, file_path):
         """Get real file information for testing."""
         if not os.path.exists(file_path):
             return None
-        
+
         stat = os.stat(file_path)
         return {
             'path': file_path,
@@ -215,7 +215,7 @@ class DesignTestFileFactory:
             'permissions': oct(stat.st_mode)[-3:],
             'extension': os.path.splitext(file_path)[1].lower()
         }
-    
+
     def cleanup(self):
         """Clean up all test files and directories."""
         if os.path.exists(self.temp_base):
@@ -224,37 +224,37 @@ class DesignTestFileFactory:
 
 class FileSystemTestUtilities:
     """Utilities for real file system testing operations."""
-    
+
     @staticmethod
     def validate_file_exists(file_path):
         """Validate file exists with real file system check."""
         return os.path.exists(file_path) and os.path.isfile(file_path)
-    
+
     @staticmethod
     def validate_directory_exists(dir_path):
         """Validate directory exists with real file system check."""
         return os.path.exists(dir_path) and os.path.isdir(dir_path)
-    
+
     @staticmethod
     def get_mime_type(file_path):
         """Get real MIME type of file."""
         import mimetypes
         mime_type, _ = mimetypes.guess_type(file_path)
         return mime_type or 'application/octet-stream'
-    
+
     @staticmethod
     def calculate_file_hash(file_path):
         """Calculate real file hash for integrity verification."""
         import hashlib
         if not os.path.exists(file_path):
             return None
-        
+
         hash_sha256 = hashlib.sha256()
         with open(file_path, 'rb') as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_sha256.update(chunk)
         return hash_sha256.hexdigest()
-    
+
     @staticmethod
     def copy_file(source, destination):
         """Real file copy operation for testing."""
@@ -266,7 +266,7 @@ class FileSystemTestUtilities:
         except Exception as e:
             print(f"File copy failed: {e}")
             return False
-    
+
     @staticmethod
     def move_file(source, destination):
         """Real file move operation for testing."""
@@ -278,7 +278,7 @@ class FileSystemTestUtilities:
         except Exception as e:
             print(f"File move failed: {e}")
             return False
-    
+
     @staticmethod
     def delete_file(file_path):
         """Real file deletion for testing."""
@@ -290,7 +290,7 @@ class FileSystemTestUtilities:
         except Exception as e:
             print(f"File deletion failed: {e}")
             return False
-    
+
     @staticmethod
     def create_directory(dir_path):
         """Real directory creation for testing."""
@@ -300,14 +300,14 @@ class FileSystemTestUtilities:
         except Exception as e:
             print(f"Directory creation failed: {e}")
             return False
-    
+
     @staticmethod
     def list_directory_contents(dir_path):
         """Real directory listing for testing."""
         try:
             if not os.path.exists(dir_path):
                 return []
-            
+
             contents = []
             for item in os.listdir(dir_path):
                 item_path = os.path.join(dir_path, item)
@@ -322,14 +322,14 @@ class FileSystemTestUtilities:
         except Exception as e:
             print(f"Directory listing failed: {e}")
             return []
-    
+
     @staticmethod
     def check_disk_space(path=None):
         """Check real disk space for testing."""
         import shutil
         if path is None:
             path = os.getcwd()
-        
+
         try:
             total, used, free = shutil.disk_usage(path)
             return {
@@ -345,7 +345,7 @@ class FileSystemTestUtilities:
 
 class MediaTestUtilities:
     """Utilities for real media file testing."""
-    
+
     @staticmethod
     def validate_image_file(file_path):
         """Validate real image file integrity."""
@@ -359,7 +359,7 @@ class MediaTestUtilities:
             return FileSystemTestUtilities.validate_file_exists(file_path)
         except Exception:
             return False
-    
+
     @staticmethod
     def get_image_dimensions(file_path):
         """Get real image dimensions."""
@@ -371,7 +371,7 @@ class MediaTestUtilities:
             return None
         except Exception:
             return None
-    
+
     @staticmethod
     def resize_image(source_path, destination_path, size=(100, 100)):
         """Real image resize operation for testing."""
@@ -387,93 +387,93 @@ class MediaTestUtilities:
         except Exception as e:
             print(f"Image resize failed: {e}")
             return False
-    
+
     @staticmethod
     def validate_file_size(file_path, max_size_mb=5):
         """Validate real file size constraints."""
         if not os.path.exists(file_path):
             return False
-        
+
         file_size = os.path.getsize(file_path)
         max_size_bytes = max_size_mb * 1024 * 1024
         return file_size <= max_size_bytes
-    
+
     @staticmethod
     def scan_for_malicious_content(file_path):
         """Basic file security scanning for testing."""
         if not os.path.exists(file_path):
             return False
-        
+
         # Basic checks for potentially malicious files
         suspicious_extensions = ['.exe', '.bat', '.cmd', '.scr', '.pif']
         file_ext = os.path.splitext(file_path)[1].lower()
-        
+
         if file_ext in suspicious_extensions:
             return False
-        
+
         # Check file size (files that are too large might be suspicious)
         file_size = os.path.getsize(file_path)
         if file_size > 100 * 1024 * 1024:  # 100MB limit
             return False
-        
+
         return True
 
 
 class StaticAssetTestUtilities:
     """Utilities for static asset testing with real file operations."""
-    
+
     @staticmethod
     def validate_css_syntax(css_path):
         """Basic CSS syntax validation for testing."""
         if not os.path.exists(css_path):
             return False
-        
+
         try:
             with open(css_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-                
+
             # Basic syntax checks
             brace_count = content.count('{') - content.count('}')
             if brace_count != 0:
                 return False
-                
+
             # Check for basic CSS structure
             if ':' not in content and '{' in content:
                 return False
-                
+
             return True
         except Exception:
             return False
-    
+
     @staticmethod
     def validate_javascript_syntax(js_path):
         """Basic JavaScript syntax validation for testing."""
         if not os.path.exists(js_path):
             return False
-        
+
         try:
             with open(js_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-                
+
             # Basic syntax checks
             paren_count = content.count('(') - content.count(')')
             brace_count = content.count('{') - content.count('}')
             bracket_count = content.count('[') - content.count(']')
-            
+
             if paren_count != 0 or brace_count != 0 or bracket_count != 0:
                 return False
-                
+
             return True
         except Exception:
             return False
-    
+
     @staticmethod
     def minify_css(css_path, output_path):
         """Basic CSS minification for testing."""
         try:
             with open(css_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            
+
             # Basic minification: remove comments and extra whitespace
             import re
             # Remove CSS comments
@@ -483,15 +483,15 @@ class StaticAssetTestUtilities:
             content = content.replace(' {', '{').replace('{ ', '{')
             content = content.replace(' }', '}').replace('} ', '}')
             content = content.replace('; ', ';').replace(' ;', ';')
-            
+
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(content.strip())
-            
+
             return True
         except Exception as e:
             print(f"CSS minification failed: {e}")
             return False
-    
+
     @staticmethod
     def compress_image(source_path, destination_path, quality=85):
         """Real image compression for testing."""
@@ -505,7 +505,7 @@ class StaticAssetTestUtilities:
                         img = img.convert('RGBA')
                     background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
                     img = background
-                
+
                 img.save(destination_path, 'JPEG', quality=quality, optimize=True)
                 return True
         except ImportError:

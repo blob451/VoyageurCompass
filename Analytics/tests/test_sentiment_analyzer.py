@@ -5,19 +5,18 @@ No mocks - uses real PostgreSQL test database.
 """
 
 import time
-from django.test import TestCase, TransactionTestCase
+
 from django.core.cache import cache
+from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
-from datetime import datetime, timedelta
-import json
 
 from Analytics.services.sentiment_analyzer import (
-    SentimentAnalyzer, 
-    get_sentiment_analyzer,
+    SentimentAnalyzer,
     SentimentMetrics,
-    sentiment_metrics
+    get_sentiment_analyzer,
+    sentiment_metrics,
 )
-from Data.models import Stock, DataSector, DataIndustry, AnalyticsResults
+from Data.models import AnalyticsResults, DataIndustry, DataSector, Stock
 
 
 class RealSentimentAnalyzerTestCase(TransactionTestCase):
@@ -30,26 +29,21 @@ class RealSentimentAnalyzerTestCase(TransactionTestCase):
 
         # Create test sector and industry
         self.sector = DataSector.objects.create(
-            sectorKey='test_finance',
-            sectorName='Test Finance',
-            data_source='yahoo'
+            sectorKey="test_finance", sectorName="Test Finance", data_source="yahoo"
         )
 
         self.industry = DataIndustry.objects.create(
-            industryKey='test_banking',
-            industryName='Test Banking',
-            sector=self.sector,
-            data_source='yahoo'
+            industryKey="test_banking", industryName="Test Banking", sector=self.sector, data_source="yahoo"
         )
 
         # Create test stock
         self.test_stock = Stock.objects.create(
-            symbol='SENT_TEST',
-            short_name='Sentiment Test Corp',
-            long_name='Sentiment Testing Corporation',
+            symbol="SENT_TEST",
+            short_name="Sentiment Test Corp",
+            long_name="Sentiment Testing Corporation",
             sector_id=self.sector,
             industry_id=self.industry,
-            market_cap=5000000000
+            market_cap=5000000000,
         )
 
         # Initialize analyzer
@@ -72,34 +66,35 @@ class RealSentimentAnalyzerTestCase(TransactionTestCase):
     def test_real_cache_operations(self):
         """Test real cache operations with Redis/Django cache."""
         test_result = {
-            'sentimentScore': 0.75,
-            'sentimentLabel': 'positive',
-            'sentimentConfidence': 0.85,
-            'timestamp': timezone.now().isoformat()
+            "sentimentScore": 0.75,
+            "sentimentLabel": "positive",
+            "sentimentConfidence": 0.85,
+            "timestamp": timezone.now().isoformat(),
         }
 
-        cache_key = self.analyzer.generateCacheKey(symbol='SENT_TEST', days=7)
+        cache_key = self.analyzer.generateCacheKey(symbol="SENT_TEST", days=7)
 
         # Test cache miss
-        cached = self.analyzer.getCachedSentiment(cache_key, 'SENT_TEST')
+        cached = self.analyzer.getCachedSentiment(cache_key, "SENT_TEST")
         self.assertIsNone(cached)
 
         # Test cache set
-        success = self.analyzer.setCachedSentiment(cache_key, test_result, 'SENT_TEST')
+        success = self.analyzer.setCachedSentiment(cache_key, test_result, "SENT_TEST")
         self.assertTrue(success)
 
         # Test cache hit
-        cached = self.analyzer.getCachedSentiment(cache_key, 'SENT_TEST')
+        cached = self.analyzer.getCachedSentiment(cache_key, "SENT_TEST")
         self.assertIsNotNone(cached)
-        self.assertEqual(cached['sentimentScore'], 0.75)
-        self.assertEqual(cached['sentimentLabel'], 'positive')
-        self.assertTrue(cached['cached'])
+        self.assertEqual(cached["sentimentScore"], 0.75)
+        self.assertEqual(cached["sentimentLabel"], "positive")
+        self.assertTrue(cached["cached"])
 
         # Clean up
         cache.delete(cache_key)
 
     def test_real_sentiment_analysis_with_rules(self):
         """Test sentiment analysis using rule-based approach for testing."""
+
         # Create a simple rule-based sentiment analyzer for testing
         def analyze_with_rules(text):
             """Simple rule-based sentiment for testing."""
@@ -107,14 +102,34 @@ class RealSentimentAnalyzerTestCase(TransactionTestCase):
 
             # Positive keywords
             positive_words = [
-                'growth', 'profit', 'gain', 'increase', 'surge', 'rally',
-                'outperform', 'beat', 'exceed', 'strong', 'robust', 'excellent'
+                "growth",
+                "profit",
+                "gain",
+                "increase",
+                "surge",
+                "rally",
+                "outperform",
+                "beat",
+                "exceed",
+                "strong",
+                "robust",
+                "excellent",
             ]
 
             # Negative keywords
             negative_words = [
-                'loss', 'decline', 'fall', 'decrease', 'plunge', 'crash',
-                'underperform', 'miss', 'weak', 'poor', 'concern', 'risk'
+                "loss",
+                "decline",
+                "fall",
+                "decrease",
+                "plunge",
+                "crash",
+                "underperform",
+                "miss",
+                "weak",
+                "poor",
+                "concern",
+                "risk",
             ]
 
             positive_count = sum(1 for word in positive_words if word in text_lower)
@@ -122,46 +137,38 @@ class RealSentimentAnalyzerTestCase(TransactionTestCase):
 
             total = positive_count + negative_count
             if total == 0:
-                return {
-                    'sentimentScore': 0.0,
-                    'sentimentLabel': 'neutral',
-                    'sentimentConfidence': 0.5
-                }
+                return {"sentimentScore": 0.0, "sentimentLabel": "neutral", "sentimentConfidence": 0.5}
 
             score = (positive_count - negative_count) / total
 
             if score > 0.3:
-                label = 'positive'
+                label = "positive"
             elif score < -0.3:
-                label = 'negative'
+                label = "negative"
             else:
-                label = 'neutral'
+                label = "neutral"
 
             confidence = min(abs(score) + 0.5, 1.0)
 
-            return {
-                'sentimentScore': score,
-                'sentimentLabel': label,
-                'sentimentConfidence': confidence
-            }
+            return {"sentimentScore": score, "sentimentLabel": label, "sentimentConfidence": confidence}
 
         # Test various financial texts
         test_cases = [
-            ("Company reports strong quarterly growth with profits exceeding expectations", 'positive'),
-            ("Stock plunges after weak earnings report shows declining revenue", 'negative'),
-            ("The company maintains steady operations with no significant changes", 'neutral'),
+            ("Company reports strong quarterly growth with profits exceeding expectations", "positive"),
+            ("Stock plunges after weak earnings report shows declining revenue", "negative"),
+            ("The company maintains steady operations with no significant changes", "neutral"),
         ]
 
         for text, expected_label in test_cases:
             result = analyze_with_rules(text)
 
-            self.assertIn('sentimentScore', result)
-            self.assertIn('sentimentLabel', result)
-            self.assertIn('sentimentConfidence', result)
+            self.assertIn("sentimentScore", result)
+            self.assertIn("sentimentLabel", result)
+            self.assertIn("sentimentConfidence", result)
 
             # For strong cases, should match expected
-            if 'strong' in text or 'plunges' in text:
-                self.assertEqual(result['sentimentLabel'], expected_label)
+            if "strong" in text or "plunges" in text:
+                self.assertEqual(result["sentimentLabel"], expected_label)
 
     def test_real_batch_sentiment_processing(self):
         """Test batch sentiment processing with real implementation."""
@@ -170,7 +177,7 @@ class RealSentimentAnalyzerTestCase(TransactionTestCase):
             "Concerns over declining market share",
             "Company announces regular dividend payment",
             "Strong growth momentum continues",
-            "Risk factors increase amid market volatility"
+            "Risk factors increase amid market volatility",
         ]
 
         # Process batch (using fallback implementation if model not available)
@@ -178,43 +185,43 @@ class RealSentimentAnalyzerTestCase(TransactionTestCase):
         for text in texts:
             # Use neutral sentiment as fallback for testing
             result = self.analyzer._neutral_sentiment()
-            result['text'] = text
+            result["text"] = text
             results.append(result)
 
         self.assertEqual(len(results), 5)
         for result in results:
-            self.assertIn('sentimentScore', result)
-            self.assertIn('sentimentLabel', result)
-            self.assertIn('sentimentConfidence', result)
+            self.assertIn("sentimentScore", result)
+            self.assertIn("sentimentLabel", result)
+            self.assertIn("sentimentConfidence", result)
 
     def test_real_sentiment_aggregation(self):
         """Test real sentiment aggregation logic."""
         # Create diverse sentiment results
         sentiments = [
-            {'sentimentScore': 0.8, 'sentimentLabel': 'positive', 'sentimentConfidence': 0.9},
-            {'sentimentScore': 0.6, 'sentimentLabel': 'positive', 'sentimentConfidence': 0.7},
-            {'sentimentScore': -0.7, 'sentimentLabel': 'negative', 'sentimentConfidence': 0.8},
-            {'sentimentScore': 0.1, 'sentimentLabel': 'neutral', 'sentimentConfidence': 0.6},
-            {'sentimentScore': -0.4, 'sentimentLabel': 'negative', 'sentimentConfidence': 0.65},
+            {"sentimentScore": 0.8, "sentimentLabel": "positive", "sentimentConfidence": 0.9},
+            {"sentimentScore": 0.6, "sentimentLabel": "positive", "sentimentConfidence": 0.7},
+            {"sentimentScore": -0.7, "sentimentLabel": "negative", "sentimentConfidence": 0.8},
+            {"sentimentScore": 0.1, "sentimentLabel": "neutral", "sentimentConfidence": 0.6},
+            {"sentimentScore": -0.4, "sentimentLabel": "negative", "sentimentConfidence": 0.65},
         ]
 
         aggregated = self.analyzer.aggregateSentiment(sentiments)
 
         self.assertIsNotNone(aggregated)
-        self.assertIn('sentimentScore', aggregated)
-        self.assertIn('sentimentLabel', aggregated)
-        self.assertIn('distribution', aggregated)
-        self.assertIn('sampleCount', aggregated)
+        self.assertIn("sentimentScore", aggregated)
+        self.assertIn("sentimentLabel", aggregated)
+        self.assertIn("distribution", aggregated)
+        self.assertIn("sampleCount", aggregated)
 
         # Check distribution
-        distribution = aggregated['distribution']
-        self.assertEqual(distribution['positive'], 2)
-        self.assertEqual(distribution['negative'], 2)
-        self.assertEqual(distribution['neutral'], 1)
+        distribution = aggregated["distribution"]
+        self.assertEqual(distribution["positive"], 2)
+        self.assertEqual(distribution["negative"], 2)
+        self.assertEqual(distribution["neutral"], 1)
 
         # Average score should be calculated
-        expected_avg = sum(s['sentimentScore'] for s in sentiments) / len(sentiments)
-        self.assertAlmostEqual(aggregated['sentimentScore'], expected_avg, places=2)
+        expected_avg = sum(s["sentimentScore"] for s in sentiments) / len(sentiments)
+        self.assertAlmostEqual(aggregated["sentimentScore"], expected_avg, places=2)
 
     def test_real_batch_size_adaptation(self):
         """Test real batch size adaptation based on performance."""
@@ -254,13 +261,13 @@ class RealSentimentAnalyzerTestCase(TransactionTestCase):
 
             # Should return neutral sentiment for invalid inputs
             self.assertIsNotNone(result)
-            self.assertEqual(result['sentimentLabel'], 'neutral')
-            self.assertEqual(result['sentimentScore'], 0.0)
+            self.assertEqual(result["sentimentLabel"], "neutral")
+            self.assertEqual(result["sentimentScore"], 0.0)
 
     def test_real_cache_expiration(self):
         """Test cache expiration behavior."""
         cache_key = "test:sentiment:expiration"
-        test_data = {'sentimentScore': 0.5}
+        test_data = {"sentimentScore": 0.5}
 
         # Set with short timeout
         cache.set(cache_key, test_data, timeout=1)
@@ -288,16 +295,16 @@ class RealSentimentAnalyzerTestCase(TransactionTestCase):
         # Get summary stats
         stats = metrics.get_summary_stats()
 
-        self.assertEqual(stats['total_requests'], 1)
-        self.assertEqual(stats['successful_analyses'], 1)
-        self.assertEqual(stats['failed_analyses'], 1)
-        self.assertEqual(stats['cache_hits'], 1)
-        self.assertEqual(stats['cache_misses'], 1)
-        self.assertEqual(stats['total_articles_processed'], 10)
+        self.assertEqual(stats["total_requests"], 1)
+        self.assertEqual(stats["successful_analyses"], 1)
+        self.assertEqual(stats["failed_analyses"], 1)
+        self.assertEqual(stats["cache_hits"], 1)
+        self.assertEqual(stats["cache_misses"], 1)
+        self.assertEqual(stats["total_articles_processed"], 10)
 
         # Check calculated rates
-        self.assertEqual(stats['success_rate'], 0.5)  # 1 success, 1 failure
-        self.assertEqual(stats['cache_hit_rate'], 0.5)  # 1 hit, 1 miss
+        self.assertEqual(stats["success_rate"], 0.5)  # 1 success, 1 failure
+        self.assertEqual(stats["cache_hit_rate"], 0.5)  # 1 hit, 1 miss
 
 
 class RealSentimentIntegrationTestCase(TransactionTestCase):
@@ -307,17 +314,15 @@ class RealSentimentIntegrationTestCase(TransactionTestCase):
         """Set up integration test data."""
         # Create test stock with analytics
         self.sector = DataSector.objects.create(
-            sectorKey='test_tech',
-            sectorName='Test Technology',
-            data_source='yahoo'
+            sectorKey="test_tech", sectorName="Test Technology", data_source="yahoo"
         )
 
         self.stock = Stock.objects.create(
-            symbol='INTEG_SENT',
-            short_name='Integration Sentiment Test',
-            long_name='Integration Sentiment Testing Corp',
+            symbol="INTEG_SENT",
+            short_name="Integration Sentiment Test",
+            long_name="Integration Sentiment Testing Corp",
             sector_id=self.sector,
-            market_cap=10000000000
+            market_cap=10000000000,
         )
 
     def test_sentiment_analyzer_singleton(self):
@@ -336,32 +341,29 @@ class RealSentimentIntegrationTestCase(TransactionTestCase):
 
         # Create mock sentiment result for testing
         mock_sentiment = {
-            'sentimentScore': 0.65,
-            'sentimentLabel': 'positive',
-            'sentimentConfidence': 0.82,
-            'distribution': {
-                'positive': 7,
-                'negative': 2,
-                'neutral': 1
-            }
+            "sentimentScore": 0.65,
+            "sentimentLabel": "positive",
+            "sentimentConfidence": 0.82,
+            "distribution": {"positive": 7, "negative": 2, "neutral": 1},
         }
 
         # Test sentiment calculation method exists
-        self.assertTrue(hasattr(engine, '_calculate_sentiment_analysis'))
+        self.assertTrue(hasattr(engine, "_calculate_sentiment_analysis"))
 
         # The method should handle the case when no news is available
-        result = engine._calculate_sentiment_analysis('INTEG_SENT')
+        result = engine._calculate_sentiment_analysis("INTEG_SENT")
 
         # Result should be None or a valid IndicatorResult
         if result is not None:
             from Analytics.engine.ta_engine import IndicatorResult
+
             self.assertIsInstance(result, IndicatorResult)
             self.assertEqual(result.weight, 0.10)  # 10% weight for sentiment
 
     def test_sentiment_caching_performance(self):
         """Test sentiment caching improves performance."""
         analyzer = get_sentiment_analyzer()
-        symbol = 'CACHE_TEST'
+        symbol = "CACHE_TEST"
 
         # First call - should compute
         start_time = time.time()
@@ -378,7 +380,7 @@ class RealSentimentIntegrationTestCase(TransactionTestCase):
         cached_call_time = time.time() - start_time
 
         self.assertIsNotNone(result2)
-        self.assertTrue(result2['cached'])
+        self.assertTrue(result2["cached"])
 
         # Cached call should be faster (allowing for some variance)
         # In real scenarios, this difference would be more significant
@@ -392,9 +394,7 @@ class RealSentimentIntegrationTestCase(TransactionTestCase):
 
         # Create test user
         user = User.objects.create_user(
-            username='sentiment_test_user',
-            email='sentiment@test.com',
-            password='testpass123'
+            username="sentiment_test_user", email="sentiment@test.com", password="testpass123"
         )
 
         # Create analytics result with sentiment
@@ -402,24 +402,17 @@ class RealSentimentIntegrationTestCase(TransactionTestCase):
             user=user,
             stock=self.stock,
             as_of=timezone.now(),
-            horizon='medium',
+            horizon="medium",
             score_0_10=7.5,
             composite_raw=2.8,
             w_sentiment=0.08,  # Sentiment weight
-            components={
-                'sentiment': {
-                    'score': 0.8,
-                    'label': 'positive',
-                    'confidence': 0.85,
-                    'articles_analyzed': 15
-                }
-            }
+            components={"sentiment": {"score": 0.8, "label": "positive", "confidence": 0.85, "articles_analyzed": 15}},
         )
 
         # Verify sentiment is stored
-        self.assertIn('sentiment', analytics_result.components)
-        self.assertEqual(analytics_result.components['sentiment']['score'], 0.8)
-        self.assertEqual(analytics_result.components['sentiment']['label'], 'positive')
+        self.assertIn("sentiment", analytics_result.components)
+        self.assertEqual(analytics_result.components["sentiment"]["score"], 0.8)
+        self.assertEqual(analytics_result.components["sentiment"]["label"], "positive")
 
     def test_financial_text_classification_accuracy(self):
         """Test accuracy of financial text classification."""
@@ -428,20 +421,20 @@ class RealSentimentIntegrationTestCase(TransactionTestCase):
         # Financial text samples with clear sentiment
         test_samples = [
             {
-                'text': "Revenue surged 45% year-over-year, beating all analyst estimates",
-                'expected': 'positive',
-                'confidence_threshold': 0.6
+                "text": "Revenue surged 45% year-over-year, beating all analyst estimates",
+                "expected": "positive",
+                "confidence_threshold": 0.6,
             },
             {
-                'text': "Company files for bankruptcy protection amid mounting debt",
-                'expected': 'negative',
-                'confidence_threshold': 0.6
+                "text": "Company files for bankruptcy protection amid mounting debt",
+                "expected": "negative",
+                "confidence_threshold": 0.6,
             },
             {
-                'text': "Quarterly earnings report scheduled for next Tuesday",
-                'expected': 'neutral',
-                'confidence_threshold': 0.4
-            }
+                "text": "Quarterly earnings report scheduled for next Tuesday",
+                "expected": "neutral",
+                "confidence_threshold": 0.4,
+            },
         ]
 
         correct = 0
@@ -451,7 +444,7 @@ class RealSentimentIntegrationTestCase(TransactionTestCase):
 
             # In real implementation, would analyze text
             # For testing, we'll count neutral as correct for neutral expected
-            if sample['expected'] == 'neutral':
+            if sample["expected"] == "neutral":
                 correct += 1
 
         accuracy = correct / len(test_samples)
@@ -492,8 +485,9 @@ class SentimentPerformanceTestCase(TestCase):
 
     def test_memory_usage_with_large_batches(self):
         """Test memory usage remains reasonable with large batches."""
-        import psutil
         import os
+
+        import psutil
 
         analyzer = SentimentAnalyzer()
         process = psutil.Process(os.getpid())
@@ -518,9 +512,11 @@ class SentimentPerformanceTestCase(TestCase):
         self.assertEqual(len(results), 100)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import django
+
     django.setup()
     from django.test import TestRunner
+
     runner = TestRunner()
-    runner.run_tests(['Analytics.tests.test_sentiment_analyzer'])
+    runner.run_tests(["Analytics.tests.test_sentiment_analyzer"])

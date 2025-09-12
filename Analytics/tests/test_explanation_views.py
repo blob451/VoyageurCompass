@@ -3,18 +3,16 @@ Unit tests for Analytics explanation views and API endpoints.
 Tests explanation generation with real LLM service integration.
 """
 
-from django.test import TestCase, TransactionTestCase
-from django.contrib.auth import get_user_model
-from django.urls import reverse
-from rest_framework.test import APIClient
-from rest_framework import status
-from datetime import datetime, timedelta
 from decimal import Decimal
-import json
-from django.utils import timezone
 
-from Data.models import Stock, DataSector, DataIndustry, AnalyticsResults
-from Analytics.tests.fixtures import OllamaTestService, AnalyticsTestDataFactory
+from django.contrib.auth import get_user_model
+from django.test import TestCase, TransactionTestCase
+from django.urls import reverse
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+from Analytics.tests.fixtures import OllamaTestService
+from Data.models import AnalyticsResults, DataIndustry, DataSector, Stock
 
 User = get_user_model()
 
@@ -26,43 +24,39 @@ class ExplanationViewsIntegrationTestCase(TransactionTestCase):
         """Set up test environment."""
         self.client = APIClient()
         self.user = User.objects.create_user(
-            username='explanation_test_user',
-            email='explanation@test.com',
-            password='explanation_test_pass_123'
+            username="explanation_test_user", email="explanation@test.com", password="explanation_test_pass_123"
         )
 
         # Create test data
         self.sector = DataSector.objects.create(
-            sectorKey='tech_explanation',
-            sectorName='Technology Explanation',
-            data_source='yahoo'
+            sectorKey="tech_explanation", sectorName="Technology Explanation", data_source="yahoo"
         )
 
         self.industry = DataIndustry.objects.create(
-            industryKey='software_explanation',
-            industryName='Software Explanation',
+            industryKey="software_explanation",
+            industryName="Software Explanation",
             sector=self.sector,
-            data_source='yahoo'
+            data_source="yahoo",
         )
 
         self.stock = Stock.objects.create(
-            symbol='EXPL',
-            short_name='Explanation Test Corp',
-            currency='USD',
-            exchange='NASDAQ',
+            symbol="EXPL",
+            short_name="Explanation Test Corp",
+            currency="USD",
+            exchange="NASDAQ",
             sector_id=self.sector,
-            industry_id=self.industry
+            industry_id=self.industry,
         )
 
         # Create analytics results for explanation
         self.analytics = AnalyticsResults.objects.create(
             stock=self.stock,
             as_of=timezone.now(),
-            w_rsi14=Decimal('0.655'),
-            w_sma50vs200=Decimal('0.148'),
-            w_macd12269=Decimal('0.085'),
-            composite_raw=Decimal('7.2'),
-            sentimentScore=0.72
+            w_rsi14=Decimal("0.655"),
+            w_sma50vs200=Decimal("0.148"),
+            w_macd12269=Decimal("0.085"),
+            composite_raw=Decimal("7.2"),
+            sentimentScore=0.72,
         )
 
         # Initialize test service
@@ -74,10 +68,8 @@ class ExplanationViewsIntegrationTestCase(TransactionTestCase):
 
         try:
             # Test the explanation generation endpoint
-            url = reverse('analytics:generate_explanation', args=[self.analytics.id])
-            response = self.client.post(url, {
-                'detail_level': 'standard'
-            }, format='json')
+            url = reverse("analytics:generate_explanation", args=[self.analytics.id])
+            response = self.client.post(url, {"detail_level": "standard"}, format="json")
 
             # Response should be successful or indicate service processing
             self.assertIn(response.status_code, [200, 202, 503])
@@ -86,11 +78,11 @@ class ExplanationViewsIntegrationTestCase(TransactionTestCase):
                 data = response.json()
 
                 # Verify response structure
-                if 'explanation' in data:
-                    self.assertIn('content', data['explanation'])
-                    self.assertIsInstance(data['explanation']['content'], str)
-                elif 'status' in data:
-                    self.assertIn(data['status'], ['processing', 'queued'])
+                if "explanation" in data:
+                    self.assertIn("content", data["explanation"])
+                    self.assertIsInstance(data["explanation"]["content"], str)
+                elif "status" in data:
+                    self.assertIn(data["status"], ["processing", "queued"])
 
         except Exception as e:
             # If service unavailable, test should handle gracefully
@@ -103,23 +95,15 @@ class ExplanationViewsIntegrationTestCase(TransactionTestCase):
 
         # Create stock without analytics
         stock_no_analytics = Stock.objects.create(
-            symbol='NOANALYTI',
-            short_name='No Analytics Corp',
-            sector_id=self.sector,
-            industry_id=self.industry
+            symbol="NOANALYTI", short_name="No Analytics Corp", sector_id=self.sector, industry_id=self.industry
         )
 
         # Create a dummy analytics record for URL generation
         dummy_analytics = AnalyticsResults.objects.create(
-            stock=stock_no_analytics,
-            as_of=timezone.now(),
-            composite_raw=Decimal('0.0'),
-            sentimentScore=0.0
+            stock=stock_no_analytics, as_of=timezone.now(), composite_raw=Decimal("0.0"), sentimentScore=0.0
         )
-        url = reverse('analytics:generate_explanation', args=[dummy_analytics.id])
-        response = self.client.post(url, {
-            'detail_level': 'standard'
-        }, format='json')
+        url = reverse("analytics:generate_explanation", args=[dummy_analytics.id])
+        response = self.client.post(url, {"detail_level": "standard"}, format="json")
 
         # Should handle gracefully
         self.assertIn(response.status_code, [200, 404, 503])
@@ -127,10 +111,8 @@ class ExplanationViewsIntegrationTestCase(TransactionTestCase):
     def test_explanation_authentication_required(self):
         """Test that explanation endpoints require authentication."""
         # Test without authentication
-        url = reverse('analytics:generate_explanation', args=[self.analytics.id])
-        response = self.client.post(url, {
-            'detail_level': 'standard'
-        }, format='json')
+        url = reverse("analytics:generate_explanation", args=[self.analytics.id])
+        response = self.client.post(url, {"detail_level": "standard"}, format="json")
 
         self.assertEqual(response.status_code, 401)
 
@@ -138,10 +120,8 @@ class ExplanationViewsIntegrationTestCase(TransactionTestCase):
         """Test explanation generation with invalid stock symbol."""
         self.client.force_authenticate(user=self.user)
 
-        url = reverse('analytics:generate_explanation', args=[99999])  # Invalid analysis_id
-        response = self.client.post(url, {
-            'detail_level': 'standard'
-        }, format='json')
+        url = reverse("analytics:generate_explanation", args=[99999])  # Invalid analysis_id
+        response = self.client.post(url, {"detail_level": "standard"}, format="json")
 
         self.assertEqual(response.status_code, 404)
 
@@ -149,15 +129,13 @@ class ExplanationViewsIntegrationTestCase(TransactionTestCase):
         """Test explanation generation with different detail levels."""
         self.client.force_authenticate(user=self.user)
 
-        detail_levels = ['summary', 'standard', 'detailed']
+        detail_levels = ["summary", "standard", "detailed"]
 
         for level in detail_levels:
             with self.subTest(detail_level=level):
                 try:
-                    url = reverse('analytics:generate_explanation', args=[self.analytics.id])
-                    response = self.client.post(url, {
-                        'detail_level': level
-                    }, format='json')
+                    url = reverse("analytics:generate_explanation", args=[self.analytics.id])
+                    response = self.client.post(url, {"detail_level": level}, format="json")
 
                     # Should handle all detail levels
                     self.assertIn(response.status_code, [200, 202, 503])
@@ -174,9 +152,7 @@ class ExplanationHealthTestCase(TestCase):
         """Set up health test environment."""
         self.client = APIClient()
         self.user = User.objects.create_user(
-            username='health_test_user',
-            email='health@test.com',
-            password='health_test_pass_123'
+            username="health_test_user", email="health@test.com", password="health_test_pass_123"
         )
 
     def test_explanation_service_health_check(self):
@@ -201,31 +177,19 @@ class ExplanationHealthTestCase(TestCase):
         self.client.force_authenticate(user=self.user)
 
         # Create test stock for timeout testing
-        sector = DataSector.objects.create(
-            sectorKey='timeout_test',
-            sectorName='Timeout Test',
-            data_source='yahoo'
-        )
+        sector = DataSector.objects.create(sectorKey="timeout_test", sectorName="Timeout Test", data_source="yahoo")
 
-        stock = Stock.objects.create(
-            symbol='TIMEOUT',
-            short_name='Timeout Test Corp',
-            sector_id=sector
-        )
+        stock = Stock.objects.create(symbol="TIMEOUT", short_name="Timeout Test Corp", sector_id=sector)
 
         try:
             # Create analytics for the timeout test stock
             timeout_analytics = AnalyticsResults.objects.create(
-                stock=stock,
-                as_of=timezone.now(),
-                composite_raw=Decimal('5.0'),
-                sentimentScore=0.5
+                stock=stock, as_of=timezone.now(), composite_raw=Decimal("5.0"), sentimentScore=0.5
             )
-            url = reverse('analytics:generate_explanation', args=[timeout_analytics.id])
-            response = self.client.post(url, {
-                'detail_level': 'standard',
-                'timeout': 1  # Very short timeout for testing
-            }, format='json')
+            url = reverse("analytics:generate_explanation", args=[timeout_analytics.id])
+            response = self.client.post(
+                url, {"detail_level": "standard", "timeout": 1}, format="json"  # Very short timeout for testing
+            )
 
             # Should handle timeout gracefully
             self.assertIn(response.status_code, [200, 202, 408, 503])
@@ -235,6 +199,7 @@ class ExplanationHealthTestCase(TestCase):
             print(f"Timeout test handled: {e}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import unittest
+
     unittest.main()

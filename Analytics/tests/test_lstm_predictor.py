@@ -4,20 +4,22 @@ Tests IntegratedPredictionService and LSTM components with actual functionality.
 No mocks - uses real PostgreSQL test database.
 """
 
-import torch
-import torch.nn as nn
-import numpy as np
 from datetime import datetime, timedelta
 from decimal import Decimal
-from django.test import TestCase, TransactionTestCase
-from django.contrib.auth.models import User
-import tempfile
-import os
 
+import numpy as np
+import torch
+import torch.nn as nn
+from django.test import TestCase, TransactionTestCase
+
+from Analytics.ml.models.lstm_base import (
+    AttentionLayer,
+    SectorCrossAttention,
+    UniversalLSTMPredictor,
+)
 from Analytics.services.integrated_predictor import IntegratedPredictionService
 from Analytics.services.universal_predictor import UniversalLSTMAnalyticsService
-from Analytics.ml.models.lstm_base import UniversalLSTMPredictor, SectorCrossAttention, AttentionLayer
-from Data.models import Stock, StockPrice, DataSector, DataIndustry
+from Data.models import DataIndustry, DataSector, Stock, StockPrice
 
 
 class RealIntegratedPredictionTestCase(TransactionTestCase):
@@ -27,28 +29,23 @@ class RealIntegratedPredictionTestCase(TransactionTestCase):
         """Set up test data in PostgreSQL."""
         # Create sector and industry
         self.sector = DataSector.objects.create(
-            sectorKey='test_tech',
-            sectorName='Test Technology',
-            data_source='yahoo'
+            sectorKey="test_tech", sectorName="Test Technology", data_source="yahoo"
         )
 
         self.industry = DataIndustry.objects.create(
-            industryKey='test_ai',
-            industryName='Test Artificial Intelligence',
-            sector=self.sector,
-            data_source='yahoo'
+            industryKey="test_ai", industryName="Test Artificial Intelligence", sector=self.sector, data_source="yahoo"
         )
 
         # Create test stock
         self.stock = Stock.objects.create(
-            symbol='PRED_TEST',
-            short_name='Prediction Test Corp',
-            long_name='Prediction Testing Corporation',
-            exchange='NASDAQ',
-            currency='USD',
+            symbol="PRED_TEST",
+            short_name="Prediction Test Corp",
+            long_name="Prediction Testing Corporation",
+            exchange="NASDAQ",
+            currency="USD",
             sector_id=self.sector,
             industry_id=self.industry,
-            market_cap=15000000000
+            market_cap=15000000000,
         )
 
         # Create realistic price data
@@ -99,7 +96,7 @@ class RealIntegratedPredictionTestCase(TransactionTestCase):
                 close=Decimal(str(round(close_price, 2))),
                 adjusted_close=Decimal(str(round(close_price, 2))),
                 volume=volume,
-                data_source='test'
+                data_source="test",
             )
 
     def test_real_service_initialization(self):
@@ -112,23 +109,23 @@ class RealIntegratedPredictionTestCase(TransactionTestCase):
         self.assertIsNotNone(service.lstm_service)
 
         # Verify service has required methods
-        self.assertTrue(hasattr(service, 'predict_with_ta_context'))
-        self.assertTrue(hasattr(service, '_get_ta_indicators'))
+        self.assertTrue(hasattr(service, "predict_with_ta_context"))
+        self.assertTrue(hasattr(service, "_get_ta_indicators"))
 
     def test_real_ta_indicators_extraction(self):
         """Test real TA indicators extraction."""
         service = IntegratedPredictionService()
 
         # Get TA indicators from real data
-        ta_result = service._get_ta_indicators('PRED_TEST')
+        ta_result = service._get_ta_indicators("PRED_TEST")
 
         # Should return a result
         self.assertIsNotNone(ta_result)
-        self.assertIn('success', ta_result)
+        self.assertIn("success", ta_result)
 
-        if ta_result['success']:
-            self.assertIn('indicators', ta_result)
-            indicators = ta_result['indicators']
+        if ta_result["success"]:
+            self.assertIn("indicators", ta_result)
+            indicators = ta_result["indicators"]
 
             # Should have some basic indicators
             self.assertIsInstance(indicators, dict)
@@ -136,7 +133,7 @@ class RealIntegratedPredictionTestCase(TransactionTestCase):
             # Check that indicators have proper structure
             for indicator_name, indicator_data in indicators.items():
                 if indicator_data is not None:
-                    self.assertIn('raw', indicator_data)
+                    self.assertIn("raw", indicator_data)
 
     def test_real_lstm_prediction_service(self):
         """Test real LSTM prediction service functionality."""
@@ -147,18 +144,18 @@ class RealIntegratedPredictionTestCase(TransactionTestCase):
 
         # Test basic prediction structure (may not have trained model)
         try:
-            result = lstm_service.predict_stock_price('PRED_TEST')
+            result = lstm_service.predict_stock_price("PRED_TEST")
 
-            if result is not None and result.get('success'):
-                self.assertIn('predicted_price', result)
-                self.assertIn('confidence', result)
-                self.assertIn('model_version', result)
+            if result is not None and result.get("success"):
+                self.assertIn("predicted_price", result)
+                self.assertIn("confidence", result)
+                self.assertIn("model_version", result)
             else:
                 # No trained model available - this is expected in test environment
                 self.assertTrue(True)  # Test passes
         except Exception as e:
             # Expected if no model is trained
-            self.assertIn('model', str(e).lower())
+            self.assertIn("model", str(e).lower())
 
     def test_real_attention_mechanisms(self):
         """Test real attention mechanism functionality."""
@@ -209,25 +206,19 @@ class RealIntegratedPredictionTestCase(TransactionTestCase):
 
     def test_real_universal_lstm_architecture(self):
         """Test real UniversalLSTM architecture."""
-        config = {
-            'input_size': 5,
-            'hidden_size': 32,
-            'num_layers': 1,
-            'dropout': 0.1,
-            'sector_embedding_dim': 16
-        }
+        config = {"input_size": 5, "hidden_size": 32, "num_layers": 1, "dropout": 0.1, "sector_embedding_dim": 16}
 
         model = UniversalLSTMPredictor(
-            input_size=config['input_size'],
-            hidden_size=config['hidden_size'],
-            num_layers=config['num_layers'],
-            dropout=config['dropout']
+            input_size=config["input_size"],
+            hidden_size=config["hidden_size"],
+            num_layers=config["num_layers"],
+            dropout=config["dropout"],
         )
 
         # Test forward pass
         batch_size = 4
         seq_len = 20
-        sample_input = torch.randn(batch_size, seq_len, config['input_size'])
+        sample_input = torch.randn(batch_size, seq_len, config["input_size"])
 
         output = model(sample_input)
 
@@ -245,7 +236,7 @@ class RealIntegratedPredictionTestCase(TransactionTestCase):
         """Test real data processing for predictions."""
         from Analytics.services.advanced_lstm_trainer import AdvancedLSTMTrainer
 
-        trainer = AdvancedLSTMTrainer('PRED_TEST')
+        trainer = AdvancedLSTMTrainer("PRED_TEST")
 
         # Test data preparation
         X_train, X_val, y_train, y_val = trainer.prepare_training_data(lookback_days=100)
@@ -276,18 +267,9 @@ class RealIntegratedPredictionTestCase(TransactionTestCase):
 
         # Mock technical analysis results
         mock_indicators = {
-            'sma50vs200': {
-                'raw': {'sma50': 205, 'sma200': 200, 'position': 'bullish'},
-                'score': 0.8
-            },
-            'rsi14': {
-                'raw': {'rsi': 55.0},
-                'score': 0.6
-            },
-            'macd12269': {
-                'raw': {'histogram': 0.5, 'signal': 'bullish'},
-                'score': 0.7
-            }
+            "sma50vs200": {"raw": {"sma50": 205, "sma200": 200, "position": "bullish"}, "score": 0.8},
+            "rsi14": {"raw": {"rsi": 55.0}, "score": 0.6},
+            "macd12269": {"raw": {"histogram": 0.5, "signal": "bullish"}, "score": 0.7},
         }
 
         # Test dynamic weight calculation logic
@@ -482,10 +464,7 @@ class RealPredictionIntegrationTestCase(TransactionTestCase):
         """Set up integration test data."""
         # Create test stock with comprehensive data
         self.stock = Stock.objects.create(
-            symbol='FULL_TEST',
-            short_name='Full Integration Test',
-            exchange='NYSE',
-            market_cap=50000000000
+            symbol="FULL_TEST", short_name="Full Integration Test", exchange="NYSE", market_cap=50000000000
         )
 
         # Create extensive price history
@@ -510,7 +489,7 @@ class RealPredictionIntegrationTestCase(TransactionTestCase):
                 low=Decimal(str(round(price - 3, 2))),
                 close=Decimal(str(round(price, 2))),
                 adjusted_close=Decimal(str(round(price, 2))),
-                volume=int(1500000 * (1 + np.random.uniform(-0.3, 0.3)))
+                volume=int(1500000 * (1 + np.random.uniform(-0.3, 0.3))),
             )
 
     def test_full_prediction_pipeline(self):
@@ -519,15 +498,15 @@ class RealPredictionIntegrationTestCase(TransactionTestCase):
 
         # Test that pipeline doesn't crash
         try:
-            result = service.predict_with_ta_context('FULL_TEST')
+            result = service.predict_with_ta_context("FULL_TEST")
 
-            if result and result.get('success'):
+            if result and result.get("success"):
                 # Verify result structure
-                required_keys = ['symbol', 'success']
+                required_keys = ["symbol", "success"]
                 for key in required_keys:
                     self.assertIn(key, result)
 
-                self.assertEqual(result['symbol'], 'FULL_TEST')
+                self.assertEqual(result["symbol"], "FULL_TEST")
             else:
                 # No trained model available - expected in test environment
                 self.assertTrue(True)
@@ -535,7 +514,7 @@ class RealPredictionIntegrationTestCase(TransactionTestCase):
         except Exception as e:
             # Should not crash, but may have expected errors like missing models
             error_msg = str(e).lower()
-            acceptable_errors = ['model', 'train', 'file', 'path']
+            acceptable_errors = ["model", "train", "file", "path"]
             self.assertTrue(any(term in error_msg for term in acceptable_errors))
 
     def test_technical_analysis_integration(self):
@@ -545,23 +524,21 @@ class RealPredictionIntegrationTestCase(TransactionTestCase):
         engine = TechnicalAnalysisEngine()
 
         # Test that TA engine can analyze the stock
-        result = engine.analyze_stock('FULL_TEST')
+        result = engine.analyze_stock("FULL_TEST")
 
         self.assertIsNotNone(result)
-        self.assertEqual(result['symbol'], 'FULL_TEST')
-        self.assertIn('indicators', result)
-        self.assertIn('score_0_10', result)
+        self.assertEqual(result["symbol"], "FULL_TEST")
+        self.assertIn("indicators", result)
+        self.assertIn("score_0_10", result)
 
         # Score should be in valid range
-        self.assertGreaterEqual(result['score_0_10'], 0)
-        self.assertLessEqual(result['score_0_10'], 10)
+        self.assertGreaterEqual(result["score_0_10"], 0)
+        self.assertLessEqual(result["score_0_10"], 10)
 
     def test_data_consistency_across_services(self):
         """Test data consistency across different services."""
         # Get price data from database
-        prices = StockPrice.objects.filter(
-            stock__symbol='FULL_TEST'
-        ).order_by('date')
+        prices = StockPrice.objects.filter(stock__symbol="FULL_TEST").order_by("date")
 
         self.assertGreater(prices.count(), 100)
 
@@ -574,9 +551,11 @@ class RealPredictionIntegrationTestCase(TransactionTestCase):
             self.assertGreater(price.close, 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import django
+
     django.setup()
     from django.test import TestRunner
+
     runner = TestRunner()
-    runner.run_tests(['Analytics.tests.test_lstm_predictor'])
+    runner.run_tests(["Analytics.tests.test_lstm_predictor"])
