@@ -3,32 +3,33 @@ Fine-tuning Integration for Domain-specific FinBERT Models
 Provides framework for training custom models on company-specific data
 """
 
+import json
 import logging
 import time
-import json
-from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
-from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 
 # Conditional imports for ML dependencies
 try:
     import torch
-    from torch.utils.data import Dataset, DataLoader
+    from torch.utils.data import DataLoader, Dataset
+
     TORCH_AVAILABLE = True
 except ImportError:
     torch = None
     Dataset = None
     DataLoader = None
     TORCH_AVAILABLE = False
-from transformers import (
-    AutoTokenizer, 
-    AutoModelForSequenceClassification,
-    TrainingArguments,
-    Trainer,
-    EvalPrediction
-)
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+from transformers import (
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    EvalPrediction,
+    Trainer,
+    TrainingArguments,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FineTuningConfig:
     """Configuration for fine-tuning process."""
+
     base_model: str = "ProsusAI/finbert"
     output_dir: str = "./models/finetuned"
     learning_rate: float = 2e-5
@@ -52,13 +54,7 @@ class FineTuningConfig:
 class SentimentDataset(Dataset):
     """Custom dataset for sentiment analysis fine-tuning."""
 
-    def __init__(
-        self,
-        texts: List[str],
-        labels: List[int],
-        tokenizer,
-        max_length: int = 512
-    ):
+    def __init__(self, texts: List[str], labels: List[int], tokenizer, max_length: int = 512):
         """
         Initialize dataset.
 
@@ -82,17 +78,13 @@ class SentimentDataset(Dataset):
 
         # Tokenize text
         encoding = self.tokenizer(
-            text,
-            truncation=True,
-            padding='max_length',
-            max_length=self.max_length,
-            return_tensors='pt'
+            text, truncation=True, padding="max_length", max_length=self.max_length, return_tensors="pt"
         )
 
         return {
-            'input_ids': encoding['input_ids'].flatten(),
-            'attention_mask': encoding['attention_mask'].flatten(),
-            'labels': torch.tensor(label, dtype=torch.long)
+            "input_ids": encoding["input_ids"].flatten(),
+            "attention_mask": encoding["attention_mask"].flatten(),
+            "labels": torch.tensor(label, dtype=torch.long),
         }
 
 
@@ -114,11 +106,7 @@ class FineTuningPipeline:
         self.trainer = None
 
         # Label mappings
-        self.label_map = {
-            'negative': 0,
-            'neutral': 1,
-            'positive': 2
-        }
+        self.label_map = {"negative": 0, "neutral": 1, "positive": 2}
         self.reverse_label_map = {v: k for k, v in self.label_map.items()}
 
         # Training history
@@ -126,10 +114,7 @@ class FineTuningPipeline:
         self.validation_history = []
 
     def prepare_data(
-        self,
-        texts: List[str],
-        labels: List[str],
-        validation_split: float = 0.2
+        self, texts: List[str], labels: List[str], validation_split: float = 0.2
     ) -> Tuple[Dataset, Dataset]:
         """
         Prepare training and validation datasets.
@@ -164,16 +149,10 @@ class FineTuningPipeline:
             self.tokenizer = AutoTokenizer.from_pretrained(self.config.base_model)
 
         # Create datasets
-        train_dataset = SentimentDataset(
-            train_texts, train_labels, self.tokenizer, self.config.max_length
-        )
-        val_dataset = SentimentDataset(
-            val_texts, val_labels, self.tokenizer, self.config.max_length
-        )
+        train_dataset = SentimentDataset(train_texts, train_labels, self.tokenizer, self.config.max_length)
+        val_dataset = SentimentDataset(val_texts, val_labels, self.tokenizer, self.config.max_length)
 
-        logger.info(
-            f"Prepared datasets: {len(train_dataset)} train, {len(val_dataset)} validation"
-        )
+        logger.info(f"Prepared datasets: {len(train_dataset)} train, {len(val_dataset)} validation")
 
         return train_dataset, val_dataset
 
@@ -186,7 +165,7 @@ class FineTuningPipeline:
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 self.config.base_model,
                 num_labels=3,  # negative, neutral, positive
-                problem_type="single_label_classification"
+                problem_type="single_label_classification",
             )
 
             logger.info("Base model loaded successfully")
@@ -209,22 +188,11 @@ class FineTuningPipeline:
         predictions = np.argmax(predictions, axis=1)
 
         accuracy = accuracy_score(labels, predictions)
-        precision, recall, f1, _ = precision_recall_fscore_support(
-            labels, predictions, average='weighted'
-        )
+        precision, recall, f1, _ = precision_recall_fscore_support(labels, predictions, average="weighted")
 
-        return {
-            'accuracy': accuracy,
-            'precision': precision,
-            'recall': recall,
-            'f1': f1
-        }
+        return {"accuracy": accuracy, "precision": precision, "recall": recall, "f1": f1}
 
-    def train(
-        self,
-        train_dataset: Dataset,
-        val_dataset: Dataset = None
-    ) -> Dict[str, Any]:
+    def train(self, train_dataset: Dataset, val_dataset: Dataset = None) -> Dict[str, Any]:
         """
         Train the model on provided dataset.
 
@@ -257,7 +225,7 @@ class FineTuningPipeline:
             metric_for_best_model="eval_f1" if val_dataset else None,
             greater_is_better=True,
             save_total_limit=3,
-            push_to_hub=False
+            push_to_hub=False,
         )
 
         # Initialize trainer
@@ -266,7 +234,7 @@ class FineTuningPipeline:
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
-            compute_metrics=self.compute_metrics if val_dataset else None
+            compute_metrics=self.compute_metrics if val_dataset else None,
         )
 
         # Start training
@@ -285,11 +253,11 @@ class FineTuningPipeline:
             logger.info(
                 f"Fine-tuning completed in {training_time:.2f} seconds",
                 extra={
-                    'event_type': 'finetuning_complete',
-                    'training_time': training_time,
-                    'train_loss': train_result.training_loss,
-                    'steps': train_result.global_step
-                }
+                    "event_type": "finetuning_complete",
+                    "training_time": training_time,
+                    "train_loss": train_result.training_loss,
+                    "steps": train_result.global_step,
+                },
             )
 
             # Evaluate on validation set if available
@@ -299,21 +267,17 @@ class FineTuningPipeline:
                 logger.info(f"Validation results: {eval_results}")
 
             return {
-                'training_loss': train_result.training_loss,
-                'training_time': training_time,
-                'eval_results': eval_results,
-                'model_path': self.config.output_dir
+                "training_loss": train_result.training_loss,
+                "training_time": training_time,
+                "eval_results": eval_results,
+                "model_path": self.config.output_dir,
             }
 
         except Exception as e:
             logger.error(f"Fine-tuning failed: {str(e)}")
             raise
 
-    def evaluate_model(
-        self,
-        test_dataset: Dataset,
-        model_path: str = None
-    ) -> Dict[str, Any]:
+    def evaluate_model(self, test_dataset: Dataset, model_path: str = None) -> Dict[str, Any]:
         """
         Evaluate trained model on test dataset.
 
@@ -331,11 +295,7 @@ class FineTuningPipeline:
 
         if not self.trainer:
             # Create trainer for evaluation
-            self.trainer = Trainer(
-                model=self.model,
-                tokenizer=self.tokenizer,
-                compute_metrics=self.compute_metrics
-            )
+            self.trainer = Trainer(model=self.model, tokenizer=self.tokenizer, compute_metrics=self.compute_metrics)
 
         # Run evaluation
         eval_results = self.trainer.evaluate(eval_dataset=test_dataset)
@@ -343,11 +303,7 @@ class FineTuningPipeline:
         logger.info(f"Model evaluation results: {eval_results}")
         return eval_results
 
-    def predict(
-        self,
-        texts: List[str],
-        model_path: str = None
-    ) -> List[Dict[str, Any]]:
+    def predict(self, texts: List[str], model_path: str = None) -> List[Dict[str, Any]]:
         """
         Make predictions on new texts.
 
@@ -368,11 +324,7 @@ class FineTuningPipeline:
 
         # Prepare data
         inputs = self.tokenizer(
-            texts,
-            truncation=True,
-            padding=True,
-            max_length=self.config.max_length,
-            return_tensors='pt'
+            texts, truncation=True, padding=True, max_length=self.config.max_length, return_tensors="pt"
         )
 
         # Make predictions
@@ -390,24 +342,26 @@ class FineTuningPipeline:
             confidence = float(probs[predicted_label_id])
 
             # Convert to sentiment score (-1 to 1)
-            if predicted_label == 'positive':
+            if predicted_label == "positive":
                 score = confidence
-            elif predicted_label == 'negative':
+            elif predicted_label == "negative":
                 score = -confidence
             else:
                 score = 0.0
 
-            results.append({
-                'text': text,
-                'sentimentLabel': predicted_label,
-                'sentimentScore': score,
-                'sentimentConfidence': confidence,
-                'probabilities': {
-                    'negative': float(probs[0]),
-                    'neutral': float(probs[1]),
-                    'positive': float(probs[2])
+            results.append(
+                {
+                    "text": text,
+                    "sentimentLabel": predicted_label,
+                    "sentimentScore": score,
+                    "sentimentConfidence": confidence,
+                    "probabilities": {
+                        "negative": float(probs[0]),
+                        "neutral": float(probs[1]),
+                        "positive": float(probs[2]),
+                    },
                 }
-            })
+            )
 
         return results
 
@@ -419,21 +373,21 @@ class FineTuningPipeline:
             output_path: Path to save model info
         """
         model_info = {
-            'base_model': self.config.base_model,
-            'fine_tuned_model': self.config.output_dir,
-            'configuration': {
-                'learning_rate': self.config.learning_rate,
-                'batch_size': self.config.batch_size,
-                'epochs': self.config.epochs,
-                'max_length': self.config.max_length
+            "base_model": self.config.base_model,
+            "fine_tuned_model": self.config.output_dir,
+            "configuration": {
+                "learning_rate": self.config.learning_rate,
+                "batch_size": self.config.batch_size,
+                "epochs": self.config.epochs,
+                "max_length": self.config.max_length,
             },
-            'training_history': self.training_history,
-            'validation_history': self.validation_history,
-            'label_mapping': self.label_map,
-            'created_at': time.time()
+            "training_history": self.training_history,
+            "validation_history": self.validation_history,
+            "label_mapping": self.label_map,
+            "created_at": time.time(),
         }
 
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             json.dump(model_info, f, indent=2)
 
         logger.info(f"Model info exported to {output_path}")
@@ -466,10 +420,7 @@ class FineTuningDataCollector:
         return texts, labels
 
     @staticmethod
-    def create_synthetic_data(
-        symbol: str,
-        count: int = 1000
-    ) -> Tuple[List[str], List[str]]:
+    def create_synthetic_data(symbol: str, count: int = 1000) -> Tuple[List[str], List[str]]:
         """
         Create synthetic financial sentiment data for testing.
 
@@ -488,7 +439,7 @@ class FineTuningDataCollector:
             f"{symbol} stock surges after positive analyst upgrade",
             f"{symbol} announces strategic partnership that boosts investor confidence",
             f"{symbol} beats earnings expectations for the third consecutive quarter",
-            f"{symbol} sees increased market share in key segments"
+            f"{symbol} sees increased market share in key segments",
         ]
 
         negative_templates = [
@@ -496,7 +447,7 @@ class FineTuningDataCollector:
             f"{symbol} stock declines following disappointing earnings",
             f"{symbol} warns of potential headwinds in upcoming quarters",
             f"{symbol} experiences supply chain disruptions affecting production",
-            f"{symbol} misses analyst expectations amid market volatility"
+            f"{symbol} misses analyst expectations amid market volatility",
         ]
 
         neutral_templates = [
@@ -504,7 +455,7 @@ class FineTuningDataCollector:
             f"{symbol} schedules annual shareholder meeting",
             f"{symbol} files standard regulatory reports with SEC",
             f"{symbol} maintains current guidance for fiscal year",
-            f"{symbol} participates in industry conference"
+            f"{symbol} participates in industry conference",
         ]
 
         texts = []
@@ -515,17 +466,17 @@ class FineTuningDataCollector:
         # Generate positive samples
         for _ in range(samples_per_class):
             texts.append(random.choice(positive_templates))
-            labels.append('positive')
+            labels.append("positive")
 
         # Generate negative samples
         for _ in range(samples_per_class):
             texts.append(random.choice(negative_templates))
-            labels.append('negative')
+            labels.append("negative")
 
         # Generate neutral samples
         for _ in range(count - 2 * samples_per_class):
             texts.append(random.choice(neutral_templates))
-            labels.append('neutral')
+            labels.append("neutral")
 
         # Shuffle data
         combined = list(zip(texts, labels))

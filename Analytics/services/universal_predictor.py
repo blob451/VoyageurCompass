@@ -4,16 +4,18 @@ Universal LSTM prediction service for real-time stock price forecasting.
 
 import logging
 import os
-import pandas as pd
-import numpy as np
-from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
-from django.core.cache import cache
+from typing import Any, Dict, Optional
+
+import numpy as np
+import pandas as pd
 from django.conf import settings
+from django.core.cache import cache
 
 # Conditional imports for ML dependencies to support CI environments
 try:
     import torch
+
     TORCH_AVAILABLE = True
 except ImportError:
     torch = None
@@ -22,8 +24,9 @@ except ImportError:
 # Try to import ML modules with graceful fallback
 try:
     from Analytics.ml.models.lstm_base import UniversalLSTMPredictor, load_model
-    from Analytics.ml.universal_preprocessor import UniversalLSTMPreprocessor
     from Analytics.ml.sector_mappings import get_sector_mapper
+    from Analytics.ml.universal_preprocessor import UniversalLSTMPreprocessor
+
     LSTM_MODULES_AVAILABLE = True
 except ImportError:
     UniversalLSTMPredictor = None
@@ -33,7 +36,6 @@ except ImportError:
     LSTM_MODULES_AVAILABLE = False
 
 from Data.repo.price_reader import PriceReader
-from Data.services.yahoo_finance import yahoo_finance_service
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +48,9 @@ class UniversalLSTMAnalyticsService:
         self.model_dir = model_dir
 
         if TORCH_AVAILABLE:
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
-            self.device = 'cpu'  # Fallback string device
+            self.device = "cpu"  # Fallback string device
 
         self.model = None
         self.preprocessor = None
@@ -58,7 +60,7 @@ class UniversalLSTMAnalyticsService:
 
         self.sequence_length = 50
         self.cache_ttl = 300
-        self.prediction_enabled = getattr(settings, 'ENABLE_UNIVERSAL_PREDICTIONS', True)
+        self.prediction_enabled = getattr(settings, "ENABLE_UNIVERSAL_PREDICTIONS", True)
 
         self._load_universal_model()
 
@@ -71,7 +73,9 @@ class UniversalLSTMAnalyticsService:
             return False
 
         try:
-            model_files = [f for f in os.listdir(self.model_dir) if f.startswith('universal_lstm_') and f.endswith('.pth')]
+            model_files = [
+                f for f in os.listdir(self.model_dir) if f.startswith("universal_lstm_") and f.endswith(".pth")
+            ]
         except OSError:
             logger.warning(f"Cannot access model directory: {self.model_dir}")
             return False
@@ -91,7 +95,7 @@ class UniversalLSTMAnalyticsService:
             # Create preprocessor with fitted scalers
             self.preprocessor = UniversalLSTMPreprocessor(sequence_length=self.sequence_length)
 
-            if scalers and 'feature_scaler' in scalers and 'target_scaler' in scalers:
+            if scalers and "feature_scaler" in scalers and "target_scaler" in scalers:
                 self.preprocessor.set_scalers(scalers)
                 logger.info("Universal model loaded with fitted scalers")
             else:
@@ -134,12 +138,7 @@ class UniversalLSTMAnalyticsService:
 
         return sector_id, industry_id
 
-    def _prepare_prediction_data(
-        self,
-        symbol: str,
-        sector_id: int,
-        industry_id: int
-    ) -> Optional[tuple]:
+    def _prepare_prediction_data(self, symbol: str, sector_id: int, industry_id: int) -> Optional[tuple]:
         """
         Prepare recent price data for universal prediction.
 
@@ -156,31 +155,30 @@ class UniversalLSTMAnalyticsService:
             end_date = datetime.now().date()
             start_date = (datetime.now() - timedelta(days=self.sequence_length + 30)).date()  # Extra buffer
 
-            price_data = self.price_reader.get_stock_prices(
-                symbol=symbol,
-                start_date=start_date,
-                end_date=end_date
-            )
+            price_data = self.price_reader.get_stock_prices(symbol=symbol, start_date=start_date, end_date=end_date)
 
             if not price_data or len(price_data) < self.sequence_length + 5:
-                logger.warning(f"Insufficient price data for {symbol}: got {len(price_data) if price_data else 0}, need {self.sequence_length + 5}")
+                logger.warning(
+                    f"Insufficient price data for {symbol}: got {len(price_data) if price_data else 0}, need {self.sequence_length + 5}"
+                )
 
                 # Try auto-sync if no data
                 if not price_data:
                     from Data.services.yahoo_finance import yahoo_finance_service
+
                     logger.info(f"Attempting auto-sync for {symbol}")
-                    sync_result = yahoo_finance_service.get_stock_data(symbol, period='1y', sync_db=True)
-                    if sync_result and 'error' not in sync_result:
+                    sync_result = yahoo_finance_service.get_stock_data(symbol, period="1y", sync_db=True)
+                    if sync_result and "error" not in sync_result:
                         # Retry fetching after sync
                         price_data = self.price_reader.get_stock_prices(
-                            symbol=symbol,
-                            start_date=start_date,
-                            end_date=end_date
+                            symbol=symbol, start_date=start_date, end_date=end_date
                         )
                         if price_data and len(price_data) >= self.sequence_length + 5:
                             logger.info(f"Auto-sync successful for {symbol}: {len(price_data)} data points")
                         else:
-                            logger.warning(f"Auto-sync insufficient for {symbol}: {len(price_data) if price_data else 0} data points")
+                            logger.warning(
+                                f"Auto-sync insufficient for {symbol}: {len(price_data) if price_data else 0} data points"
+                            )
                             return None
                     else:
                         logger.error(f"Auto-sync failed for {symbol}")
@@ -189,21 +187,23 @@ class UniversalLSTMAnalyticsService:
                     return None
 
             # Convert PriceData objects to DataFrame efficiently
-            df = pd.DataFrame([{
-                'date': p.date,
-                'open': float(p.open),
-                'high': float(p.high),
-                'low': float(p.low),
-                'close': float(p.close),
-                'volume': int(p.volume)
-            } for p in price_data])
+            df = pd.DataFrame(
+                [
+                    {
+                        "date": p.date,
+                        "open": float(p.open),
+                        "high": float(p.high),
+                        "low": float(p.low),
+                        "close": float(p.close),
+                        "volume": int(p.volume),
+                    }
+                    for p in price_data
+                ]
+            )
 
             # Engineer universal features
             feature_df = self.preprocessor.engineer_universal_features(
-                df, 
-                symbol=symbol,
-                sector_id=sector_id,
-                industry_id=industry_id
+                df, symbol=symbol, sector_id=sector_id, industry_id=industry_id
             )
 
             # Extract the most recent sequence for prediction (optimized)
@@ -214,7 +214,7 @@ class UniversalLSTMAnalyticsService:
                 return None
 
             # Get only the required sequence data directly to avoid copying full array
-            features = feature_df[feature_cols].iloc[-self.sequence_length:].values
+            features = feature_df[feature_cols].iloc[-self.sequence_length :].values
 
             # Transform using fitted scalers
             if self.preprocessor.fitted:
@@ -234,11 +234,7 @@ class UniversalLSTMAnalyticsService:
             return None
 
     def predict_stock_price(
-        self,
-        symbol: str,
-        horizon: str = '1d',
-        use_cache: bool = True,
-        return_all_outputs: bool = False
+        self, symbol: str, horizon: str = "1d", use_cache: bool = True, return_all_outputs: bool = False
     ) -> Optional[Dict[str, Any]]:
         """
         Predict stock price using Universal LSTM model for Analytics Engine.
@@ -285,7 +281,7 @@ class UniversalLSTMAnalyticsService:
                 if isinstance(self.model, UniversalLSTMPredictor):
                     # Universal model with multi-task outputs
                     outputs = self.model(features_tensor, sector_tensor, industry_tensor)
-                    raw_prediction = outputs['price'].item()
+                    raw_prediction = outputs["price"].item()
 
                     # CRITICAL FIX: Apply inverse transformation to get percentage return
                     if self.preprocessor.fitted:
@@ -300,18 +296,24 @@ class UniversalLSTMAnalyticsService:
                         max_price = current_price * 3.0  # No more than 200% increase
 
                         if prediction_price <= min_price or prediction_price >= max_price:
-                            logger.warning(f"Unrealistic prediction for {symbol}: ${prediction_price:.2f} "
-                                         f"(raw: {raw_prediction:.6f}, return: {predicted_return:.4f}, "
-                                         f"valid range: ${min_price:.2f}-${max_price:.2f})")
+                            logger.warning(
+                                f"Unrealistic prediction for {symbol}: ${prediction_price:.2f} "
+                                f"(raw: {raw_prediction:.6f}, return: {predicted_return:.4f}, "
+                                f"valid range: ${min_price:.2f}-${max_price:.2f})"
+                            )
                             # Use a conservative prediction: current price ± 5% max
                             predicted_return = np.clip(predicted_return, -0.05, 0.05)
                             prediction_price = current_price * (1 + predicted_return)
-                            logger.info(f"Clamped prediction for {symbol}: ${prediction_price:.2f} "
-                                       f"(return: {predicted_return:.4f})")
+                            logger.info(
+                                f"Clamped prediction for {symbol}: ${prediction_price:.2f} "
+                                f"(return: {predicted_return:.4f})"
+                            )
 
                         # Log successful transformation for debugging
-                        logger.debug(f"Prediction transformation for {symbol}: "
-                                   f"raw={raw_prediction:.6f} → return={predicted_return:.4f} → price=${prediction_price:.2f}")
+                        logger.debug(
+                            f"Prediction transformation for {symbol}: "
+                            f"raw={raw_prediction:.6f} → return={predicted_return:.4f} → price=${prediction_price:.2f}"
+                        )
                     else:
                         logger.warning(f"Scalers not fitted for {symbol} - using fallback prediction")
                         # Fallback: assume raw prediction is already a percentage return
@@ -320,16 +322,16 @@ class UniversalLSTMAnalyticsService:
 
                     # Extract additional outputs if available
                     additional_outputs = {}
-                    if return_all_outputs and 'volatility' in outputs:
-                        additional_outputs['volatility'] = outputs['volatility'].item()
-                    if return_all_outputs and 'trend' in outputs:
-                        additional_outputs['trend_probabilities'] = outputs['trend'].cpu().numpy().tolist()
-                    if return_all_outputs and 'attention_weights' in outputs:
-                        additional_outputs['attention_weights'] = outputs['attention_weights'].cpu().numpy().tolist()
+                    if return_all_outputs and "volatility" in outputs:
+                        additional_outputs["volatility"] = outputs["volatility"].item()
+                    if return_all_outputs and "trend" in outputs:
+                        additional_outputs["trend_probabilities"] = outputs["trend"].cpu().numpy().tolist()
+                    if return_all_outputs and "attention_weights" in outputs:
+                        additional_outputs["attention_weights"] = outputs["attention_weights"].cpu().numpy().tolist()
                 else:
                     # Fallback for enhanced models
                     prediction_result = self.model.predict(features_tensor, return_confidence=True)
-                    prediction_price = prediction_result['prediction']
+                    prediction_price = prediction_result["prediction"]
                     additional_outputs = {}
 
             # Current price already extracted during data preparation for efficiency
@@ -347,19 +349,19 @@ class UniversalLSTMAnalyticsService:
 
             # Prepare comprehensive result
             result = {
-                'symbol': symbol,
-                'horizon': horizon,
-                'predicted_price': float(prediction_price),
-                'current_price': float(current_price),
-                'price_change': float(prediction_price - current_price),
-                'price_change_pct': float(price_change_pct),
-                'confidence': float(base_confidence),
-                'sector_name': sector_name,
-                'sector_id': int(sector_id),
-                'industry_id': int(industry_id),
-                'model_type': 'UniversalLSTM',
-                'model_version': self.model_metadata.get('model_version', '4.0.0') if self.model_metadata else '4.0.0',
-                'prediction_timestamp': datetime.now().isoformat()
+                "symbol": symbol,
+                "horizon": horizon,
+                "predicted_price": float(prediction_price),
+                "current_price": float(current_price),
+                "price_change": float(prediction_price - current_price),
+                "price_change_pct": float(price_change_pct),
+                "confidence": float(base_confidence),
+                "sector_name": sector_name,
+                "sector_id": int(sector_id),
+                "industry_id": int(industry_id),
+                "model_type": "UniversalLSTM",
+                "model_version": self.model_metadata.get("model_version", "4.0.0") if self.model_metadata else "4.0.0",
+                "prediction_timestamp": datetime.now().isoformat(),
             }
 
             # Add multi-task outputs if requested
@@ -382,11 +384,7 @@ class UniversalLSTMAnalyticsService:
             logger.error(f"Universal prediction failed for {symbol}: {str(e)}")
             return None
 
-    def normalize_prediction_score(
-        self,
-        prediction_result: Dict[str, Any],
-        lookback_days: int = 30
-    ) -> float:
+    def normalize_prediction_score(self, prediction_result: Dict[str, Any], lookback_days: int = 30) -> float:
         """
         Normalize universal prediction to [0, 1] score for TA engine integration.
 
@@ -400,21 +398,21 @@ class UniversalLSTMAnalyticsService:
         if not prediction_result:
             return 0.5  # Neutral if no prediction
 
-        price_change_pct = prediction_result.get('price_change_pct', 0)
-        confidence = prediction_result.get('confidence', 0.5)
+        price_change_pct = prediction_result.get("price_change_pct", 0)
+        confidence = prediction_result.get("confidence", 0.5)
 
         # Enhanced normalization for universal model with sector awareness
-        sector_id = prediction_result.get('sector_id', 10)
+        sector_id = prediction_result.get("sector_id", 10)
 
         # Sector-specific volatility adjustments
         sector_volatility_adjustment = {
-            0: 1.2,   # Technology - higher volatility
-            1: 0.8,   # Healthcare - lower volatility  
-            2: 1.0,   # Financial Services - moderate
-            3: 1.3,   # Energy - higher volatility
-            4: 1.1,   # Consumer Cyclical - moderate-high
-            5: 0.9,   # Industrials - moderate-low
-            10: 1.0   # Unknown - neutral
+            0: 1.2,  # Technology - higher volatility
+            1: 0.8,  # Healthcare - lower volatility
+            2: 1.0,  # Financial Services - moderate
+            3: 1.3,  # Energy - higher volatility
+            4: 1.1,  # Consumer Cyclical - moderate-high
+            5: 0.9,  # Industrials - moderate-low
+            10: 1.0,  # Unknown - neutral
         }.get(sector_id, 1.0)
 
         # Adjust prediction based on sector volatility
@@ -440,25 +438,27 @@ class UniversalLSTMAnalyticsService:
             return None
 
         model_info = {
-            'model_type': 'UniversalLSTM',
-            'device': str(self.device),
-            'model_dir': self.model_dir,
-            'sequence_length': self.sequence_length,
-            'sectors_supported': 11,
-            'industries_supported': 50,
-            'cache_ttl': self.cache_ttl,
-            'prediction_enabled': self.prediction_enabled
+            "model_type": "UniversalLSTM",
+            "device": str(self.device),
+            "model_dir": self.model_dir,
+            "sequence_length": self.sequence_length,
+            "sectors_supported": 11,
+            "industries_supported": 50,
+            "cache_ttl": self.cache_ttl,
+            "prediction_enabled": self.prediction_enabled,
         }
 
         if self.model_metadata:
-            model_info.update({
-                'model_version': self.model_metadata.get('model_version', '4.0.0'),
-                'saved_at': self.model_metadata.get('saved_at'),
-                'training_stocks': len(self.model_metadata.get('training_stocks', [])),
-                'model_config': self.model_metadata.get('model_config', {})
-            })
+            model_info.update(
+                {
+                    "model_version": self.model_metadata.get("model_version", "4.0.0"),
+                    "saved_at": self.model_metadata.get("saved_at"),
+                    "training_stocks": len(self.model_metadata.get("training_stocks", [])),
+                    "model_config": self.model_metadata.get("model_config", {}),
+                }
+            )
 
-        if hasattr(self.model, 'get_model_info'):
+        if hasattr(self.model, "get_model_info"):
             model_info.update(self.model.get_model_info())
 
         return model_info
@@ -467,7 +467,7 @@ class UniversalLSTMAnalyticsService:
         """Clear prediction cache for symbol or all symbols."""
         if symbol:
             # Clear cache for specific symbol
-            for horizon in ['1d', '7d', '30d']:
+            for horizon in ["1d", "7d", "30d"]:
                 cache_key = self._get_cache_key(symbol, horizon)
                 cache.delete(cache_key)
             logger.info(f"Cleared universal prediction cache for {symbol}")

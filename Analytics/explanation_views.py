@@ -3,19 +3,19 @@ Explanation API views for Analytics app.
 Provides endpoints for generating and managing natural language explanations using local LLaMA model.
 """
 
+import logging
+import random
+import time
 from datetime import datetime
-from django.core.cache import cache
+
 from django.db import transaction
 from django.db.utils import OperationalError
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
-from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from drf_spectacular.utils import extend_schema, OpenApiParameter
-from drf_spectacular.types import OpenApiTypes
-import logging
-import time
-import random
+from rest_framework.response import Response
 
 from Analytics.services.explanation_service import get_explanation_service
 from Analytics.views import AnalysisThrottle
@@ -46,16 +46,21 @@ def retry_database_operation(operation, max_retries=3, base_delay=0.1):
             error_msg = str(e).lower()
 
             # Check if it's a concurrency-related error
-            if any(keyword in error_msg for keyword in [
-                'could not serialize access due to concurrent update',
-                'deadlock detected',
-                'database is locked',
-                'concurrent update'
-            ]):
+            if any(
+                keyword in error_msg
+                for keyword in [
+                    "could not serialize access due to concurrent update",
+                    "deadlock detected",
+                    "database is locked",
+                    "concurrent update",
+                ]
+            ):
                 if attempt < max_retries:
                     # Exponential backoff with jitter
-                    delay = base_delay * (2 ** attempt) + random.uniform(0, 0.1)
-                    logger.warning(f"[DB RETRY] Concurrency issue on attempt {attempt + 1}/{max_retries + 1}: {error_msg}")
+                    delay = base_delay * (2**attempt) + random.uniform(0, 0.1)
+                    logger.warning(
+                        f"[DB RETRY] Concurrency issue on attempt {attempt + 1}/{max_retries + 1}: {error_msg}"
+                    )
                     logger.info(f"[DB RETRY] Retrying in {delay:.3f} seconds...")
                     time.sleep(delay)
                     continue
@@ -76,39 +81,39 @@ def retry_database_operation(operation, max_retries=3, base_delay=0.1):
     description="Generate natural language explanation for a specific analysis result using local LLaMA model",
     parameters=[
         OpenApiParameter(
-            name='analysis_id',
+            name="analysis_id",
             type=OpenApiTypes.INT,
             location=OpenApiParameter.PATH,
             required=True,
-            description='Analysis result ID'
+            description="Analysis result ID",
         ),
         OpenApiParameter(
-            name='detail_level',
+            name="detail_level",
             type=OpenApiTypes.STR,
             location=OpenApiParameter.QUERY,
             required=False,
-            description='Explanation detail level: summary, standard, detailed (default: standard)'
+            description="Explanation detail level: summary, standard, detailed (default: standard)",
         ),
     ],
     responses={
         200: {
-            'description': 'Explanation generated successfully',
-            'example': {
-                'success': True,
-                'explanation': {
-                    'content': 'AAPL receives a 7.5/10 analysis score...',
-                    'confidence_score': 0.85,
-                    'detail_level': 'standard',
-                    'method': 'llm'
-                }
-            }
+            "description": "Explanation generated successfully",
+            "example": {
+                "success": True,
+                "explanation": {
+                    "content": "AAPL receives a 7.5/10 analysis score...",
+                    "confidence_score": 0.85,
+                    "detail_level": "standard",
+                    "method": "llm",
+                },
+            },
         },
-        404: {'description': 'Analysis not found'},
-        403: {'description': 'Not authorized to view this analysis'},
-        400: {'description': 'Invalid parameters'}
-    }
+        404: {"description": "Analysis not found"},
+        403: {"description": "Not authorized to view this analysis"},
+        400: {"description": "Invalid parameters"},
+    },
 )
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @throttle_classes([AnalysisThrottle])
 def generate_explanation(request, analysis_id):
@@ -124,27 +129,22 @@ def generate_explanation(request, analysis_id):
     Returns:
         Generated explanation with metadata
     """
-    detail_level = request.query_params.get('detail_level', 'standard')
+    detail_level = request.query_params.get("detail_level", "standard")
 
     # Validate detail level
-    if detail_level not in ['summary', 'standard', 'detailed']:
+    if detail_level not in ["summary", "standard", "detailed"]:
         return Response(
-            {'error': 'detail_level must be one of: summary, standard, detailed'},
-            status=status.HTTP_400_BAD_REQUEST
+            {"error": "detail_level must be one of: summary, standard, detailed"}, status=status.HTTP_400_BAD_REQUEST
         )
 
     try:
         # Get the analysis result and ensure it belongs to the user
-        analysis_result = AnalyticsResults.objects.filter(
-            id=analysis_id,
-            user=request.user
-        ).select_related('stock').first()
+        analysis_result = (
+            AnalyticsResults.objects.filter(id=analysis_id, user=request.user).select_related("stock").first()
+        )
 
         if not analysis_result:
-            return Response(
-                {'error': 'Analysis not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Analysis not found"}, status=status.HTTP_404_NOT_FOUND)
 
         logger.info(f"Generating explanation for analysis {analysis_id} ({analysis_result.stock.symbol})")
 
@@ -164,42 +164,43 @@ def generate_explanation(request, analysis_id):
             llm_available = False
 
         if not explanation_service.is_enabled():
-            logger.error(f"[EXPLAIN] Service not enabled - enabled: {explanation_service.enabled}, llm_available: {llm_available}")
-            return Response(
-                {'error': 'Explanation service not available'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            logger.error(
+                f"[EXPLAIN] Service not enabled - enabled: {explanation_service.enabled}, llm_available: {llm_available}"
             )
+            return Response({"error": "Explanation service not available"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         # Check if explanation already exists for this detail level
         existing_explanations = analysis_result.explanations_json or {}
-        existing_levels = existing_explanations.get('levels', {})
+        existing_levels = existing_explanations.get("levels", {})
 
         if detail_level in existing_levels:
             # Return existing explanation for this detail level
             logger.info(f"[EXPLAIN] Returning existing {detail_level} explanation for analysis {analysis_id}")
             existing_explanation = existing_levels[detail_level]
             explanation_result = {
-                'content': existing_explanation.get('content', ''),
-                'confidence_score': existing_explanation.get('confidence', 0.0),
-                'method': analysis_result.explanation_method or 'llm',
-                'word_count': existing_explanation.get('word_count', len(existing_explanation.get('content', '').split())),
-                'indicators_explained': existing_explanations.get('indicators_explained', []),
-                'risk_factors': existing_explanations.get('risk_factors', []),
-                'recommendation': existing_explanations.get('recommendation', 'HOLD'),
-                'generation_time': 0.0  # Retrieved from cache/DB
+                "content": existing_explanation.get("content", ""),
+                "confidence_score": existing_explanation.get("confidence", 0.0),
+                "method": analysis_result.explanation_method or "llm",
+                "word_count": existing_explanation.get(
+                    "word_count", len(existing_explanation.get("content", "").split())
+                ),
+                "indicators_explained": existing_explanations.get("indicators_explained", []),
+                "risk_factors": existing_explanations.get("risk_factors", []),
+                "recommendation": existing_explanations.get("recommendation", "HOLD"),
+                "generation_time": 0.0,  # Retrieved from cache/DB
             }
         else:
             # Generate new explanation for this detail level
             logger.info(f"[EXPLAIN] Starting {detail_level} explanation generation for {analysis_result.stock.symbol}")
             try:
                 explanation_result = explanation_service.explain_prediction_single(
-                    analysis_result,
-                    detail_level=detail_level,
-                    user=request.user
+                    analysis_result, detail_level=detail_level, user=request.user
                 )
 
                 if explanation_result:
-                    logger.info(f"[EXPLAIN] Explanation generated successfully - method: {explanation_result.get('method')}, length: {len(explanation_result.get('content', ''))}")
+                    logger.info(
+                        f"[EXPLAIN] Explanation generated successfully - method: {explanation_result.get('method')}, length: {len(explanation_result.get('content', ''))}"
+                    )
                 else:
                     logger.error(f"[EXPLAIN] Explanation generation returned None for analysis {analysis_id}")
 
@@ -209,10 +210,7 @@ def generate_explanation(request, analysis_id):
 
         if not explanation_result:
             logger.error(f"[EXPLAIN] Failed to generate explanation for analysis {analysis_id}")
-            return Response(
-                {'error': 'Failed to generate explanation'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": "Failed to generate explanation"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Update the database with explanation using retry mechanism for concurrency
         def save_explanation():
@@ -221,12 +219,11 @@ def generate_explanation(request, analysis_id):
 
             # Check if explanation for this detail level needs to be saved
             existing_explanations = analysis_result.explanations_json or {}
-            levels = existing_explanations.get('levels', {})
+            levels = existing_explanations.get("levels", {})
 
             # Generate new explanation if this detail level doesn't exist or method changed
             needs_new_explanation = (
-                detail_level not in levels or 
-                analysis_result.explanation_method != explanation_result.get('method')
+                detail_level not in levels or analysis_result.explanation_method != explanation_result.get("method")
             )
 
             if needs_new_explanation:
@@ -236,36 +233,41 @@ def generate_explanation(request, analysis_id):
 
                     # Refresh existing explanations and double-check after acquiring lock
                     current_explanations = locked_result.explanations_json or {}
-                    current_levels = current_explanations.get('levels', {})
+                    current_levels = current_explanations.get("levels", {})
 
-                    if detail_level not in current_levels or locked_result.explanation_method != explanation_result.get('method'):
+                    if (
+                        detail_level not in current_levels
+                        or locked_result.explanation_method != explanation_result.get("method")
+                    ):
                         # Update the levels with new explanation
                         current_levels[detail_level] = {
-                            'content': explanation_result.get('content', ''),
-                            'confidence': explanation_result.get('confidence_score', 0.0),
-                            'generated_at': datetime.now().isoformat(),
-                            'word_count': explanation_result.get('word_count', 0)
+                            "content": explanation_result.get("content", ""),
+                            "confidence": explanation_result.get("confidence_score", 0.0),
+                            "generated_at": datetime.now().isoformat(),
+                            "word_count": explanation_result.get("word_count", 0),
                         }
 
                         # Update the full explanations_json structure
                         locked_result.explanations_json = {
-                            'levels': current_levels,
-                            'indicators_explained': explanation_result.get('indicators_explained', []),
-                            'risk_factors': explanation_result.get('risk_factors', []),
-                            'recommendation': explanation_result.get('recommendation', 'HOLD'),
-                            'current_level': detail_level
+                            "levels": current_levels,
+                            "indicators_explained": explanation_result.get("indicators_explained", []),
+                            "risk_factors": explanation_result.get("risk_factors", []),
+                            "recommendation": explanation_result.get("recommendation", "HOLD"),
+                            "current_level": detail_level,
                         }
 
                         # Update other fields (keep narrative_text for backward compatibility with latest)
-                        locked_result.explanation_method = explanation_result.get('method', 'unknown')
-                        locked_result.explanation_version = '1.0'
-                        locked_result.narrative_text = explanation_result.get('content', '')
-                        locked_result.explanation_confidence = explanation_result.get('confidence_score', 0.0)
+                        locked_result.explanation_method = explanation_result.get("method", "unknown")
+                        locked_result.explanation_version = "1.0"
+                        locked_result.narrative_text = explanation_result.get("content", "")
+                        locked_result.explanation_confidence = explanation_result.get("confidence_score", 0.0)
                         locked_result.explained_at = datetime.now()
                         locked_result.save()
                         logger.info(f"[DB SAVE] Explanation saved for analysis {analysis_id} ({detail_level} level)")
                     else:
-                        logger.info(f"[DB SAVE] Explanation for {detail_level} level already exists for analysis {analysis_id}")
+                        logger.info(
+                            f"[DB SAVE] Explanation for {detail_level} level already exists for analysis {analysis_id}"
+                        )
             else:
                 logger.info(f"[DB SAVE] Explanation for {detail_level} level already exists for analysis {analysis_id}")
 
@@ -277,20 +279,20 @@ def generate_explanation(request, analysis_id):
             # Continue execution - explanation generation was successful, only save failed
 
         response_data = {
-            'success': True,
-            'analysis_id': analysis_id,
-            'symbol': analysis_result.stock.symbol,
-            'explanation': {
-                'content': explanation_result.get('content', ''),
-                'confidence_score': explanation_result.get('confidence_score', 0.0),
-                'detail_level': detail_level,
-                'method': explanation_result.get('method', 'unknown'),
-                'generation_time': explanation_result.get('generation_time', 0.0),
-                'word_count': explanation_result.get('word_count', 0),
-                'indicators_explained': explanation_result.get('indicators_explained', []),
-                'risk_factors': explanation_result.get('risk_factors', []),
-                'recommendation': explanation_result.get('recommendation', 'HOLD')
-            }
+            "success": True,
+            "analysis_id": analysis_id,
+            "symbol": analysis_result.stock.symbol,
+            "explanation": {
+                "content": explanation_result.get("content", ""),
+                "confidence_score": explanation_result.get("confidence_score", 0.0),
+                "detail_level": detail_level,
+                "method": explanation_result.get("method", "unknown"),
+                "generation_time": explanation_result.get("generation_time", 0.0),
+                "word_count": explanation_result.get("word_count", 0),
+                "indicators_explained": explanation_result.get("indicators_explained", []),
+                "risk_factors": explanation_result.get("risk_factors", []),
+                "recommendation": explanation_result.get("recommendation", "HOLD"),
+            },
         }
 
         logger.info(f"Explanation generated successfully for analysis {analysis_id}")
@@ -300,8 +302,7 @@ def generate_explanation(request, analysis_id):
         logger.error(f"Error in generate_explanation: {str(e)}", exc_info=True)
         logger.error(f"Explanation generation failed for analysis {analysis_id}: {str(e)}")
         return Response(
-            {'error': f'Explanation generation failed: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": f"Explanation generation failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
@@ -310,17 +311,12 @@ def generate_explanation(request, analysis_id):
     description="Get current status of the explanation service and LLM availability",
     responses={
         200: {
-            'description': 'Service status retrieved',
-            'example': {
-                'enabled': True,
-                'llm_available': True,
-                'model_name': 'llama3.1:70b',
-                'cache_ttl': 300
-            }
+            "description": "Service status retrieved",
+            "example": {"enabled": True, "llm_available": True, "model_name": "llama3.1:70b", "cache_ttl": 300},
         }
-    }
+    },
 )
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def explanation_service_status(request):
     """
@@ -333,16 +329,12 @@ def explanation_service_status(request):
         explanation_service = get_explanation_service()
         status_data = explanation_service.get_service_status()
 
-        return Response({
-            'success': True,
-            'status': status_data
-        })
+        return Response({"success": True, "status": status_data})
 
     except Exception as e:
         logger.error(f"Error getting explanation service status: {str(e)}")
         return Response(
-            {'error': f'Failed to get service status: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": f"Failed to get service status: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
@@ -351,39 +343,39 @@ def explanation_service_status(request):
     description="Retrieve previously generated explanation for an analysis result",
     parameters=[
         OpenApiParameter(
-            name='analysis_id',
+            name="analysis_id",
             type=OpenApiTypes.INT,
             location=OpenApiParameter.PATH,
             required=True,
-            description='Analysis result ID'
+            description="Analysis result ID",
         ),
         OpenApiParameter(
-            name='detail_level',
+            name="detail_level",
             type=OpenApiTypes.STR,
             location=OpenApiParameter.QUERY,
             required=False,
-            description='Explanation detail level: summary, standard, detailed (default: latest)'
+            description="Explanation detail level: summary, standard, detailed (default: latest)",
         ),
     ],
     responses={
         200: {
-            'description': 'Explanation retrieved successfully',
-            'example': {
-                'success': True,
-                'has_explanation': True,
-                'explanation': {
-                    'content': 'Previously generated explanation...',
-                    'confidence_score': 0.85,
-                    'method': 'llm',
-                    'explained_at': '2025-01-17T10:30:00Z'
-                }
-            }
+            "description": "Explanation retrieved successfully",
+            "example": {
+                "success": True,
+                "has_explanation": True,
+                "explanation": {
+                    "content": "Previously generated explanation...",
+                    "confidence_score": 0.85,
+                    "method": "llm",
+                    "explained_at": "2025-01-17T10:30:00Z",
+                },
+            },
         },
-        404: {'description': 'Analysis not found'},
-        403: {'description': 'Not authorized to view this analysis'}
-    }
+        404: {"description": "Analysis not found"},
+        403: {"description": "Not authorized to view this analysis"},
+    },
 )
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_explanation(request, analysis_id):
     """
@@ -398,24 +390,20 @@ def get_explanation(request, analysis_id):
     Returns:
         Existing explanation data if available
     """
-    detail_level = request.query_params.get('detail_level', None)
+    detail_level = request.query_params.get("detail_level", None)
 
     try:
         # Get the analysis result and ensure it belongs to the user
-        analysis_result = AnalyticsResults.objects.filter(
-            id=analysis_id,
-            user=request.user
-        ).select_related('stock').first()
+        analysis_result = (
+            AnalyticsResults.objects.filter(id=analysis_id, user=request.user).select_related("stock").first()
+        )
 
         if not analysis_result:
-            return Response(
-                {'error': 'Analysis not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Analysis not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Get explanations data
         explanations_json = analysis_result.explanations_json or {}
-        levels = explanations_json.get('levels', {})
+        levels = explanations_json.get("levels", {})
 
         # Determine which explanation content to return
         explanation_content = None
@@ -424,7 +412,7 @@ def get_explanation(request, analysis_id):
         if detail_level and detail_level in levels:
             # Return specific detail level if requested and available
             level_data = levels[detail_level]
-            explanation_content = level_data.get('content', '')
+            explanation_content = level_data.get("content", "")
             used_level = detail_level
         elif detail_level and detail_level not in levels:
             # Specific level requested but doesn't exist - return empty to trigger generation
@@ -433,57 +421,59 @@ def get_explanation(request, analysis_id):
         elif levels:
             # If no specific level requested, return the latest generated level
             # Priority: detailed -> standard -> summary (most comprehensive first)
-            for preferred_level in ['detailed', 'standard', 'summary']:
+            for preferred_level in ["detailed", "standard", "summary"]:
                 if preferred_level in levels:
                     level_data = levels[preferred_level]
-                    explanation_content = level_data.get('content', '')
+                    explanation_content = level_data.get("content", "")
                     used_level = preferred_level
                     break
         else:
             # Fallback to narrative_text for backward compatibility
             explanation_content = analysis_result.narrative_text
-            used_level = 'legacy'
+            used_level = "legacy"
 
         has_explanation = bool(explanation_content)
 
         response_data = {
-            'success': True,
-            'analysis_id': analysis_id,
-            'symbol': analysis_result.stock.symbol,
-            'has_explanation': has_explanation,
-            'detail_level_returned': used_level,
-            'detail_level_requested': detail_level
+            "success": True,
+            "analysis_id": analysis_id,
+            "symbol": analysis_result.stock.symbol,
+            "has_explanation": has_explanation,
+            "detail_level_returned": used_level,
+            "detail_level_requested": detail_level,
         }
 
         if has_explanation:
-            if used_level != 'legacy' and used_level in levels:
+            if used_level != "legacy" and used_level in levels:
                 level_data = levels[used_level]
-                response_data['explanation'] = {
-                    'content': explanation_content,
-                    'confidence_score': level_data.get('confidence', analysis_result.explanation_confidence),
-                    'method': analysis_result.explanation_method,
-                    'version': analysis_result.explanation_version,
-                    'explained_at': level_data.get('generated_at', 
-                                     analysis_result.explained_at.isoformat() if analysis_result.explained_at else None),
-                    'language': analysis_result.narrative_language,
-                    'word_count': level_data.get('word_count', len(explanation_content.split())),
-                    'detail_level': used_level,
-                    'structured_data': explanations_json,
-                    'available_levels': list(levels.keys())
+                response_data["explanation"] = {
+                    "content": explanation_content,
+                    "confidence_score": level_data.get("confidence", analysis_result.explanation_confidence),
+                    "method": analysis_result.explanation_method,
+                    "version": analysis_result.explanation_version,
+                    "explained_at": level_data.get(
+                        "generated_at",
+                        analysis_result.explained_at.isoformat() if analysis_result.explained_at else None,
+                    ),
+                    "language": analysis_result.narrative_language,
+                    "word_count": level_data.get("word_count", len(explanation_content.split())),
+                    "detail_level": used_level,
+                    "structured_data": explanations_json,
+                    "available_levels": list(levels.keys()),
                 }
             else:
                 # Legacy format for backward compatibility
-                response_data['explanation'] = {
-                    'content': explanation_content,
-                    'confidence_score': analysis_result.explanation_confidence,
-                    'method': analysis_result.explanation_method,
-                    'version': analysis_result.explanation_version,
-                    'explained_at': analysis_result.explained_at.isoformat() if analysis_result.explained_at else None,
-                    'language': analysis_result.narrative_language,
-                    'word_count': len(explanation_content.split()) if explanation_content else 0,
-                    'detail_level': 'legacy',
-                    'structured_data': explanations_json,
-                    'available_levels': list(levels.keys())
+                response_data["explanation"] = {
+                    "content": explanation_content,
+                    "confidence_score": analysis_result.explanation_confidence,
+                    "method": analysis_result.explanation_method,
+                    "version": analysis_result.explanation_version,
+                    "explained_at": analysis_result.explained_at.isoformat() if analysis_result.explained_at else None,
+                    "language": analysis_result.narrative_language,
+                    "word_count": len(explanation_content.split()) if explanation_content else 0,
+                    "detail_level": "legacy",
+                    "structured_data": explanations_json,
+                    "available_levels": list(levels.keys()),
                 }
 
         return Response(response_data)
@@ -491,6 +481,5 @@ def get_explanation(request, analysis_id):
     except Exception as e:
         logger.error(f"Error retrieving explanation for analysis {analysis_id}: {str(e)}")
         return Response(
-            {'error': f'Failed to retrieve explanation: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": f"Failed to retrieve explanation: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

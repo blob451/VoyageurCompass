@@ -3,10 +3,10 @@ Data Processing Module
 Handles data transformation and processing for VoyageurCompass.
 """
 
-import logging
-from typing import Dict, List, Any
-from datetime import datetime, timedelta
 import json
+import logging
+from datetime import datetime, timedelta
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -33,13 +33,13 @@ class DataProcessor:
         try:
             if not raw_data:
                 return {
-                    'prices': [],
-                    'dates': [],
-                    'volumes': [],
-                    'high': None,
-                    'low': None,
-                    'average': None,
-                    'total_volume': 0
+                    "prices": [],
+                    "dates": [],
+                    "volumes": [],
+                    "high": None,
+                    "low": None,
+                    "average": None,
+                    "total_volume": 0,
                 }
 
             prices = []
@@ -47,40 +47,40 @@ class DataProcessor:
             volumes = []
 
             for data_point in raw_data:
-                if 'close' in data_point and data_point['close'] is not None:
+                if "close" in data_point and data_point["close"] is not None:
                     try:
-                        prices.append(float(data_point['close']))
+                        prices.append(float(data_point["close"]))
                     except (ValueError, TypeError):
                         # Skip invalid close prices
                         continue
-                if 'date' in data_point and data_point['date'] is not None:
-                    dates.append(data_point['date'])
-                if 'volume' in data_point and data_point['volume'] is not None:
+                if "date" in data_point and data_point["date"] is not None:
+                    dates.append(data_point["date"])
+                if "volume" in data_point and data_point["volume"] is not None:
                     try:
-                        volumes.append(int(data_point['volume']))
+                        volumes.append(int(data_point["volume"]))
                     except (ValueError, TypeError):
                         # Skip invalid volumes
                         continue
 
             processed = {
-                'prices': prices,
-                'dates': dates,
-                'volumes': volumes,
-                'high': max(prices) if prices else None,
-                'low': min(prices) if prices else None,
-                'average': sum(prices) / len(prices) if prices else None,
-                'total_volume': sum(volumes) if volumes else 0,
-                'data_points': len(prices),
-                'processed_at': datetime.now().isoformat()
+                "prices": prices,
+                "dates": dates,
+                "volumes": volumes,
+                "high": max(prices) if prices else None,
+                "low": min(prices) if prices else None,
+                "average": sum(prices) / len(prices) if prices else None,
+                "total_volume": sum(volumes) if volumes else 0,
+                "data_points": len(prices),
+                "processed_at": datetime.now().isoformat(),
             }
 
             return processed
 
         except Exception as e:
             logger.error(f"Error processing price data: {str(e)}")
-            return {'error': str(e)}
+            return {"error": str(e)}
 
-    def normalize_data(self, data: List[float], method: str = 'minmax') -> List[float]:
+    def normalize_data(self, data: List[float], method: str = "minmax") -> List[float]:
         """
         Normalize a list of numerical data.
 
@@ -95,7 +95,7 @@ class DataProcessor:
             if not data:
                 return []
 
-            if method == 'minmax':
+            if method == "minmax":
                 min_val = min(data)
                 max_val = max(data)
                 range_val = max_val - min_val
@@ -105,10 +105,10 @@ class DataProcessor:
 
                 normalized = [(x - min_val) / range_val for x in data]
 
-            elif method == 'zscore':
+            elif method == "zscore":
                 mean = sum(data) / len(data)
                 variance = sum((x - mean) ** 2 for x in data) / len(data)
-                std_dev = variance ** 0.5
+                std_dev = variance**0.5
 
                 if std_dev == 0:
                     return [0] * len(data)
@@ -127,7 +127,7 @@ class DataProcessor:
             logger.error(f"Error normalizing data: {str(e)}")
             return []
 
-    def aggregate_data(self, data: List[Dict], key: str, aggregation: str = 'sum') -> float:
+    def aggregate_data(self, data: List[Dict], key: str, aggregation: str = "sum") -> float:
         """
         Aggregate data based on a key and aggregation method.
 
@@ -145,13 +145,13 @@ class DataProcessor:
             if not values:
                 return 0
 
-            if aggregation == 'sum':
+            if aggregation == "sum":
                 return sum(values)
-            elif aggregation == 'avg':
+            elif aggregation == "avg":
                 return sum(values) / len(values)
-            elif aggregation == 'min':
+            elif aggregation == "min":
                 return min(values)
-            elif aggregation == 'max':
+            elif aggregation == "max":
                 return max(values)
             else:
                 raise ValueError(f"Unknown aggregation method: {aggregation}")
@@ -177,7 +177,7 @@ class DataProcessor:
 
             mean = sum(data) / len(data)
             variance = sum((x - mean) ** 2 for x in data) / len(data)
-            std_dev = variance ** 0.5
+            std_dev = variance**0.5
 
             if std_dev == 0:
                 return data
@@ -194,8 +194,7 @@ class DataProcessor:
             logger.error(f"Error filtering outliers: {str(e)}")
             return data
 
-    def resample_data(self, data: List[Dict], date_key: str, value_key: str,
-                      frequency: str = 'daily') -> List[Dict]:
+    def resample_data(self, data: List[Dict], date_key: str, value_key: str, frequency: str = "daily") -> List[Dict]:
         """
         Resample time series data to a different frequency.
 
@@ -213,7 +212,7 @@ class DataProcessor:
                 return []
 
             # Sort data by date
-            sorted_data = sorted(data, key=lambda x: x.get(date_key, ''))
+            sorted_data = sorted(data, key=lambda x: x.get(date_key, ""))
 
             # Group data by period
             grouped = {}
@@ -227,16 +226,16 @@ class DataProcessor:
 
                 # Parse date and determine period key
                 try:
-                    date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
                 except (ValueError, TypeError):
                     continue
 
-                if frequency == 'daily':
+                if frequency == "daily":
                     period_key = date.date().isoformat()
-                elif frequency == 'weekly':
+                elif frequency == "weekly":
                     week_start = date - timedelta(days=date.weekday())
                     period_key = week_start.date().isoformat()
-                elif frequency == 'monthly':
+                elif frequency == "monthly":
                     period_key = f"{date.year}-{date.month:02d}"
                 else:
                     period_key = date.date().isoformat()
@@ -248,11 +247,7 @@ class DataProcessor:
             # Calculate average for each period
             resampled = []
             for period, values in grouped.items():
-                resampled.append({
-                    'period': period,
-                    'value': sum(values) / len(values),
-                    'count': len(values)
-                })
+                resampled.append({"period": period, "value": sum(values) / len(values), "count": len(values)})
 
             return resampled
 
@@ -321,7 +316,7 @@ class DataProcessor:
                     if isinstance(value, str):
                         # Try to convert string numbers
                         try:
-                            if '.' in value:
+                            if "." in value:
                                 cleaned_item[key] = float(value)
                             else:
                                 cleaned_item[key] = int(value)
@@ -352,12 +347,12 @@ class DataProcessor:
             from Core.services.utils import sanitize_filename
 
             safe_filename = sanitize_filename(filename)
-            if not safe_filename.endswith('.json'):
-                safe_filename += '.json'
+            if not safe_filename.endswith(".json"):
+                safe_filename += ".json"
 
             filepath = f"Temp/{safe_filename}"
 
-            with open(filepath, 'w') as f:
+            with open(filepath, "w") as f:
                 json.dump(data, f, indent=2, default=str)
 
             logger.info(f"Data exported to {filepath}")

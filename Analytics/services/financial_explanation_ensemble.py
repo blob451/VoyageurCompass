@@ -5,23 +5,25 @@ Combines multiple models for optimal financial explanation generation.
 
 import logging
 import time
-import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime
-from enum import Enum
-from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import asyncio
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
+import numpy as np
+
+from Analytics.services.hybrid_analysis_coordinator import (
+    get_hybrid_analysis_coordinator,
+)
 from Analytics.services.local_llm_service import get_local_llm_service
 from Analytics.services.sentiment_analyzer import get_sentiment_analyzer
-from Analytics.services.hybrid_analysis_coordinator import get_hybrid_analysis_coordinator
 
 logger = logging.getLogger(__name__)
 
 
 class EnsembleStrategy(Enum):
     """Ensemble voting strategies."""
+
     MAJORITY_VOTE = "majority_vote"
     CONFIDENCE_WEIGHTED = "confidence_weighted"
     PERFORMANCE_WEIGHTED = "performance_weighted"
@@ -31,6 +33,7 @@ class EnsembleStrategy(Enum):
 @dataclass
 class ModelPrediction:
     """Container for individual model prediction."""
+
     model_name: str
     content: str
     confidence: float
@@ -56,57 +59,59 @@ class FinancialExplanationEnsemble:
 
         # Model registry with performance tracking
         self.models = {
-            'base_8b': {
-                'name': 'llama3.1:8b',
-                'type': 'base',
-                'strength': 'fast_generation',
-                'weight': 1.0,
-                'performance_history': []
+            "base_8b": {
+                "name": "llama3.1:8b",
+                "type": "base",
+                "strength": "fast_generation",
+                "weight": 1.0,
+                "performance_history": [],
             },
-            'base_70b': {
-                'name': 'llama3.1:70b',
-                'type': 'base',
-                'strength': 'complex_analysis',
-                'weight': 1.2,
-                'performance_history': []
+            "base_70b": {
+                "name": "llama3.1:70b",
+                "type": "base",
+                "strength": "complex_analysis",
+                "weight": 1.2,
+                "performance_history": [],
             },
-            'sentiment_enhanced': {
-                'name': 'hybrid_sentiment',
-                'type': 'hybrid',
-                'strength': 'sentiment_integration',
-                'weight': 1.1,
-                'performance_history': []
-            }
+            "sentiment_enhanced": {
+                "name": "hybrid_sentiment",
+                "type": "hybrid",
+                "strength": "sentiment_integration",
+                "weight": 1.1,
+                "performance_history": [],
+            },
             # Fine-tuned models would be added here when available
         }
 
         # Ensemble configuration
         self.ensemble_config = {
-            'default_strategy': EnsembleStrategy.CONFIDENCE_WEIGHTED,
-            'parallel_execution': True,
-            'timeout_per_model': 30.0,
-            'min_models_required': 2,
-            'quality_threshold': 0.6,
-            'enable_adaptive_weighting': True,
-            'performance_window_size': 100
+            "default_strategy": EnsembleStrategy.CONFIDENCE_WEIGHTED,
+            "parallel_execution": True,
+            "timeout_per_model": 30.0,
+            "min_models_required": 2,
+            "quality_threshold": 0.6,
+            "enable_adaptive_weighting": True,
+            "performance_window_size": 100,
         }
 
         # Performance tracking
         self.ensemble_metrics = {
-            'total_predictions': 0,
-            'successful_predictions': 0,
-            'average_generation_time': 0.0,
-            'strategy_usage': {strategy: 0 for strategy in EnsembleStrategy},
-            'model_usage_stats': {model: 0 for model in self.models.keys()}
+            "total_predictions": 0,
+            "successful_predictions": 0,
+            "average_generation_time": 0.0,
+            "strategy_usage": {strategy: 0 for strategy in EnsembleStrategy},
+            "model_usage_stats": {model: 0 for model in self.models.keys()},
         }
 
         logger.info("Financial Explanation Ensemble initialized")
 
-    def generate_ensemble_explanation(self,
-                                    analysis_data: Dict[str, Any],
-                                    detail_level: str = 'standard',
-                                    strategy: Optional[EnsembleStrategy] = None,
-                                    return_all_predictions: bool = False) -> Dict[str, Any]:
+    def generate_ensemble_explanation(
+        self,
+        analysis_data: Dict[str, Any],
+        detail_level: str = "standard",
+        strategy: Optional[EnsembleStrategy] = None,
+        return_all_predictions: bool = False,
+    ) -> Dict[str, Any]:
         """
         Generate explanation using ensemble of models.
 
@@ -120,9 +125,9 @@ class FinancialExplanationEnsemble:
             Ensemble prediction result
         """
         start_time = time.time()
-        self.ensemble_metrics['total_predictions'] += 1
+        self.ensemble_metrics["total_predictions"] += 1
 
-        symbol = analysis_data.get('symbol', 'UNKNOWN')
+        symbol = analysis_data.get("symbol", "UNKNOWN")
         logger.info(f"[ENSEMBLE] Starting ensemble explanation for {symbol}")
 
         try:
@@ -130,44 +135,42 @@ class FinancialExplanationEnsemble:
             if strategy is None:
                 strategy = self._select_optimal_strategy(analysis_data)
 
-            self.ensemble_metrics['strategy_usage'][strategy] += 1
+            self.ensemble_metrics["strategy_usage"][strategy] += 1
 
             # Get model predictions
             model_predictions = self._get_model_predictions(analysis_data, detail_level)
 
-            if len(model_predictions) < self.ensemble_config['min_models_required']:
+            if len(model_predictions) < self.ensemble_config["min_models_required"]:
                 logger.warning(f"[ENSEMBLE] Insufficient model predictions ({len(model_predictions)}) for {symbol}")
                 return self._create_fallback_result(analysis_data, detail_level)
 
             # Apply ensemble strategy
-            ensemble_result = self._apply_ensemble_strategy(
-                model_predictions, 
-                strategy, 
-                analysis_data
-            )
+            ensemble_result = self._apply_ensemble_strategy(model_predictions, strategy, analysis_data)
 
             # Add ensemble metadata
             generation_time = time.time() - start_time
-            ensemble_result.update({
-                'ensemble_metadata': {
-                    'strategy_used': strategy.value,
-                    'models_consulted': [pred.model_name for pred in model_predictions],
-                    'total_generation_time': generation_time,
-                    'model_count': len(model_predictions),
-                    'consensus_strength': self._calculate_consensus_strength(model_predictions),
-                    'quality_distribution': self._get_quality_distribution(model_predictions)
+            ensemble_result.update(
+                {
+                    "ensemble_metadata": {
+                        "strategy_used": strategy.value,
+                        "models_consulted": [pred.model_name for pred in model_predictions],
+                        "total_generation_time": generation_time,
+                        "model_count": len(model_predictions),
+                        "consensus_strength": self._calculate_consensus_strength(model_predictions),
+                        "quality_distribution": self._get_quality_distribution(model_predictions),
+                    }
                 }
-            })
+            )
 
             # Include individual predictions if requested
             if return_all_predictions:
-                ensemble_result['individual_predictions'] = [
+                ensemble_result["individual_predictions"] = [
                     {
-                        'model': pred.model_name,
-                        'content': pred.content,
-                        'confidence': pred.confidence,
-                        'recommendation': pred.recommendation,
-                        'quality_score': pred.quality_score
+                        "model": pred.model_name,
+                        "content": pred.content,
+                        "confidence": pred.confidence,
+                        "recommendation": pred.recommendation,
+                        "quality_score": pred.quality_score,
                     }
                     for pred in model_predictions
                 ]
@@ -194,8 +197,8 @@ class FinancialExplanationEnsemble:
         Returns:
             Optimal ensemble strategy
         """
-        score = analysis_data.get('score_0_10', 5.0)
-        weighted_scores = analysis_data.get('weighted_scores', {})
+        score = analysis_data.get("score_0_10", 5.0)
+        weighted_scores = analysis_data.get("weighted_scores", {})
 
         # Calculate complexity
         complexity = len(weighted_scores) / 12.0  # Normalized complexity
@@ -208,16 +211,14 @@ class FinancialExplanationEnsemble:
         elif score_extremity < 0.3:
             # Unclear signals - use confidence weighting
             return EnsembleStrategy.CONFIDENCE_WEIGHTED
-        elif self.ensemble_config['enable_adaptive_weighting']:
+        elif self.ensemble_config["enable_adaptive_weighting"]:
             # Adaptive strategy based on recent performance
             return EnsembleStrategy.ADAPTIVE_WEIGHTED
         else:
             # Default strategy
-            return self.ensemble_config['default_strategy']
+            return self.ensemble_config["default_strategy"]
 
-    def _get_model_predictions(self,
-                             analysis_data: Dict[str, Any],
-                             detail_level: str) -> List[ModelPrediction]:
+    def _get_model_predictions(self, analysis_data: Dict[str, Any], detail_level: str) -> List[ModelPrediction]:
         """
         Get predictions from all available models.
 
@@ -230,7 +231,7 @@ class FinancialExplanationEnsemble:
         """
         predictions = []
 
-        if self.ensemble_config['parallel_execution']:
+        if self.ensemble_config["parallel_execution"]:
             # Parallel execution for faster results
             predictions = self._get_predictions_parallel(analysis_data, detail_level)
         else:
@@ -246,9 +247,7 @@ class FinancialExplanationEnsemble:
 
         return valid_predictions
 
-    def _get_predictions_parallel(self,
-                                analysis_data: Dict[str, Any],
-                                detail_level: str) -> List[ModelPrediction]:
+    def _get_predictions_parallel(self, analysis_data: Dict[str, Any], detail_level: str) -> List[ModelPrediction]:
         """Get model predictions in parallel."""
         predictions = []
 
@@ -257,77 +256,63 @@ class FinancialExplanationEnsemble:
             future_to_model = {}
 
             # Base 8B model
-            if self._is_model_available('base_8b'):
-                future = executor.submit(
-                    self._get_base_model_prediction,
-                    analysis_data, detail_level, 'llama3.1:8b'
-                )
-                future_to_model[future] = 'base_8b'
+            if self._is_model_available("base_8b"):
+                future = executor.submit(self._get_base_model_prediction, analysis_data, detail_level, "llama3.1:8b")
+                future_to_model[future] = "base_8b"
 
             # Sentiment-enhanced prediction
-            if self._is_model_available('sentiment_enhanced'):
-                future = executor.submit(
-                    self._get_sentiment_enhanced_prediction,
-                    analysis_data, detail_level
-                )
-                future_to_model[future] = 'sentiment_enhanced'
+            if self._is_model_available("sentiment_enhanced"):
+                future = executor.submit(self._get_sentiment_enhanced_prediction, analysis_data, detail_level)
+                future_to_model[future] = "sentiment_enhanced"
 
             # Base 70B model (for complex scenarios)
-            complexity_score = len(analysis_data.get('weighted_scores', {})) / 12.0
-            if complexity_score > 0.7 and self._is_model_available('base_70b'):
-                future = executor.submit(
-                    self._get_base_model_prediction,
-                    analysis_data, detail_level, 'llama3.1:70b'
-                )
-                future_to_model[future] = 'base_70b'
+            complexity_score = len(analysis_data.get("weighted_scores", {})) / 12.0
+            if complexity_score > 0.7 and self._is_model_available("base_70b"):
+                future = executor.submit(self._get_base_model_prediction, analysis_data, detail_level, "llama3.1:70b")
+                future_to_model[future] = "base_70b"
 
             # Collect results
-            for future in as_completed(future_to_model, timeout=self.ensemble_config['timeout_per_model']):
+            for future in as_completed(future_to_model, timeout=self.ensemble_config["timeout_per_model"]):
                 model_name = future_to_model[future]
                 try:
                     prediction = future.result(timeout=5.0)  # Additional timeout safety
                     if prediction:
                         predictions.append(prediction)
-                        self.ensemble_metrics['model_usage_stats'][model_name] += 1
+                        self.ensemble_metrics["model_usage_stats"][model_name] += 1
                 except Exception as e:
                     logger.error(f"[ENSEMBLE] Error getting prediction from {model_name}: {str(e)}")
 
         return predictions
 
-    def _get_predictions_sequential(self,
-                                  analysis_data: Dict[str, Any],
-                                  detail_level: str) -> List[ModelPrediction]:
+    def _get_predictions_sequential(self, analysis_data: Dict[str, Any], detail_level: str) -> List[ModelPrediction]:
         """Get model predictions sequentially."""
         predictions = []
 
         # Base 8B model (always try first)
-        if self._is_model_available('base_8b'):
-            prediction = self._get_base_model_prediction(analysis_data, detail_level, 'llama3.1:8b')
+        if self._is_model_available("base_8b"):
+            prediction = self._get_base_model_prediction(analysis_data, detail_level, "llama3.1:8b")
             if prediction:
                 predictions.append(prediction)
-                self.ensemble_metrics['model_usage_stats']['base_8b'] += 1
+                self.ensemble_metrics["model_usage_stats"]["base_8b"] += 1
 
         # Sentiment-enhanced prediction
-        if self._is_model_available('sentiment_enhanced'):
+        if self._is_model_available("sentiment_enhanced"):
             prediction = self._get_sentiment_enhanced_prediction(analysis_data, detail_level)
             if prediction:
                 predictions.append(prediction)
-                self.ensemble_metrics['model_usage_stats']['sentiment_enhanced'] += 1
+                self.ensemble_metrics["model_usage_stats"]["sentiment_enhanced"] += 1
 
         return predictions
 
-    def _get_base_model_prediction(self,
-                                 analysis_data: Dict[str, Any],
-                                 detail_level: str,
-                                 model_name: str) -> Optional[ModelPrediction]:
+    def _get_base_model_prediction(
+        self, analysis_data: Dict[str, Any], detail_level: str, model_name: str
+    ) -> Optional[ModelPrediction]:
         """Get prediction from base LLM model."""
         try:
             start_time = time.time()
             logger.info(f"[ENSEMBLE] Generating base model prediction for {analysis_data.get('symbol', 'UNKNOWN')}")
 
-            result = self.llm_service.generate_explanation(
-                analysis_data, detail_level
-            )
+            result = self.llm_service.generate_explanation(analysis_data, detail_level)
 
             if not result:
                 logger.warning(f"[ENSEMBLE] No result from base model {model_name}")
@@ -336,18 +321,18 @@ class FinancialExplanationEnsemble:
             generation_time = time.time() - start_time
 
             # Extract recommendation from content
-            content = result.get('content', '')
+            content = result.get("content", "")
             recommendation = self._extract_recommendation(content)
 
             prediction = ModelPrediction(
                 model_name=model_name,
                 content=content,
-                confidence=result.get('confidence_score', 0.8),
+                confidence=result.get("confidence_score", 0.8),
                 generation_time=generation_time,
-                metadata={'cached': result.get('cached', False)},
+                metadata={"cached": result.get("cached", False)},
                 recommendation=recommendation,
                 technical_coverage=self._calculate_technical_coverage(content, analysis_data),
-                quality_score=self._assess_content_quality(content)
+                quality_score=self._assess_content_quality(content),
             )
 
             logger.info(f"[ENSEMBLE] Successfully generated prediction from {model_name} in {generation_time:.2f}s")
@@ -357,16 +342,14 @@ class FinancialExplanationEnsemble:
             logger.error(f"Error getting base model prediction from {model_name}: {str(e)}")
             return None
 
-    def _get_sentiment_enhanced_prediction(self,
-                                         analysis_data: Dict[str, Any],
-                                         detail_level: str) -> Optional[ModelPrediction]:
+    def _get_sentiment_enhanced_prediction(
+        self, analysis_data: Dict[str, Any], detail_level: str
+    ) -> Optional[ModelPrediction]:
         """Get prediction from sentiment-enhanced system."""
         try:
             start_time = time.time()
 
-            result = self.hybrid_coordinator.generate_enhanced_explanation(
-                analysis_data, detail_level
-            )
+            result = self.hybrid_coordinator.generate_enhanced_explanation(analysis_data, detail_level)
 
             if not result:
                 return None
@@ -374,11 +357,11 @@ class FinancialExplanationEnsemble:
             generation_time = time.time() - start_time
 
             return ModelPrediction(
-                model_name='hybrid_sentiment',
-                content=result.get('content', ''),
-                confidence=result.get('confidence_score', 0.5),
+                model_name="hybrid_sentiment",
+                content=result.get("content", ""),
+                confidence=result.get("confidence_score", 0.5),
                 generation_time=generation_time,
-                metadata=result
+                metadata=result,
             )
 
         except Exception as e:
@@ -387,11 +370,10 @@ class FinancialExplanationEnsemble:
 
     def _is_model_available(self, model_key: str) -> bool:
         """Check if a model is available for predictions."""
-        if model_key == 'base_8b' or model_key == 'base_70b':
+        if model_key == "base_8b" or model_key == "base_70b":
             return self.llm_service.is_available()
-        elif model_key == 'sentiment_enhanced':
-            return (self.llm_service.is_available() and 
-                   hasattr(self.sentiment_service, 'analyzeSentimentSingle'))
+        elif model_key == "sentiment_enhanced":
+            return self.llm_service.is_available() and hasattr(self.sentiment_service, "analyzeSentimentSingle")
         return False
 
     def _validate_prediction(self, prediction: ModelPrediction) -> bool:
@@ -409,18 +391,14 @@ class FinancialExplanationEnsemble:
 
         return True
 
-    def _enhance_prediction(self,
-                          prediction: ModelPrediction,
-                          analysis_data: Dict[str, Any]) -> ModelPrediction:
+    def _enhance_prediction(self, prediction: ModelPrediction, analysis_data: Dict[str, Any]) -> ModelPrediction:
         """Enhance prediction with additional analysis."""
         try:
             # Extract recommendation
             prediction.recommendation = self._extract_recommendation(prediction.content)
 
             # Calculate technical coverage
-            prediction.technical_coverage = self._calculate_technical_coverage(
-                prediction.content, analysis_data
-            )
+            prediction.technical_coverage = self._calculate_technical_coverage(prediction.content, analysis_data)
 
             # Calculate quality score
             prediction.quality_score = self._calculate_prediction_quality(prediction)
@@ -435,24 +413,22 @@ class FinancialExplanationEnsemble:
         """Extract investment recommendation from content."""
         content_upper = content.upper()
 
-        if 'STRONG BUY' in content_upper:
-            return 'STRONG BUY'
-        elif 'STRONG SELL' in content_upper:
-            return 'STRONG SELL'
-        elif 'BUY' in content_upper:
-            return 'BUY'
-        elif 'SELL' in content_upper:
-            return 'SELL'
-        elif 'HOLD' in content_upper:
-            return 'HOLD'
+        if "STRONG BUY" in content_upper:
+            return "STRONG BUY"
+        elif "STRONG SELL" in content_upper:
+            return "STRONG SELL"
+        elif "BUY" in content_upper:
+            return "BUY"
+        elif "SELL" in content_upper:
+            return "SELL"
+        elif "HOLD" in content_upper:
+            return "HOLD"
 
         return None
 
-    def _calculate_technical_coverage(self,
-                                    content: str,
-                                    analysis_data: Dict[str, Any]) -> float:
+    def _calculate_technical_coverage(self, content: str, analysis_data: Dict[str, Any]) -> float:
         """Calculate how well content covers technical indicators."""
-        weighted_scores = analysis_data.get('weighted_scores', {})
+        weighted_scores = analysis_data.get("weighted_scores", {})
         if not weighted_scores:
             return 0.0
 
@@ -465,19 +441,19 @@ class FinancialExplanationEnsemble:
         for indicator, _ in top_indicators:
             indicator_terms = []
 
-            if 'sma' in indicator:
-                indicator_terms.extend(['sma', 'moving average', 'ma'])
-            elif 'rsi' in indicator:
-                indicator_terms.extend(['rsi', 'relative strength'])
-            elif 'macd' in indicator:
-                indicator_terms.extend(['macd'])
-            elif 'bb' in indicator:
-                indicator_terms.extend(['bollinger', 'bands'])
-            elif 'vol' in indicator:
-                indicator_terms.extend(['volume', 'vol'])
+            if "sma" in indicator:
+                indicator_terms.extend(["sma", "moving average", "ma"])
+            elif "rsi" in indicator:
+                indicator_terms.extend(["rsi", "relative strength"])
+            elif "macd" in indicator:
+                indicator_terms.extend(["macd"])
+            elif "bb" in indicator:
+                indicator_terms.extend(["bollinger", "bands"])
+            elif "vol" in indicator:
+                indicator_terms.extend(["volume", "vol"])
             else:
                 # Generic term
-                clean_name = indicator.replace('w_', '').replace('_', ' ')
+                clean_name = indicator.replace("w_", "").replace("_", " ")
                 indicator_terms.append(clean_name)
 
             if any(term in content_lower for term in indicator_terms):
@@ -506,10 +482,9 @@ class FinancialExplanationEnsemble:
 
         return sum(quality_factors)
 
-    def _apply_ensemble_strategy(self,
-                               predictions: List[ModelPrediction],
-                               strategy: EnsembleStrategy,
-                               analysis_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _apply_ensemble_strategy(
+        self, predictions: List[ModelPrediction], strategy: EnsembleStrategy, analysis_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Apply ensemble strategy to combine predictions."""
 
         if strategy == EnsembleStrategy.MAJORITY_VOTE:
@@ -533,11 +508,11 @@ class FinancialExplanationEnsemble:
         if len(predictions) == 1:
             pred = predictions[0]
             return {
-                'content': pred.content,
-                'confidence_score': pred.confidence,
-                'generation_time': pred.generation_time,
-                'model_used': pred.model_name,
-                'ensemble_method': 'single_model'
+                "content": pred.content,
+                "confidence_score": pred.confidence,
+                "generation_time": pred.generation_time,
+                "model_used": pred.model_name,
+                "ensemble_method": "single_model",
             }
 
         # Weight by confidence and quality
@@ -571,17 +546,19 @@ class FinancialExplanationEnsemble:
         # If recommendations differ significantly, add uncertainty note
         unique_recommendations = set(p.recommendation for p in predictions if p.recommendation)
         if len(unique_recommendations) > 1:
-            ensemble_content += f"\n\nNote: Model consensus shows mixed signals. Primary recommendation: {ensemble_recommendation}."
+            ensemble_content += (
+                f"\n\nNote: Model consensus shows mixed signals. Primary recommendation: {ensemble_recommendation}."
+            )
 
         return {
-            'content': ensemble_content,
-            'confidence_score': ensemble_confidence,
-            'generation_time': sum(p.generation_time for p in predictions) / len(predictions),
-            'model_used': 'ensemble_confidence_weighted',
-            'ensemble_method': 'confidence_weighted',
-            'primary_model': best_prediction.model_name,
-            'recommendation_consensus': ensemble_recommendation,
-            'consensus_strength': len(predictions) - len(unique_recommendations) + 1
+            "content": ensemble_content,
+            "confidence_score": ensemble_confidence,
+            "generation_time": sum(p.generation_time for p in predictions) / len(predictions),
+            "model_used": "ensemble_confidence_weighted",
+            "ensemble_method": "confidence_weighted",
+            "primary_model": best_prediction.model_name,
+            "recommendation_consensus": ensemble_recommendation,
+            "consensus_strength": len(predictions) - len(unique_recommendations) + 1,
         }
 
     def _performance_weighted_ensemble(self, predictions: List[ModelPrediction]) -> Dict[str, Any]:
@@ -590,7 +567,7 @@ class FinancialExplanationEnsemble:
         weights = {}
         for pred in predictions:
             model_config = self.models.get(self._get_model_key(pred.model_name), {})
-            weights[pred.model_name] = model_config.get('weight', 1.0)
+            weights[pred.model_name] = model_config.get("weight", 1.0)
 
         # Apply performance weighting (similar to confidence weighting but with performance weights)
         total_weight = 0
@@ -613,13 +590,13 @@ class FinancialExplanationEnsemble:
             ensemble_recommendation = max(weighted_scores.items(), key=lambda x: x[1])[0]
 
         return {
-            'content': best_prediction.content,
-            'confidence_score': best_prediction.confidence,
-            'generation_time': best_prediction.generation_time,
-            'model_used': 'ensemble_performance_weighted',
-            'ensemble_method': 'performance_weighted',
-            'primary_model': best_prediction.model_name,
-            'recommendation_consensus': ensemble_recommendation
+            "content": best_prediction.content,
+            "confidence_score": best_prediction.confidence,
+            "generation_time": best_prediction.generation_time,
+            "model_used": "ensemble_performance_weighted",
+            "ensemble_method": "performance_weighted",
+            "primary_model": best_prediction.model_name,
+            "recommendation_consensus": ensemble_recommendation,
         }
 
     def _majority_vote_ensemble(self, predictions: List[ModelPrediction]) -> Dict[str, Any]:
@@ -647,63 +624,62 @@ class FinancialExplanationEnsemble:
             best_prediction = max(predictions, key=lambda p: p.quality_score)
 
         return {
-            'content': best_prediction.content,
-            'confidence_score': best_prediction.confidence,
-            'generation_time': best_prediction.generation_time,
-            'model_used': 'ensemble_majority_vote',
-            'ensemble_method': 'majority_vote',
-            'primary_model': best_prediction.model_name,
-            'recommendation_consensus': majority_recommendation,
-            'vote_strength': recommendation_votes.get(majority_recommendation, 0) if majority_recommendation else 0
+            "content": best_prediction.content,
+            "confidence_score": best_prediction.confidence,
+            "generation_time": best_prediction.generation_time,
+            "model_used": "ensemble_majority_vote",
+            "ensemble_method": "majority_vote",
+            "primary_model": best_prediction.model_name,
+            "recommendation_consensus": majority_recommendation,
+            "vote_strength": recommendation_votes.get(majority_recommendation, 0) if majority_recommendation else 0,
         }
 
-    def _adaptive_weighted_ensemble(self,
-                                  predictions: List[ModelPrediction],
-                                  analysis_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _adaptive_weighted_ensemble(
+        self, predictions: List[ModelPrediction], analysis_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Combine predictions using adaptive weighting based on scenario."""
         # Analyze scenario characteristics
-        score = analysis_data.get('score_0_10', 5.0)
-        complexity = len(analysis_data.get('weighted_scores', {})) / 12.0
+        score = analysis_data.get("score_0_10", 5.0)
+        complexity = len(analysis_data.get("weighted_scores", {})) / 12.0
 
         # Adapt weights based on scenario
         adaptive_weights = {}
 
         for pred in predictions:
-            base_weight = self.models.get(self._get_model_key(pred.model_name), {}).get('weight', 1.0)
+            base_weight = self.models.get(self._get_model_key(pred.model_name), {}).get("weight", 1.0)
 
             # Adjust based on scenario
-            if pred.model_name == 'llama3.1:70b' and complexity > 0.7:
+            if pred.model_name == "llama3.1:70b" and complexity > 0.7:
                 # Boost 70B for complex scenarios
                 adaptive_weights[pred.model_name] = base_weight * 1.3
-            elif pred.model_name == 'hybrid_sentiment' and abs(score - 5.0) > 2.0:
+            elif pred.model_name == "hybrid_sentiment" and abs(score - 5.0) > 2.0:
                 # Boost sentiment-enhanced for extreme scores
                 adaptive_weights[pred.model_name] = base_weight * 1.2
             else:
                 adaptive_weights[pred.model_name] = base_weight
 
         # Apply adaptive weights
-        best_prediction = max(predictions, 
-                            key=lambda p: adaptive_weights.get(p.model_name, 1.0) * p.quality_score)
+        best_prediction = max(predictions, key=lambda p: adaptive_weights.get(p.model_name, 1.0) * p.quality_score)
 
         return {
-            'content': best_prediction.content,
-            'confidence_score': best_prediction.confidence,
-            'generation_time': best_prediction.generation_time,
-            'model_used': 'ensemble_adaptive_weighted',
-            'ensemble_method': 'adaptive_weighted',
-            'primary_model': best_prediction.model_name,
-            'adaptive_weights': adaptive_weights
+            "content": best_prediction.content,
+            "confidence_score": best_prediction.confidence,
+            "generation_time": best_prediction.generation_time,
+            "model_used": "ensemble_adaptive_weighted",
+            "ensemble_method": "adaptive_weighted",
+            "primary_model": best_prediction.model_name,
+            "adaptive_weights": adaptive_weights,
         }
 
     def _get_model_key(self, model_name: str) -> str:
         """Get model key from model name."""
-        if 'llama3.1:8b' in model_name:
-            return 'base_8b'
-        elif 'llama3.1:70b' in model_name:
-            return 'base_70b'
-        elif 'hybrid_sentiment' in model_name:
-            return 'sentiment_enhanced'
-        return 'unknown'
+        if "llama3.1:8b" in model_name:
+            return "base_8b"
+        elif "llama3.1:70b" in model_name:
+            return "base_70b"
+        elif "hybrid_sentiment" in model_name:
+            return "sentiment_enhanced"
+        return "unknown"
 
     def _calculate_consensus_strength(self, predictions: List[ModelPrediction]) -> float:
         """Calculate consensus strength among predictions."""
@@ -729,10 +705,10 @@ class FinancialExplanationEnsemble:
         quality_scores = [p.quality_score for p in predictions]
 
         return {
-            'mean_quality': np.mean(quality_scores),
-            'std_quality': np.std(quality_scores),
-            'min_quality': np.min(quality_scores),
-            'max_quality': np.max(quality_scores)
+            "mean_quality": np.mean(quality_scores),
+            "std_quality": np.std(quality_scores),
+            "min_quality": np.min(quality_scores),
+            "max_quality": np.max(quality_scores),
         }
 
     def _create_fallback_result(self, analysis_data: Dict[str, Any], detail_level: str) -> Dict[str, Any]:
@@ -741,13 +717,15 @@ class FinancialExplanationEnsemble:
         try:
             result = self.llm_service.generate_explanation(analysis_data, detail_level)
             if result:
-                result.update({
-                    'ensemble_method': 'fallback_single',
-                    'ensemble_metadata': {
-                        'fallback_reason': 'insufficient_predictions',
-                        'models_consulted': ['base_model']
+                result.update(
+                    {
+                        "ensemble_method": "fallback_single",
+                        "ensemble_metadata": {
+                            "fallback_reason": "insufficient_predictions",
+                            "models_consulted": ["base_model"],
+                        },
                     }
-                })
+                )
                 return result
         except Exception:
             pass
@@ -757,49 +735,47 @@ class FinancialExplanationEnsemble:
     def _create_empty_result(self) -> Dict[str, Any]:
         """Create empty result structure."""
         return {
-            'content': 'Unable to generate explanation at this time.',
-            'confidence_score': 0.0,
-            'generation_time': 0.0,
-            'model_used': 'none',
-            'ensemble_method': 'failed',
-            'error': True
+            "content": "Unable to generate explanation at this time.",
+            "confidence_score": 0.0,
+            "generation_time": 0.0,
+            "model_used": "none",
+            "ensemble_method": "failed",
+            "error": True,
         }
 
     def _create_error_result(self, error_message: str) -> Dict[str, Any]:
         """Create error result structure."""
         return {
-            'content': 'Error generating explanation.',
-            'confidence_score': 0.0,
-            'generation_time': 0.0,
-            'model_used': 'none',
-            'ensemble_method': 'error',
-            'error': True,
-            'error_message': error_message
+            "content": "Error generating explanation.",
+            "confidence_score": 0.0,
+            "generation_time": 0.0,
+            "model_used": "none",
+            "ensemble_method": "error",
+            "error": True,
+            "error_message": error_message,
         }
 
     def _update_ensemble_metrics(self, generation_time: float, success: bool):
         """Update ensemble performance metrics."""
         if success:
-            self.ensemble_metrics['successful_predictions'] += 1
+            self.ensemble_metrics["successful_predictions"] += 1
 
         # Update average generation time
-        current_avg = self.ensemble_metrics['average_generation_time']
-        total_predictions = self.ensemble_metrics['total_predictions']
+        current_avg = self.ensemble_metrics["average_generation_time"]
+        total_predictions = self.ensemble_metrics["total_predictions"]
 
-        self.ensemble_metrics['average_generation_time'] = (
-            (current_avg * (total_predictions - 1) + generation_time) / total_predictions
-        )
+        self.ensemble_metrics["average_generation_time"] = (
+            current_avg * (total_predictions - 1) + generation_time
+        ) / total_predictions
 
     def get_ensemble_status(self) -> Dict[str, Any]:
         """Get current ensemble system status."""
         return {
-            'ensemble_active': True,
-            'available_models': [key for key in self.models.keys() if self._is_model_available(key)],
-            'ensemble_config': {k: v.value if isinstance(v, Enum) else v 
-                              for k, v in self.ensemble_config.items()},
-            'performance_metrics': self.ensemble_metrics.copy(),
-            'model_registry': {k: {**v, 'available': self._is_model_available(k)} 
-                             for k, v in self.models.items()}
+            "ensemble_active": True,
+            "available_models": [key for key in self.models.keys() if self._is_model_available(key)],
+            "ensemble_config": {k: v.value if isinstance(v, Enum) else v for k, v in self.ensemble_config.items()},
+            "performance_metrics": self.ensemble_metrics.copy(),
+            "model_registry": {k: {**v, "available": self._is_model_available(k)} for k, v in self.models.items()},
         }
 
 

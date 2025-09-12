@@ -1,27 +1,27 @@
 """
-Sector and Industry Mapping Configuration for Universal LSTM Model
-Defines the sector-differentiation framework with standardized mappings.
+Sector and Industry mapping configuration for Universal LSTM architecture.
+Provides sector-differentiation framework with standardised classification mappings.
 """
 
-from typing import Dict, List, Optional, Any
 import logging
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 # Sector Mapping as defined in the Universal Model plan
 SECTOR_MAPPING = {
-    'Technology': 0,
-    'Healthcare': 1,
-    'Financial Services': 2,
-    'Energy': 3,
-    'Consumer Cyclical': 4,
-    'Industrials': 5,
-    'Communication Services': 6,
-    'Consumer Defensive': 7,
-    'Real Estate': 8,
-    'Utilities': 9,
-    'Unknown': 10
+    "Technology": 0,
+    "Healthcare": 1,
+    "Financial Services": 2,
+    "Energy": 3,
+    "Consumer Cyclical": 4,
+    "Industrials": 5,
+    "Communication Services": 6,
+    "Consumer Defensive": 7,
+    "Real Estate": 8,
+    "Utilities": 9,
+    "Unknown": 10,
 }
 
 # Reverse mapping for sector ID to name
@@ -30,74 +30,65 @@ SECTOR_ID_TO_NAME = {v: k for k, v in SECTOR_MAPPING.items()}
 # Industry Sub-Classification Mapping (50 major industries)
 INDUSTRY_MAPPING = {
     # Technology (0-9)
-    'Software—Application': 0,
-    'Software—Infrastructure': 1,
-    'Semiconductors': 2,
-    'Computer Hardware': 3,
-    'Consumer Electronics': 4,
-    'Internet Content & Information': 5,
-    'Electronic Gaming & Multimedia': 6,
-    'Information Technology Services': 7,
-    'Scientific & Technical Instruments': 8,
-    'Solar': 9,
-
+    "Software—Application": 0,
+    "Software—Infrastructure": 1,
+    "Semiconductors": 2,
+    "Computer Hardware": 3,
+    "Consumer Electronics": 4,
+    "Internet Content & Information": 5,
+    "Electronic Gaming & Multimedia": 6,
+    "Information Technology Services": 7,
+    "Scientific & Technical Instruments": 8,
+    "Solar": 9,
     # Healthcare (10-14)
-    'Drug Manufacturers—General': 10,
-    'Drug Manufacturers—Specialty & Generic': 11,
-    'Biotechnology': 12,
-    'Medical Devices': 13,
-    'Healthcare Plans': 14,
-
+    "Drug Manufacturers—General": 10,
+    "Drug Manufacturers—Specialty & Generic": 11,
+    "Biotechnology": 12,
+    "Medical Devices": 13,
+    "Healthcare Plans": 14,
     # Financial Services (15-19)
-    'Banks—Diversified': 15,
-    'Banks—Regional': 16,
-    'Insurance—Life': 17,
-    'Insurance—Property & Casualty': 18,
-    'Asset Management': 19,
-
+    "Banks—Diversified": 15,
+    "Banks—Regional": 16,
+    "Insurance—Life": 17,
+    "Insurance—Property & Casualty": 18,
+    "Asset Management": 19,
     # Energy (20-24)
-    'Oil & Gas Integrated': 20,
-    'Oil & Gas E&P': 21,
-    'Oil & Gas Refining & Marketing': 22,
-    'Oil & Gas Midstream': 23,
-    'Renewable Energy': 24,
-
+    "Oil & Gas Integrated": 20,
+    "Oil & Gas E&P": 21,
+    "Oil & Gas Refining & Marketing": 22,
+    "Oil & Gas Midstream": 23,
+    "Renewable Energy": 24,
     # Consumer Cyclical (25-29)
-    'Auto Manufacturers': 25,
-    'Auto Parts': 26,
-    'Restaurants': 27,
-    'Specialty Retail': 28,
-    'Internet Retail': 29,
-
+    "Auto Manufacturers": 25,
+    "Auto Parts": 26,
+    "Restaurants": 27,
+    "Specialty Retail": 28,
+    "Internet Retail": 29,
     # Industrials (30-34)
-    'Aerospace & Defense': 30,
-    'Industrial Machinery': 31,
-    'Building Materials': 32,
-    'Transportation & Logistics': 33,
-    'Electrical Equipment & Parts': 34,
-
+    "Aerospace & Defense": 30,
+    "Industrial Machinery": 31,
+    "Building Materials": 32,
+    "Transportation & Logistics": 33,
+    "Electrical Equipment & Parts": 34,
     # Communication Services (35-39)
-    'Telecom Services': 35,
-    'Entertainment': 36,
-    'Interactive Media & Services': 37,
-    'Broadcasting': 38,
-    'Advertising Agencies': 39,
-
+    "Telecom Services": 35,
+    "Entertainment": 36,
+    "Interactive Media & Services": 37,
+    "Broadcasting": 38,
+    "Advertising Agencies": 39,
     # Consumer Defensive (40-44)
-    'Beverages—Non-Alcoholic': 40,
-    'Food Distribution': 41,
-    'Packaged Foods': 42,
-    'Household & Personal Products': 43,
-    'Discount Stores': 44,
-
+    "Beverages—Non-Alcoholic": 40,
+    "Food Distribution": 41,
+    "Packaged Foods": 42,
+    "Household & Personal Products": 43,
+    "Discount Stores": 44,
     # Real Estate (45-47)
-    'REIT—Retail': 45,
-    'REIT—Residential': 46,
-    'REIT—Industrial': 47,
-
+    "REIT—Retail": 45,
+    "REIT—Residential": 46,
+    "REIT—Industrial": 47,
     # Utilities (48-49)
-    'Utilities—Regulated Electric': 48,
-    'Utilities—Renewable': 49
+    "Utilities—Regulated Electric": 48,
+    "Utilities—Renewable": 49,
 }
 
 # Reverse mapping for industry ID to name
@@ -105,134 +96,231 @@ INDUSTRY_ID_TO_NAME = {v: k for k, v in INDUSTRY_MAPPING.items()}
 
 # Sector to Industry groupings
 SECTOR_TO_INDUSTRIES = {
-    'Technology': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    'Healthcare': [10, 11, 12, 13, 14],
-    'Financial Services': [15, 16, 17, 18, 19],
-    'Energy': [20, 21, 22, 23, 24],
-    'Consumer Cyclical': [25, 26, 27, 28, 29],
-    'Industrials': [30, 31, 32, 33, 34],
-    'Communication Services': [35, 36, 37, 38, 39],
-    'Consumer Defensive': [40, 41, 42, 43, 44],
-    'Real Estate': [45, 46, 47],
-    'Utilities': [48, 49],
-    'Unknown': []  # No specific industries mapped
+    "Technology": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "Healthcare": [10, 11, 12, 13, 14],
+    "Financial Services": [15, 16, 17, 18, 19],
+    "Energy": [20, 21, 22, 23, 24],
+    "Consumer Cyclical": [25, 26, 27, 28, 29],
+    "Industrials": [30, 31, 32, 33, 34],
+    "Communication Services": [35, 36, 37, 38, 39],
+    "Consumer Defensive": [40, 41, 42, 43, 44],
+    "Real Estate": [45, 46, 47],
+    "Utilities": [48, 49],
+    "Unknown": [],  # No specific industries mapped
 }
 
 # Training Stock Universe as defined in the plan
 TRAINING_STOCK_UNIVERSE = {
-    'Technology': [
+    "Technology": [
         # Mega-cap
-        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META',
-        # Cloud/Software  
-        'CRM', 'ORCL', 'ADBE', 'INTU', 'WDAY',
+        "AAPL",
+        "MSFT",
+        "GOOGL",
+        "AMZN",
+        "META",
+        # Cloud/Software
+        "CRM",
+        "ORCL",
+        "ADBE",
+        "INTU",
+        "WDAY",
         # Semiconductors
-        'NVDA', 'INTC', 'AMD', 'QCOM', 'TSM'
+        "NVDA",
+        "INTC",
+        "AMD",
+        "QCOM",
+        "TSM",
     ],
-    'Healthcare': [
+    "Healthcare": [
         # Pharmaceuticals
-        'JNJ', 'PFE', 'MRK', 'BMY', 'LLY',
+        "JNJ",
+        "PFE",
+        "MRK",
+        "BMY",
+        "LLY",
         # Biotechnology
-        'GILD', 'AMGN', 'BIIB', 'REGN', 'VRTX',
+        "GILD",
+        "AMGN",
+        "BIIB",
+        "REGN",
+        "VRTX",
         # Medical Devices
-        'TMO', 'DHR', 'ABT', 'SYK', 'ISRG'
+        "TMO",
+        "DHR",
+        "ABT",
+        "SYK",
+        "ISRG",
     ],
-    'Financial Services': [
+    "Financial Services": [
         # Banks
-        'JPM', 'BAC', 'WFC', 'C', 'GS',
+        "JPM",
+        "BAC",
+        "WFC",
+        "C",
+        "GS",
         # Insurance
-        'BRK-A', 'UNH', 'AIG', 'PGR', 'ALL',  # Replaced BRK.B with BRK-A (Berkshire Hathaway Class A)
+        "BRK-A",
+        "UNH",
+        "AIG",
+        "PGR",
+        "ALL",  # Replaced BRK.B with BRK-A (Berkshire Hathaway Class A)
         # Asset Management
-        'BLK', 'MS', 'SCHW', 'TROW', 'AMG'
+        "BLK",
+        "MS",
+        "SCHW",
+        "TROW",
+        "AMG",
     ],
-    'Energy': [
+    "Energy": [
         # Integrated
-        'XOM', 'CVX', 'COP', 'BP', 'SLB',  # Replaced TOT with SLB (Schlumberger - oilfield services)
+        "XOM",
+        "CVX",
+        "COP",
+        "BP",
+        "SLB",  # Replaced TOT with SLB (Schlumberger - oilfield services)
         # E&P
-        'EOG', 'PSX', 'VLO', 'MPC', 'OKE'
+        "EOG",
+        "PSX",
+        "VLO",
+        "MPC",
+        "OKE",
     ],
-    'Consumer Cyclical': [
+    "Consumer Cyclical": [
         # Retail
-        'HD', 'MCD', 'NKE', 'SBUX', 'TGT',
+        "HD",
+        "MCD",
+        "NKE",
+        "SBUX",
+        "TGT",
         # Automotive
-        'TSLA', 'GM', 'F', 'NIO', 'RIVN',
+        "TSLA",
+        "GM",
+        "F",
+        "NIO",
+        "RIVN",
         # E-commerce
-        'AMZN', 'BABA', 'EBAY', 'ETSY', 'SE'
+        "AMZN",
+        "BABA",
+        "EBAY",
+        "ETSY",
+        "SE",
     ],
-    'Industrials': [
+    "Industrials": [
         # Aerospace
-        'BA', 'LMT', 'RTX', 'GD', 'NOC',
+        "BA",
+        "LMT",
+        "RTX",
+        "GD",
+        "NOC",
         # Machinery
-        'CAT', 'DE', 'CMI', 'ITW', 'ROK',
+        "CAT",
+        "DE",
+        "CMI",
+        "ITW",
+        "ROK",
         # Logistics
-        'UPS', 'FDX', 'XPO', 'ODFL', 'CHRW'
+        "UPS",
+        "FDX",
+        "XPO",
+        "ODFL",
+        "CHRW",
     ],
-    'Communication Services': [
+    "Communication Services": [
         # Media
-        'DIS', 'NFLX', 'WBD', 'PARA', 'FOXA',
+        "DIS",
+        "NFLX",
+        "WBD",
+        "PARA",
+        "FOXA",
         # Telecom
-        'VZ', 'T', 'TMUS', 'CHTR', 'CMCSA'
+        "VZ",
+        "T",
+        "TMUS",
+        "CHTR",
+        "CMCSA",
     ],
-    'Consumer Defensive': [
+    "Consumer Defensive": [
         # Staples
-        'PG', 'KO', 'PEP', 'WMT', 'COST',
+        "PG",
+        "KO",
+        "PEP",
+        "WMT",
+        "COST",
         # Food
-        'GIS', 'K', 'CPB', 'CAG', 'SJM'
+        "GIS",
+        "K",
+        "CPB",
+        "CAG",
+        "SJM",
     ],
-    'Real Estate': [
+    "Real Estate": [
         # REITs
-        'AMT', 'PLD', 'CCI', 'EQIX', 'PSA'
+        "AMT",
+        "PLD",
+        "CCI",
+        "EQIX",
+        "PSA",
     ],
-    'Utilities': [
+    "Utilities": [
         # Electric
-        'NEE', 'SO', 'DUK', 'AEP', 'EXC'
-    ]
+        "NEE",
+        "SO",
+        "DUK",
+        "AEP",
+        "EXC",
+    ],
 }
 
 # Universal Feature Set (25 normalized features + sector/industry embeddings)
 UNIVERSAL_FEATURES = [
-    # Price dynamics (normalized)
-    'price_change_pct',
-    'price_range_pct', 
-    'volume_change_pct',
-
-    # Moving averages (relative)
-    'price_vs_sma10',
-    'price_vs_sma20', 
-    'price_vs_sma50',
-
-    # Technical indicators (sector-normalized)
-    'rsi_sector_relative',
-    'macd_normalized',
-    'bollinger_position',
-
-    # Volume patterns
-    'volume_ratio',
-    'volume_price_trend',
-
-    # Momentum (time-normalized)
-    'momentum_5d',
-    'momentum_20d', 
-    'roc_10d',
-
-    # Volatility (regime-aware)
-    'volatility_10d',
-    'volatility_ratio',
-
-    # Market microstructure
-    'bid_ask_spread_proxy',
-    'close_position',
-
-    # Support/resistance
-    'resistance_touch',
-    'support_touch',
-
-    # Cross-stock correlations
-    'sector_correlation',
-    'market_beta',
-
-    # Regime indicators
-    'volatility_regime',
-    'trend_strength'
+    # Price dynamics (normalized) - 8 features
+    "price_change_pct",
+    "price_range_pct",
+    "volume_change_pct",
+    "price_change_1d",
+    "price_change_3d",
+    "price_change_7d",
+    "high_low_pct",
+    "open_close_pct",
+    # Moving averages (relative) - 8 features
+    "price_vs_sma10",
+    "price_vs_sma20",
+    "price_vs_sma50",
+    "price_vs_sma200",
+    "sma10_vs_sma20",
+    "sma20_vs_sma50",
+    "sma50_vs_sma200",
+    "ema_crossover_signal",
+    # Technical indicators (sector-normalized) - 8 features
+    "rsi_sector_relative",
+    "macd_normalized",
+    "bollinger_position",
+    "bollinger_width",
+    "stochastic_k",
+    "stochastic_d",
+    "williams_r",
+    "cci_normalized",
+    # Volume patterns - 6 features
+    "volume_ratio",
+    "volume_price_trend",
+    "volume_sma_ratio",
+    "volume_weighted_price",
+    "accumulation_distribution",
+    "obv_normalized",
+    # Momentum (time-normalized) - 6 features
+    "momentum_5d",
+    "momentum_20d",
+    "roc_10d",
+    "roc_20d",
+    "trix_signal",
+    "ultimate_oscillator",
+    # Volatility (regime-aware) - 6 features
+    "volatility_10d",
+    "volatility_ratio",
+    "atr_normalized",
+    "volatility_trend",
+    "volatility_breakout",
+    "garch_volatility",
 ]
 
 
@@ -272,11 +360,11 @@ class SectorMapper:
 
     def get_sector_name(self, sector_id: int) -> str:
         """Get sector name from sector ID."""
-        return SECTOR_ID_TO_NAME.get(sector_id, 'Unknown')
+        return SECTOR_ID_TO_NAME.get(sector_id, "Unknown")
 
     def get_industry_name(self, industry_id: int) -> str:
         """Get industry name from industry ID."""
-        return INDUSTRY_ID_TO_NAME.get(industry_id, 'Unknown')
+        return INDUSTRY_ID_TO_NAME.get(industry_id, "Unknown")
 
     def infer_sector_from_industry(self, industry_id: int) -> int:
         """
@@ -354,16 +442,16 @@ class SectorMapper:
         total_stocks = self.get_all_training_stocks()
 
         coverage_stats = {
-            'total_sectors': len(SECTOR_MAPPING),
-            'total_industries': len(INDUSTRY_MAPPING),
-            'total_training_stocks': len(total_stocks),
-            'stocks_per_sector': {},
-            'sector_balance': {}
+            "total_sectors": len(SECTOR_MAPPING),
+            "total_industries": len(INDUSTRY_MAPPING),
+            "total_training_stocks": len(total_stocks),
+            "stocks_per_sector": {},
+            "sector_balance": {},
         }
 
         for sector_name, stocks in TRAINING_STOCK_UNIVERSE.items():
-            coverage_stats['stocks_per_sector'][sector_name] = len(stocks)
-            coverage_stats['sector_balance'][sector_name] = len(stocks) / len(total_stocks)
+            coverage_stats["stocks_per_sector"][sector_name] = len(stocks)
+            coverage_stats["sector_balance"][sector_name] = len(stocks) / len(total_stocks)
 
         return coverage_stats
 
@@ -379,14 +467,14 @@ def get_sector_mapper() -> SectorMapper:
 
 # Export key mappings for easy access
 __all__ = [
-    'SECTOR_MAPPING',
-    'INDUSTRY_MAPPING', 
-    'SECTOR_ID_TO_NAME',
-    'INDUSTRY_ID_TO_NAME',
-    'SECTOR_TO_INDUSTRIES',
-    'TRAINING_STOCK_UNIVERSE',
-    'UNIVERSAL_FEATURES',
-    'SectorMapper',
-    'sector_mapper',
-    'get_sector_mapper'
+    "SECTOR_MAPPING",
+    "INDUSTRY_MAPPING",
+    "SECTOR_ID_TO_NAME",
+    "INDUSTRY_ID_TO_NAME",
+    "SECTOR_TO_INDUSTRIES",
+    "TRAINING_STOCK_UNIVERSE",
+    "UNIVERSAL_FEATURES",
+    "SectorMapper",
+    "sector_mapper",
+    "get_sector_mapper",
 ]

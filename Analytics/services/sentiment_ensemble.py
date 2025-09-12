@@ -5,21 +5,24 @@ Implements multiple FinBERT model variants with weighted voting
 
 import logging
 import time
-from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 
 # Conditional imports for ML dependencies to support CI environments
 try:
     import torch
+
     TORCH_AVAILABLE = True
 except ImportError:
     torch = None
     TORCH_AVAILABLE = False
 
 try:
-    from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
+
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
     AutoTokenizer = None
@@ -36,6 +39,7 @@ if not TORCH_AVAILABLE or not TRANSFORMERS_AVAILABLE:
 
 class ModelVariant(Enum):
     """Available FinBERT model variants for ensemble."""
+
     PROSUS_FINBERT = "ProsusAI/finbert"  # Primary model
     YIYANG_FINBERT = "yiyanghkust/finbert-tone"  # Alternative tone analysis
     ABHILASH_FINBERT = "abhilash1910/finbert-sentiment"  # Sentiment focused
@@ -45,6 +49,7 @@ class ModelVariant(Enum):
 @dataclass
 class ModelConfig:
     """Configuration for individual models in ensemble."""
+
     name: str
     variant: ModelVariant
     weight: float
@@ -82,33 +87,33 @@ class SentimentEnsemble:
                 variant=ModelVariant.PROSUS_FINBERT,
                 weight=0.4,
                 min_confidence=0.6,
-                specialization="general"
+                specialization="general",
             ),
             ModelConfig(
                 name="tone",
                 variant=ModelVariant.YIYANG_FINBERT,
                 weight=0.3,
                 min_confidence=0.55,
-                specialization="tone_analysis"
+                specialization="tone_analysis",
             ),
             ModelConfig(
                 name="sentiment",
                 variant=ModelVariant.ABHILASH_FINBERT,
                 weight=0.3,
                 min_confidence=0.6,
-                specialization="sentiment_focus"
-            )
+                specialization="sentiment_focus",
+            ),
         ]
 
         # Voting strategies
         self.voting_strategies = {
-            'weighted_average': self._weighted_average_voting,
-            'confidence_weighted': self._confidence_weighted_voting,
-            'majority': self._majority_voting,
-            'max_confidence': self._max_confidence_voting
+            "weighted_average": self._weighted_average_voting,
+            "confidence_weighted": self._confidence_weighted_voting,
+            "majority": self._majority_voting,
+            "max_confidence": self._max_confidence_voting,
         }
 
-        self.default_strategy = 'confidence_weighted'
+        self.default_strategy = "confidence_weighted"
 
     def initialize_models(self):
         """Initialize all models in the ensemble."""
@@ -137,7 +142,7 @@ class SentimentEnsemble:
                     tokenizer=tokenizer,
                     device=self.device,
                     max_length=config.max_length,
-                    truncation=True
+                    truncation=True,
                 )
 
                 # Store components
@@ -156,10 +161,7 @@ class SentimentEnsemble:
         logger.info(f"Ensemble initialization completed in {load_time:.2f} seconds")
 
     def analyze_with_ensemble(
-        self,
-        text: str,
-        voting_strategy: str = None,
-        return_all_predictions: bool = False
+        self, text: str, voting_strategy: str = None, return_all_predictions: bool = False
     ) -> Dict[str, Any]:
         """
         Analyze sentiment using model ensemble.
@@ -189,12 +191,12 @@ class SentimentEnsemble:
                 result = self.pipelines[config.name](text)
                 if result:
                     prediction = {
-                        'model': config.name,
-                        'specialization': config.specialization,
-                        'label': result[0]['label'].lower(),
-                        'score': result[0]['score'],
-                        'weight': config.weight,
-                        'min_confidence': config.min_confidence
+                        "model": config.name,
+                        "specialization": config.specialization,
+                        "label": result[0]["label"].lower(),
+                        "score": result[0]["score"],
+                        "weight": config.weight,
+                        "min_confidence": config.min_confidence,
                     }
                     predictions.append(prediction)
 
@@ -212,12 +214,12 @@ class SentimentEnsemble:
         ensemble_result = voting_func(predictions)
 
         # Add metadata
-        ensemble_result['ensemble_size'] = len(predictions)
-        ensemble_result['voting_strategy'] = strategy
-        ensemble_result['models_used'] = [p['model'] for p in predictions]
+        ensemble_result["ensemble_size"] = len(predictions)
+        ensemble_result["voting_strategy"] = strategy
+        ensemble_result["models_used"] = [p["model"] for p in predictions]
 
         if return_all_predictions:
-            ensemble_result['individual_predictions'] = predictions
+            ensemble_result["individual_predictions"] = predictions
 
         return ensemble_result
 
@@ -231,37 +233,37 @@ class SentimentEnsemble:
         Returns:
             Ensemble result
         """
-        total_weight = sum(p['weight'] for p in predictions)
+        total_weight = sum(p["weight"] for p in predictions)
         weighted_scores = []
 
         for pred in predictions:
             # Convert label to numeric score
-            if pred['label'] == 'positive':
-                score = pred['score']
-            elif pred['label'] == 'negative':
-                score = -pred['score']
+            if pred["label"] == "positive":
+                score = pred["score"]
+            elif pred["label"] == "negative":
+                score = -pred["score"]
             else:
                 score = 0.0
 
-            weighted_scores.append(score * pred['weight'])
+            weighted_scores.append(score * pred["weight"])
 
         ensemble_score = sum(weighted_scores) / total_weight
 
         # Determine label
         if ensemble_score > 0.1:
-            label = 'positive'
+            label = "positive"
         elif ensemble_score < -0.1:
-            label = 'negative'
+            label = "negative"
         else:
-            label = 'neutral'
+            label = "neutral"
 
         # Calculate confidence as average of individual confidences
-        avg_confidence = np.mean([p['score'] for p in predictions])
+        avg_confidence = np.mean([p["score"] for p in predictions])
 
         return {
-            'sentimentScore': float(ensemble_score),
-            'sentimentLabel': label,
-            'sentimentConfidence': float(avg_confidence)
+            "sentimentScore": float(ensemble_score),
+            "sentimentLabel": label,
+            "sentimentConfidence": float(avg_confidence),
         }
 
     def _confidence_weighted_voting(self, predictions: List[Dict]) -> Dict[str, Any]:
@@ -275,10 +277,7 @@ class SentimentEnsemble:
             Ensemble result
         """
         # Filter by minimum confidence
-        valid_predictions = [
-            p for p in predictions 
-            if p['score'] >= p['min_confidence']
-        ]
+        valid_predictions = [p for p in predictions if p["score"] >= p["min_confidence"]]
 
         if not valid_predictions:
             # Fall back to all predictions if none meet threshold
@@ -290,14 +289,14 @@ class SentimentEnsemble:
 
         for pred in valid_predictions:
             # Combine model weight with confidence
-            combined_weight = pred['weight'] * pred['score']
+            combined_weight = pred["weight"] * pred["score"]
             total_weight += combined_weight
 
             # Convert to numeric score
-            if pred['label'] == 'positive':
-                score = pred['score']
-            elif pred['label'] == 'negative':
-                score = -pred['score']
+            if pred["label"] == "positive":
+                score = pred["score"]
+            elif pred["label"] == "negative":
+                score = -pred["score"]
             else:
                 score = 0.0
 
@@ -309,25 +308,24 @@ class SentimentEnsemble:
             ensemble_score = 0.0
 
         # Determine label with confidence adjustment
-        confidence_adjusted_threshold = 0.1 * (1.0 - np.mean([p['score'] for p in valid_predictions]))
+        confidence_adjusted_threshold = 0.1 * (1.0 - np.mean([p["score"] for p in valid_predictions]))
 
         if ensemble_score > confidence_adjusted_threshold:
-            label = 'positive'
+            label = "positive"
         elif ensemble_score < -confidence_adjusted_threshold:
-            label = 'negative'
+            label = "negative"
         else:
-            label = 'neutral'
+            label = "neutral"
 
         # Calculate ensemble confidence
         ensemble_confidence = np.average(
-            [p['score'] for p in valid_predictions],
-            weights=[p['weight'] for p in valid_predictions]
+            [p["score"] for p in valid_predictions], weights=[p["weight"] for p in valid_predictions]
         )
 
         return {
-            'sentimentScore': float(ensemble_score),
-            'sentimentLabel': label,
-            'sentimentConfidence': float(ensemble_confidence)
+            "sentimentScore": float(ensemble_score),
+            "sentimentLabel": label,
+            "sentimentConfidence": float(ensemble_confidence),
         }
 
     def _majority_voting(self, predictions: List[Dict]) -> Dict[str, Any]:
@@ -341,23 +339,23 @@ class SentimentEnsemble:
             Ensemble result
         """
         # Count votes for each label
-        label_votes = {'positive': 0, 'negative': 0, 'neutral': 0}
-        label_scores = {'positive': [], 'negative': [], 'neutral': []}
+        label_votes = {"positive": 0, "negative": 0, "neutral": 0}
+        label_scores = {"positive": [], "negative": [], "neutral": []}
 
         for pred in predictions:
-            label = pred['label']
+            label = pred["label"]
             if label in label_votes:
-                label_votes[label] += pred['weight']
-                label_scores[label].append(pred['score'])
+                label_votes[label] += pred["weight"]
+                label_scores[label].append(pred["score"])
 
         # Find winning label
         winning_label = max(label_votes, key=label_votes.get)
 
         # Calculate score based on winning label
-        if winning_label == 'positive':
-            ensemble_score = np.mean(label_scores['positive']) if label_scores['positive'] else 0.5
-        elif winning_label == 'negative':
-            ensemble_score = -np.mean(label_scores['negative']) if label_scores['negative'] else -0.5
+        if winning_label == "positive":
+            ensemble_score = np.mean(label_scores["positive"]) if label_scores["positive"] else 0.5
+        elif winning_label == "negative":
+            ensemble_score = -np.mean(label_scores["negative"]) if label_scores["negative"] else -0.5
         else:
             ensemble_score = 0.0
 
@@ -366,9 +364,9 @@ class SentimentEnsemble:
         vote_confidence = label_votes[winning_label] / total_votes if total_votes > 0 else 0.0
 
         return {
-            'sentimentScore': float(ensemble_score),
-            'sentimentLabel': winning_label,
-            'sentimentConfidence': float(vote_confidence)
+            "sentimentScore": float(ensemble_score),
+            "sentimentLabel": winning_label,
+            "sentimentConfidence": float(vote_confidence),
         }
 
     def _max_confidence_voting(self, predictions: List[Dict]) -> Dict[str, Any]:
@@ -382,31 +380,26 @@ class SentimentEnsemble:
             Ensemble result
         """
         # Find prediction with highest confidence
-        best_pred = max(predictions, key=lambda p: p['score'])
+        best_pred = max(predictions, key=lambda p: p["score"])
 
         # Convert to result format
-        if best_pred['label'] == 'positive':
-            score = best_pred['score']
-        elif best_pred['label'] == 'negative':
-            score = -best_pred['score']
+        if best_pred["label"] == "positive":
+            score = best_pred["score"]
+        elif best_pred["label"] == "negative":
+            score = -best_pred["score"]
         else:
             score = 0.0
 
         return {
-            'sentimentScore': float(score),
-            'sentimentLabel': best_pred['label'],
-            'sentimentConfidence': float(best_pred['score']),
-            'selected_model': best_pred['model']
+            "sentimentScore": float(score),
+            "sentimentLabel": best_pred["label"],
+            "sentimentConfidence": float(best_pred["score"]),
+            "selected_model": best_pred["model"],
         }
 
     def _neutral_result(self) -> Dict[str, Any]:
         """Return neutral sentiment result."""
-        return {
-            'sentimentScore': 0.0,
-            'sentimentLabel': 'neutral',
-            'sentimentConfidence': 0.0,
-            'ensemble_size': 0
-        }
+        return {"sentimentScore": 0.0, "sentimentLabel": "neutral", "sentimentConfidence": 0.0, "ensemble_size": 0}
 
     def compare_models(self, text: str) -> Dict[str, Any]:
         """
@@ -434,30 +427,28 @@ class SentimentEnsemble:
 
                 if result:
                     comparisons[config.name] = {
-                        'model': config.variant.value,
-                        'specialization': config.specialization,
-                        'label': result[0]['label'].lower(),
-                        'score': result[0]['score'],
-                        'inference_time': inference_time,
-                        'weight': config.weight
+                        "model": config.variant.value,
+                        "specialization": config.specialization,
+                        "label": result[0]["label"].lower(),
+                        "score": result[0]["score"],
+                        "inference_time": inference_time,
+                        "weight": config.weight,
                     }
 
             except Exception as e:
-                comparisons[config.name] = {
-                    'error': str(e)
-                }
+                comparisons[config.name] = {"error": str(e)}
 
         # Calculate agreement metrics
-        labels = [c['label'] for c in comparisons.values() if 'label' in c]
+        labels = [c["label"] for c in comparisons.values() if "label" in c]
         unique_labels = set(labels)
 
         agreement_score = 1.0 if len(unique_labels) == 1 else 1.0 / len(unique_labels)
 
         return {
-            'models': comparisons,
-            'agreement_score': agreement_score,
-            'consensus': len(unique_labels) == 1,
-            'unique_predictions': list(unique_labels)
+            "models": comparisons,
+            "agreement_score": agreement_score,
+            "consensus": len(unique_labels) == 1,
+            "unique_predictions": list(unique_labels),
         }
 
     def unload_models(self):

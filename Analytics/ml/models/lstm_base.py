@@ -1,21 +1,22 @@
 """
-LSTM Base Model for Stock Price Prediction
-Implements Long Short-Term Memory neural network for time series forecasting.
+LSTM Base Model implementing stock price prediction through neural architecture.
+Provides Long Short-Term Memory network for temporal sequence forecasting.
 """
 
 import logging
-import numpy as np
-from typing import Tuple, Optional, Dict, Any, List, TYPE_CHECKING
-import os
-import joblib
-from datetime import datetime
 import math
+import os
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+
+import joblib
 
 # Conditional imports for ML dependencies to support CI environments
 try:
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
+
     TORCH_AVAILABLE = True
 except ImportError:
     torch = None
@@ -39,21 +40,25 @@ if not TORCH_AVAILABLE:
     # Fallback classes when PyTorch unavailable
     class SectorCrossAttention:
         """Fallback class for when PyTorch unavailable."""
+
         def __init__(self, *args, **kwargs):
             pass
 
     class AttentionLayer:
         """Fallback class for when PyTorch unavailable."""
+
         def __init__(self, *args, **kwargs):
             pass
 
     class MultiHeadAttention:
-        """Fallback class for when PyTorch unavailable."""  
+        """Fallback class for when PyTorch unavailable."""
+
         def __init__(self, *args, **kwargs):
             pass
 
     class LSTMPricePredictor:
         """Fallback class for when PyTorch unavailable."""
+
         def __init__(self, *args, **kwargs):
             pass
 
@@ -62,6 +67,7 @@ if not TORCH_AVAILABLE:
 
     class UniversalLSTMPredictor:
         """Fallback class for when PyTorch unavailable."""
+
         def __init__(self, *args, **kwargs):
             pass
 
@@ -70,6 +76,7 @@ if not TORCH_AVAILABLE:
 
     class LSTMTrainingConfig:
         """Fallback class for when PyTorch unavailable."""
+
         def __init__(self, *args, **kwargs):
             pass
 
@@ -78,11 +85,13 @@ if not TORCH_AVAILABLE:
 
     class DirectionalLoss:
         """Fallback class for when PyTorch unavailable."""
+
         def __init__(self, *args, **kwargs):
             pass
 
     class VolatilityAwareLoss:
         """Fallback class for when PyTorch unavailable."""
+
         def __init__(self, *args, **kwargs):
             pass
 
@@ -104,7 +113,7 @@ if not TORCH_AVAILABLE:
 
     def save_universal_model(*args, **kwargs):
         """Fallback function for when PyTorch unavailable."""
-        logger.error("Cannot save universal model - PyTorch not available")  
+        logger.error("Cannot save universal model - PyTorch not available")
         return None
 
     def create_universal_lstm_model(*args, **kwargs):
@@ -114,7 +123,7 @@ if not TORCH_AVAILABLE:
 
     def get_model_complexity_score(*args, **kwargs):
         """Fallback function for when PyTorch unavailable."""
-        return {'error': 'PyTorch not available'}
+        return {"error": "PyTorch not available"}
 
     def _recreate_scalers_from_file(*args, **kwargs):
         """Fallback function for when PyTorch unavailable."""
@@ -220,9 +229,17 @@ else:
     class LSTMPricePredictor(nn.Module):
         """Enhanced LSTM model for stock price prediction with 30-day sequence length."""
 
-        def __init__(self, input_size: int = 38, hidden_size: int = 128, num_layers: int = 2, 
-                     dropout: float = 0.3, sequence_length: int = 30, bidirectional: bool = True,
-                     use_attention: bool = True, attention_type: str = 'single'):
+        def __init__(
+            self,
+            input_size: int = 38,
+            hidden_size: int = 128,
+            num_layers: int = 2,
+            dropout: float = 0.3,
+            sequence_length: int = 30,
+            bidirectional: bool = True,
+            use_attention: bool = True,
+            attention_type: str = "single",
+        ):
             super(LSTMPricePredictor, self).__init__()
 
             self.input_size = input_size
@@ -243,12 +260,12 @@ else:
                 num_layers=num_layers,
                 dropout=dropout if num_layers > 1 else 0,
                 batch_first=True,
-                bidirectional=bidirectional
+                bidirectional=bidirectional,
             )
 
             # Attention mechanism
             if use_attention:
-                if attention_type == 'multi':
+                if attention_type == "multi":
                     self.attention = MultiHeadAttention(self.effective_hidden_size, num_heads=4)
                     self.attention_pool = AttentionLayer(self.effective_hidden_size)
                 else:
@@ -261,7 +278,7 @@ else:
             self.fc_intermediate = nn.Linear(self.effective_hidden_size, hidden_size)
             self.fc_output = nn.Linear(hidden_size, 1)
 
-            # Model metadata  
+            # Model metadata
             self.model_version = "3.0.0"
             self.created_at = datetime.now()
 
@@ -277,7 +294,7 @@ else:
 
             # Apply attention mechanism
             if self.use_attention:
-                if self.attention_type == 'multi':
+                if self.attention_type == "multi":
                     attended_features = self.attention(lstm_out)
                     final_output, attention_weights = self.attention_pool(attended_features)
                 else:
@@ -300,25 +317,34 @@ else:
         def get_model_info(self) -> Dict[str, Any]:
             """Get model architecture and metadata information."""
             return {
-                'model_type': 'LSTM',
-                'version': self.model_version,
-                'input_size': self.input_size,
-                'hidden_size': self.hidden_size,
-                'num_layers': self.num_layers,
-                'sequence_length': self.sequence_length,
-                'total_params': sum(p.numel() for p in self.parameters()),
-                'trainable_params': sum(p.numel() for p in self.parameters() if p.requires_grad),
-                'created_at': self.created_at.isoformat() if self.created_at else None
+                "model_type": "LSTM",
+                "version": self.model_version,
+                "input_size": self.input_size,
+                "hidden_size": self.hidden_size,
+                "num_layers": self.num_layers,
+                "sequence_length": self.sequence_length,
+                "total_params": sum(p.numel() for p in self.parameters()),
+                "trainable_params": sum(p.numel() for p in self.parameters() if p.requires_grad),
+                "created_at": self.created_at.isoformat() if self.created_at else None,
             }
 
     class UniversalLSTMPredictor(nn.Module):
-        """Universal LSTM model for stock price prediction with sector-differentiation features."""
+        """Universal LSTM neural architecture implementing sector-differentiated stock prediction."""        
 
-        def __init__(self, input_size: int = 25, sector_embedding_dim: int = 12,
-                     industry_embedding_dim: int = 6, hidden_size: int = 128, num_layers: int = 3,
-                     dropout: float = 0.3, sequence_length: int = 60, num_sectors: int = 11,
-                     num_industries: int = 50, use_cross_attention: bool = False,
-                     multi_task_output: bool = True):
+        def __init__(
+            self,
+            input_size: int = 42,
+            sector_embedding_dim: int = 12,
+            industry_embedding_dim: int = 6,
+            hidden_size: int = 128,
+            num_layers: int = 3,
+            dropout: float = 0.3,
+            sequence_length: int = 60,
+            num_sectors: int = 11,
+            num_industries: int = 50,
+            use_cross_attention: bool = False,
+            multi_task_output: bool = True,
+        ):
             super(UniversalLSTMPredictor, self).__init__()
 
             # Store configuration
@@ -347,7 +373,7 @@ else:
                 num_layers=num_layers,
                 dropout=dropout if num_layers > 1 else 0,
                 batch_first=True,
-                bidirectional=True
+                bidirectional=True,
             )
 
             # Effective hidden size (doubled for bidirectional)
@@ -367,7 +393,7 @@ else:
                 nn.Linear(self.effective_hidden_size, hidden_size),
                 nn.ReLU(),
                 nn.Dropout(dropout),
-                nn.Linear(hidden_size, 1)
+                nn.Linear(hidden_size, 1),
             )
 
             # Model metadata
@@ -378,8 +404,7 @@ else:
             nn.init.xavier_uniform_(self.sector_embedding.weight)
             nn.init.xavier_uniform_(self.industry_embedding.weight)
 
-        def forward(self, x: Tensor, sector_ids: Tensor, 
-                   industry_ids: Tensor) -> Dict[str, Tensor]:
+        def forward(self, x: Tensor, sector_ids: Tensor, industry_ids: Tensor) -> Dict[str, Tensor]:
             """Forward pass through the Universal LSTM model."""
             batch_size, seq_len, _ = x.shape
 
@@ -412,41 +437,48 @@ else:
 
             # Main price prediction
             price_pred = self.price_head(final_features)
-            outputs['price'] = price_pred
+            outputs["price"] = price_pred
 
             # Store attention weights for interpretability
-            outputs['attention_weights'] = attention_weights
+            outputs["attention_weights"] = attention_weights
 
             return outputs
 
         def get_model_info(self) -> Dict[str, Any]:
             """Get universal model architecture and metadata information."""
             return {
-                'model_type': 'UniversalLSTM',
-                'version': self.model_version,
-                'input_size': self.input_size,
-                'sector_embedding_dim': self.sector_embedding_dim,
-                'industry_embedding_dim': self.industry_embedding_dim,
-                'hidden_size': self.hidden_size,
-                'num_layers': self.num_layers,
-                'sequence_length': self.sequence_length,
-                'num_sectors': self.num_sectors,
-                'num_industries': self.num_industries,
-                'use_cross_attention': self.use_cross_attention,
-                'multi_task_output': self.multi_task_output,
-                'total_params': sum(p.numel() for p in self.parameters()),
-                'trainable_params': sum(p.numel() for p in self.parameters() if p.requires_grad),
-                'created_at': self.created_at.isoformat() if self.created_at else None
+                "model_type": "UniversalLSTM",
+                "version": self.model_version,
+                "input_size": self.input_size,
+                "sector_embedding_dim": self.sector_embedding_dim,
+                "industry_embedding_dim": self.industry_embedding_dim,
+                "hidden_size": self.hidden_size,
+                "num_layers": self.num_layers,
+                "sequence_length": self.sequence_length,
+                "num_sectors": self.num_sectors,
+                "num_industries": self.num_industries,
+                "use_cross_attention": self.use_cross_attention,
+                "multi_task_output": self.multi_task_output,
+                "total_params": sum(p.numel() for p in self.parameters()),
+                "trainable_params": sum(p.numel() for p in self.parameters() if p.requires_grad),
+                "created_at": self.created_at.isoformat() if self.created_at else None,
             }
 
     class LSTMTrainingConfig:
         """Configuration class for LSTM training parameters."""
 
-        def __init__(self, learning_rate: float = 0.001, batch_size: int = 32,
-                     num_epochs: int = 100, early_stopping_patience: int = 10,
-                     validation_split: float = 0.15, test_split: float = 0.15,
-                     sequence_length: int = 30, forecast_horizon: int = 1,
-                     min_training_samples: int = 400):
+        def __init__(
+            self,
+            learning_rate: float = 0.001,
+            batch_size: int = 32,
+            num_epochs: int = 100,
+            early_stopping_patience: int = 10,
+            validation_split: float = 0.15,
+            test_split: float = 0.15,
+            sequence_length: int = 30,
+            forecast_horizon: int = 1,
+            min_training_samples: int = 400,
+        ):
             self.learning_rate = learning_rate
             self.batch_size = batch_size
             self.num_epochs = num_epochs
@@ -461,24 +493,30 @@ else:
         def to_dict(self) -> Dict[str, Any]:
             """Convert configuration to dictionary."""
             return {
-                'learning_rate': self.learning_rate,
-                'batch_size': self.batch_size,
-                'num_epochs': self.num_epochs,
-                'early_stopping_patience': self.early_stopping_patience,
-                'validation_split': self.validation_split,
-                'test_split': self.test_split,
-                'train_split': self.train_split,
-                'sequence_length': self.sequence_length,
-                'forecast_horizon': self.forecast_horizon,
-                'min_training_samples': self.min_training_samples
+                "learning_rate": self.learning_rate,
+                "batch_size": self.batch_size,
+                "num_epochs": self.num_epochs,
+                "early_stopping_patience": self.early_stopping_patience,
+                "validation_split": self.validation_split,
+                "test_split": self.test_split,
+                "train_split": self.train_split,
+                "sequence_length": self.sequence_length,
+                "forecast_horizon": self.forecast_horizon,
+                "min_training_samples": self.min_training_samples,
             }
 
     class DirectionalLoss(nn.Module):
         """Production-ready loss function that prevents model collapse through diversity rewards."""
 
-        def __init__(self, mse_weight: float = 0.4, direction_weight: float = 0.3, 
-                     diversity_weight: float = 0.2, sector_weight: float = 0.1,
-                     min_diversity_target: float = 0.001, diversity_epsilon: float = 1e-6):
+        def __init__(
+            self,
+            mse_weight: float = 0.4,
+            direction_weight: float = 0.3,
+            diversity_weight: float = 0.2,
+            sector_weight: float = 0.1,
+            min_diversity_target: float = 0.001,
+            diversity_epsilon: float = 1e-6,
+        ):
             super(DirectionalLoss, self).__init__()
             self.mse_weight = mse_weight
             self.direction_weight = direction_weight
@@ -492,8 +530,7 @@ else:
             if abs(total_weight - 1.0) > 1e-3:
                 raise ValueError(f"Loss weights must sum to 1.0, got {total_weight}")
 
-        def forward(self, predictions: Tensor, targets: Tensor, 
-                   sector_ids: Tensor = None) -> Tensor:
+        def forward(self, predictions: Tensor, targets: Tensor, sector_ids: Tensor = None) -> Tensor:
             """Calculate production-ready combined loss that prevents model collapse."""
             predictions = predictions.squeeze()
             targets = targets.squeeze()
@@ -524,10 +561,10 @@ else:
 
             # Combine all losses
             total_loss = (
-                self.mse_weight * mse_loss + 
-                self.direction_weight * direction_loss + 
-                self.diversity_weight * diversity_loss +
-                self.sector_weight * sector_diversity_loss
+                self.mse_weight * mse_loss
+                + self.direction_weight * direction_loss
+                + self.diversity_weight * diversity_loss
+                + self.sector_weight * sector_diversity_loss
             )
 
             # Numerical stability safeguards
@@ -540,8 +577,7 @@ else:
 
             return total_loss
 
-        def _calculate_sector_diversity_loss(self, predictions: Tensor, 
-                                           sector_ids: Tensor) -> Tensor:
+        def _calculate_sector_diversity_loss(self, predictions: Tensor, sector_ids: Tensor) -> Tensor:
             """Calculate sector-aware diversity loss."""
             unique_sectors = torch.unique(sector_ids)
 
@@ -550,7 +586,7 @@ else:
 
             sector_means = []
             for sector_id in unique_sectors:
-                sector_mask = (sector_ids == sector_id)
+                sector_mask = sector_ids == sector_id
                 if torch.sum(sector_mask) > 0:
                     sector_predictions = predictions[sector_mask]
                     sector_means.append(torch.mean(sector_predictions))
@@ -575,8 +611,7 @@ else:
             super(VolatilityAwareLoss, self).__init__()
             self.base_mse_weight = base_mse_weight
 
-        def forward(self, predictions: Tensor, targets: Tensor, 
-                   volatility: Optional[Tensor] = None) -> Tensor:
+        def forward(self, predictions: Tensor, targets: Tensor, volatility: Optional[Tensor] = None) -> Tensor:
             """Calculate volatility-aware loss."""
             mse_loss = F.mse_loss(predictions, targets)
 
@@ -599,9 +634,14 @@ else:
             return mse_weight * mse_loss + direction_weight * direction_loss
 
     # Function definitions
-    def save_model(model: LSTMPricePredictor, symbol: str, model_dir: str = "Analytics/ml/trained_models",
-                   metadata: Optional[Dict[str, Any]] = None, scalers: Optional[Dict[str, Any]] = None,
-                   preprocessing_params: Optional[Dict[str, Any]] = None) -> str:
+    def save_model(
+        model: LSTMPricePredictor,
+        symbol: str,
+        model_dir: str = "Analytics/ml/trained_models",
+        metadata: Optional[Dict[str, Any]] = None,
+        scalers: Optional[Dict[str, Any]] = None,
+        preprocessing_params: Optional[Dict[str, Any]] = None,
+    ) -> str:
         """Save trained LSTM model with metadata, scalers, and preprocessing parameters."""
         os.makedirs(model_dir, exist_ok=True)
 
@@ -610,37 +650,37 @@ else:
         model_path = os.path.join(model_dir, model_filename)
 
         model_data = {
-            'model_state_dict': model.state_dict(),
-            'model_config': {
-                'input_size': model.input_size,
-                'hidden_size': model.hidden_size,
-                'num_layers': model.num_layers,
-                'sequence_length': model.sequence_length
+            "model_state_dict": model.state_dict(),
+            "model_config": {
+                "input_size": model.input_size,
+                "hidden_size": model.hidden_size,
+                "num_layers": model.num_layers,
+                "sequence_length": model.sequence_length,
             },
-            'model_info': model.get_model_info(),
-            'symbol': symbol,
-            'saved_at': datetime.now().isoformat(),
-            'metadata': metadata or {},
-            'preprocessing_params': preprocessing_params or {},
-            'model_version': '1.2.0'
+            "model_info": model.get_model_info(),
+            "symbol": symbol,
+            "saved_at": datetime.now().isoformat(),
+            "metadata": metadata or {},
+            "preprocessing_params": preprocessing_params or {},
+            "model_version": "1.2.0",
         }
 
-        if scalers and 'feature_scaler' in scalers and 'target_scaler' in scalers:
+        if scalers and "feature_scaler" in scalers and "target_scaler" in scalers:
             scaler_filename = f"scalers_{symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pkl"
             scaler_path = os.path.join(model_dir, scaler_filename)
 
             try:
                 joblib.dump(scalers, scaler_path)
-                model_data['scaler_file'] = scaler_filename
-                model_data['scalers_saved_separately'] = True
+                model_data["scaler_file"] = scaler_filename
+                model_data["scalers_saved_separately"] = True
                 logger.info(f"Scalers saved separately using joblib for {symbol} at {scaler_path}")
             except Exception as e:
                 logger.error(f"Failed to save scalers separately for {symbol}: {e}")
-                model_data['scalers'] = scalers
-                model_data['scalers_saved_separately'] = False
+                model_data["scalers"] = scalers
+                model_data["scalers_saved_separately"] = False
         else:
-            model_data['scalers'] = {}
-            model_data['scalers_saved_separately'] = False
+            model_data["scalers"] = {}
+            model_data["scalers_saved_separately"] = False
 
         try:
             torch.save(model_data, model_path, _use_new_zipfile_serialization=False)
@@ -651,12 +691,14 @@ else:
 
         return model_path
 
-    def load_model(model_path: str, device: Optional[device] = None) -> Tuple[LSTMPricePredictor, Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+    def load_model(
+        model_path: str, device: Optional[device] = None
+    ) -> Tuple[Union[LSTMPricePredictor, "UniversalLSTMPredictor"], Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
         """Load trained LSTM model from file with scalers and preprocessing parameters."""
         if not TORCH_AVAILABLE:
             raise RuntimeError("PyTorch not available - cannot load LSTM model")
 
-        device = device or torch.device('cpu')
+        device = device or torch.device("cpu")
 
         try:
             model_data = torch.load(model_path, map_location=device, weights_only=False)
@@ -664,49 +706,81 @@ else:
             logger.error(f"Failed to load model from {model_path}: {e}")
             raise
 
-        config = model_data['model_config']
-        model = LSTMPricePredictor(
-            input_size=config['input_size'],
-            hidden_size=config['hidden_size'],
-            num_layers=config['num_layers'],
-            sequence_length=config['sequence_length']
-        )
+        config = model_data["model_config"]
+        
+        # Check if this is a Universal LSTM model
+        model_info = model_data.get("model_info", {})
+        model_type = model_info.get("model_type", "standard")
+        
+        if model_type == "universal" or "sector_embedding_dim" in config or "industry_embedding_dim" in config:
+            # Load Universal LSTM model
+            logger.info(f"Loading Universal LSTM model from {model_path}")
+            model = UniversalLSTMPredictor(
+                input_size=config.get("input_size", 42),
+                hidden_size=config.get("hidden_size", 128),
+                num_layers=config.get("num_layers", 3),
+                sequence_length=config.get("sequence_length", 30),
+                sector_embedding_dim=config.get("sector_embedding_dim", 12),
+                industry_embedding_dim=config.get("industry_embedding_dim", 6),
+                dropout=config.get("dropout", 0.3),
+                multi_task_output=config.get("multi_task_output", True)
+            )
+        else:
+            # Load standard LSTM model
+            logger.info(f"Loading standard LSTM model from {model_path}")
+            model = LSTMPricePredictor(
+                input_size=config["input_size"],
+                hidden_size=config["hidden_size"],
+                num_layers=config["num_layers"],
+                sequence_length=config["sequence_length"],
+            )
 
-        model.load_state_dict(model_data['model_state_dict'])
+        model.load_state_dict(model_data["model_state_dict"])
         model.to(device)
         model.eval()
 
-        scalers = model_data.get('scalers', {})
-        preprocessing_params = model_data.get('preprocessing_params', {})
+        scalers = model_data.get("scalers", {})
+        preprocessing_params = model_data.get("preprocessing_params", {})
 
         return model, model_data, scalers, preprocessing_params
 
-    def create_enhanced_lstm_model(input_size: int = 38, hidden_size: int = 128, num_layers: int = 2,
-                                   dropout: float = 0.3, sequence_length: int = 30, 
-                                   model_type: str = 'bidirectional_attention') -> LSTMPricePredictor:
+    def create_enhanced_lstm_model(
+        input_size: int = 38,
+        hidden_size: int = 128,
+        num_layers: int = 2,
+        dropout: float = 0.3,
+        sequence_length: int = 30,
+        model_type: str = "bidirectional_attention",
+    ) -> LSTMPricePredictor:
         """Factory function to create enhanced LSTM models with different configurations."""
-        if model_type == 'standard':
-            return LSTMPricePredictor(input_size, hidden_size, num_layers, dropout, 
-                                    sequence_length, False, False)
-        elif model_type == 'bidirectional':
-            return LSTMPricePredictor(input_size, hidden_size, num_layers, dropout, 
-                                    sequence_length, True, False)
-        elif model_type == 'attention':
-            return LSTMPricePredictor(input_size, hidden_size, num_layers, dropout, 
-                                    sequence_length, False, True, 'single')
-        elif model_type == 'bidirectional_attention':
-            return LSTMPricePredictor(input_size, hidden_size, num_layers, dropout, 
-                                    sequence_length, True, True, 'single')
-        elif model_type == 'multi_attention':
-            return LSTMPricePredictor(input_size, hidden_size, num_layers, dropout, 
-                                    sequence_length, True, True, 'multi')
+        if model_type == "standard":
+            return LSTMPricePredictor(input_size, hidden_size, num_layers, dropout, sequence_length, False, False)
+        elif model_type == "bidirectional":
+            return LSTMPricePredictor(input_size, hidden_size, num_layers, dropout, sequence_length, True, False)
+        elif model_type == "attention":
+            return LSTMPricePredictor(
+                input_size, hidden_size, num_layers, dropout, sequence_length, False, True, "single"
+            )
+        elif model_type == "bidirectional_attention":
+            return LSTMPricePredictor(
+                input_size, hidden_size, num_layers, dropout, sequence_length, True, True, "single"
+            )
+        elif model_type == "multi_attention":
+            return LSTMPricePredictor(
+                input_size, hidden_size, num_layers, dropout, sequence_length, True, True, "multi"
+            )
         else:
             raise ValueError(f"Unknown model_type: {model_type}")
 
-    def save_universal_model(model: UniversalLSTMPredictor, model_name: str = "universal_lstm_v1.0",
-                            model_dir: str = "Data/ml_models/universal_lstm", metadata: Optional[Dict[str, Any]] = None,
-                            scalers: Optional[Dict[str, Any]] = None, sector_mappings: Optional[Dict[str, Any]] = None,
-                            training_stocks: Optional[List[str]] = None) -> str:
+    def save_universal_model(
+        model: UniversalLSTMPredictor,
+        model_name: str = "universal_lstm_v1.0",
+        model_dir: str = "Data/ml_models/universal_lstm",
+        metadata: Optional[Dict[str, Any]] = None,
+        scalers: Optional[Dict[str, Any]] = None,
+        sector_mappings: Optional[Dict[str, Any]] = None,
+        training_stocks: Optional[List[str]] = None,
+    ) -> str:
         """Save Universal LSTM model with comprehensive metadata and mappings."""
         os.makedirs(model_dir, exist_ok=True)
 
@@ -714,26 +788,26 @@ else:
         model_path = os.path.join(model_dir, model_filename)
 
         model_data = {
-            'model_state_dict': model.state_dict(),
-            'model_config': {
-                'input_size': model.input_size,
-                'sector_embedding_dim': model.sector_embedding_dim,
-                'industry_embedding_dim': model.industry_embedding_dim,
-                'hidden_size': model.hidden_size,
-                'num_layers': model.num_layers,
-                'sequence_length': model.sequence_length,
-                'num_sectors': model.num_sectors,
-                'num_industries': model.num_industries,
-                'use_cross_attention': model.use_cross_attention,
-                'multi_task_output': model.multi_task_output
+            "model_state_dict": model.state_dict(),
+            "model_config": {
+                "input_size": model.input_size,
+                "sector_embedding_dim": model.sector_embedding_dim,
+                "industry_embedding_dim": model.industry_embedding_dim,
+                "hidden_size": model.hidden_size,
+                "num_layers": model.num_layers,
+                "sequence_length": model.sequence_length,
+                "num_sectors": model.num_sectors,
+                "num_industries": model.num_industries,
+                "use_cross_attention": model.use_cross_attention,
+                "multi_task_output": model.multi_task_output,
             },
-            'model_info': model.get_model_info(),
-            'model_type': 'UniversalLSTM',
-            'saved_at': datetime.now().isoformat(),
-            'metadata': metadata or {},
-            'model_version': '4.0.0',
-            'training_stocks': training_stocks or [],
-            'sector_mappings': sector_mappings or {}
+            "model_info": model.get_model_info(),
+            "model_type": "UniversalLSTM",
+            "saved_at": datetime.now().isoformat(),
+            "metadata": metadata or {},
+            "model_version": "4.0.0",
+            "training_stocks": training_stocks or [],
+            "sector_mappings": sector_mappings or {},
         }
 
         try:
@@ -745,23 +819,51 @@ else:
 
         return model_path
 
-    def create_universal_lstm_model(input_size: int = 24, sector_embedding_dim: int = 16,
-                                   industry_embedding_dim: int = 8, hidden_size: int = 512,
-                                   num_layers: int = 5, dropout: float = 0.4, sequence_length: int = 60,
-                                   num_sectors: int = 11, num_industries: int = 50,
-                                   model_type: str = 'full_universal') -> UniversalLSTMPredictor:
+    def create_universal_lstm_model(
+        input_size: int = 24,
+        sector_embedding_dim: int = 16,
+        industry_embedding_dim: int = 8,
+        hidden_size: int = 512,
+        num_layers: int = 5,
+        dropout: float = 0.4,
+        sequence_length: int = 60,
+        num_sectors: int = 11,
+        num_industries: int = 50,
+        model_type: str = "full_universal",
+    ) -> UniversalLSTMPredictor:
         """Factory function to create Universal LSTM models with different configurations."""
-        if model_type == 'full_universal':
-            return UniversalLSTMPredictor(input_size, sector_embedding_dim, industry_embedding_dim,
-                                        hidden_size, num_layers, dropout, sequence_length,
-                                        num_sectors, num_industries, False, True)
-        elif model_type == 'price_only':
-            return UniversalLSTMPredictor(input_size, sector_embedding_dim, industry_embedding_dim,
-                                        hidden_size, num_layers, dropout, sequence_length,
-                                        num_sectors, num_industries, True, False)
-        elif model_type == 'lightweight':
-            return UniversalLSTMPredictor(input_size, 8, 4, 128, 2, dropout, sequence_length,
-                                        num_sectors, num_industries, False, False)
+        if model_type == "full_universal":
+            return UniversalLSTMPredictor(
+                input_size,
+                sector_embedding_dim,
+                industry_embedding_dim,
+                hidden_size,
+                num_layers,
+                dropout,
+                sequence_length,
+                num_sectors,
+                num_industries,
+                False,
+                True,
+            )
+        elif model_type == "price_only":
+            return UniversalLSTMPredictor(
+                input_size,
+                sector_embedding_dim,
+                industry_embedding_dim,
+                hidden_size,
+                num_layers,
+                dropout,
+                sequence_length,
+                num_sectors,
+                num_industries,
+                True,
+                False,
+            )
+        elif model_type == "lightweight":
+            return UniversalLSTMPredictor(
+                input_size, 8, 4, 128, 2, dropout, sequence_length, num_sectors, num_industries, False, False
+            )
         else:
             raise ValueError(f"Unknown model_type: {model_type}")
 
@@ -772,75 +874,76 @@ else:
 
         complexity_score = 1.0
 
-        if hasattr(model, 'bidirectional') and model.bidirectional:
+        if hasattr(model, "bidirectional") and model.bidirectional:
             complexity_score *= 1.5
 
-        if hasattr(model, 'use_attention') and model.use_attention:
+        if hasattr(model, "use_attention") and model.use_attention:
             complexity_score *= 1.3
-            if hasattr(model, 'attention_type') and model.attention_type == 'multi':
+            if hasattr(model, "attention_type") and model.attention_type == "multi":
                 complexity_score *= 1.2
 
-        if hasattr(model, 'num_layers'):
-            complexity_score *= (model.num_layers / 2.0)
-        if hasattr(model, 'hidden_size'):
-            complexity_score *= (model.hidden_size / 128.0)
+        if hasattr(model, "num_layers"):
+            complexity_score *= model.num_layers / 2.0
+        if hasattr(model, "hidden_size"):
+            complexity_score *= model.hidden_size / 128.0
 
         return {
-            'total_parameters': total_params,
-            'trainable_parameters': trainable_params,
-            'complexity_score': complexity_score,
-            'bidirectional': getattr(model, 'bidirectional', False),
-            'attention_enabled': getattr(model, 'use_attention', False),
-            'attention_type': getattr(model, 'attention_type', None),
-            'num_layers': getattr(model, 'num_layers', 0),
-            'hidden_size': getattr(model, 'hidden_size', 0),
-            'model_version': getattr(model, 'model_version', 'unknown')
+            "total_parameters": total_params,
+            "trainable_parameters": trainable_params,
+            "complexity_score": complexity_score,
+            "bidirectional": getattr(model, "bidirectional", False),
+            "attention_enabled": getattr(model, "use_attention", False),
+            "attention_type": getattr(model, "attention_type", None),
+            "num_layers": getattr(model, "num_layers", 0),
+            "hidden_size": getattr(model, "hidden_size", 0),
+            "model_version": getattr(model, "model_version", "unknown"),
         }
 
     def _recreate_scalers_from_file(scaler_path: str) -> Dict[str, Any]:
         """Recreate scalers from saved parameters when joblib version incompatibility occurs."""
-        from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
         import pickle
 
+        from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
+
         try:
-            with open(scaler_path, 'rb') as f:
+            with open(scaler_path, "rb") as f:
                 raw_data = pickle.load(f)
 
                 scalers = {}
 
                 for key, scaler_obj in raw_data.items():
-                    if hasattr(scaler_obj, '__class__'):
+                    if hasattr(scaler_obj, "__class__"):
                         scaler_class = scaler_obj.__class__.__name__
 
-                        if scaler_class == 'MinMaxScaler':
+                        if scaler_class == "MinMaxScaler":
                             new_scaler = MinMaxScaler()
-                            if hasattr(scaler_obj, 'data_min_'):
+                            if hasattr(scaler_obj, "data_min_"):
                                 new_scaler.data_min_ = scaler_obj.data_min_
                                 new_scaler.data_max_ = scaler_obj.data_max_
                                 new_scaler.data_range_ = scaler_obj.data_range_
                                 new_scaler.scale_ = scaler_obj.scale_
                                 new_scaler.min_ = scaler_obj.min_
                                 new_scaler.n_features_in_ = scaler_obj.n_features_in_
-                                new_scaler.feature_names_in_ = getattr(scaler_obj, 'feature_names_in_', None)
+                                new_scaler.feature_names_in_ = getattr(scaler_obj, "feature_names_in_", None)
                             scalers[key] = new_scaler
 
-                        elif scaler_class == 'StandardScaler':
+                        elif scaler_class == "StandardScaler":
                             new_scaler = StandardScaler()
-                            if hasattr(scaler_obj, 'mean_'):
+                            if hasattr(scaler_obj, "mean_"):
                                 new_scaler.mean_ = scaler_obj.mean_
                                 new_scaler.scale_ = scaler_obj.scale_
                                 new_scaler.var_ = scaler_obj.var_
                                 new_scaler.n_features_in_ = scaler_obj.n_features_in_
-                                new_scaler.feature_names_in_ = getattr(scaler_obj, 'feature_names_in_', None)
+                                new_scaler.feature_names_in_ = getattr(scaler_obj, "feature_names_in_", None)
                             scalers[key] = new_scaler
 
-                        elif scaler_class == 'RobustScaler':
+                        elif scaler_class == "RobustScaler":
                             new_scaler = RobustScaler()
-                            if hasattr(scaler_obj, 'center_'):
+                            if hasattr(scaler_obj, "center_"):
                                 new_scaler.center_ = scaler_obj.center_
                                 new_scaler.scale_ = scaler_obj.scale_
                                 new_scaler.n_features_in_ = scaler_obj.n_features_in_
-                                new_scaler.feature_names_in_ = getattr(scaler_obj, 'feature_names_in_', None)
+                                new_scaler.feature_names_in_ = getattr(scaler_obj, "feature_names_in_", None)
                             scalers[key] = new_scaler
 
                         else:

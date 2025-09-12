@@ -2,6 +2,8 @@
 
 # Environment variables (contains secrets)
 .env
+config/.env
+Design/frontend/.env
 
 # Python cache and compiled files
 __pycache__/
@@ -27,6 +29,7 @@ env/
 .coverage
 htmlcov/
 .tox/
+.benchmarks/
 
 # Temporary directory (contains development work)
 Temp/
@@ -35,9 +38,10 @@ Temp/
 db.sqlite3
 db.sqlite3-journal
 
-# Log files
+# Log files and directories
 *.log
-logs/*.txt
+logs/
+test_report.log
 
 # OS generated files
 .DS_Store
@@ -51,6 +55,8 @@ Thumbs.db
 # Node.js (frontend)
 Design/frontend/node_modules/
 Design/frontend/dist/
+Design/frontend/coverage/
+Design/frontend/.vite/
 Design/frontend/.env.local
 Design/frontend/.env.development.local
 Design/frontend/.env.test.local

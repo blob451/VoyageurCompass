@@ -3,25 +3,20 @@ Advanced Monitoring and Analytics Service for VoyageurCompass.
 Provides comprehensive system monitoring, performance tracking, and operational analytics.
 """
 
-import json
 import logging
-import time
 import threading
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
-from collections import defaultdict, deque
-from pathlib import Path
-import sqlite3
+import time
 import uuid
+from collections import defaultdict, deque
+from datetime import datetime, timedelta
+from typing import Any, Dict, List
 
-from django.conf import settings
-from django.core.cache import cache
 from django.db import connection
-from django.utils import timezone
 
 # Conditional import ensures CI environment compatibility
 try:
     import psutil
+
     PSUTIL_AVAILABLE = True
 except ImportError:
     psutil = None
@@ -40,20 +35,20 @@ class MetricsCollector:
 
         # Metric definitions
         self.metric_definitions = {
-            'system_cpu_percent': {'type': 'gauge', 'unit': 'percent'},
-            'system_memory_percent': {'type': 'gauge', 'unit': 'percent'},
-            'system_disk_usage_percent': {'type': 'gauge', 'unit': 'percent'},
-            'django_db_connections': {'type': 'gauge', 'unit': 'count'},
-            'llm_generation_time': {'type': 'histogram', 'unit': 'seconds'},
-            'llm_request_count': {'type': 'counter', 'unit': 'count'},
-            'llm_error_count': {'type': 'counter', 'unit': 'count'},
-            'cache_hit_rate': {'type': 'gauge', 'unit': 'percent'},
-            'analysis_request_count': {'type': 'counter', 'unit': 'count'},
-            'analysis_success_rate': {'type': 'gauge', 'unit': 'percent'},
-            'sentiment_analysis_time': {'type': 'histogram', 'unit': 'seconds'},
-            'hybrid_coordination_time': {'type': 'histogram', 'unit': 'seconds'},
-            'async_pipeline_queue_size': {'type': 'gauge', 'unit': 'count'},
-            'async_pipeline_processing_time': {'type': 'histogram', 'unit': 'seconds'}
+            "system_cpu_percent": {"type": "gauge", "unit": "percent"},
+            "system_memory_percent": {"type": "gauge", "unit": "percent"},
+            "system_disk_usage_percent": {"type": "gauge", "unit": "percent"},
+            "django_db_connections": {"type": "gauge", "unit": "count"},
+            "llm_generation_time": {"type": "histogram", "unit": "seconds"},
+            "llm_request_count": {"type": "counter", "unit": "count"},
+            "llm_error_count": {"type": "counter", "unit": "count"},
+            "cache_hit_rate": {"type": "gauge", "unit": "percent"},
+            "analysis_request_count": {"type": "counter", "unit": "count"},
+            "analysis_success_rate": {"type": "gauge", "unit": "percent"},
+            "sentiment_analysis_time": {"type": "histogram", "unit": "seconds"},
+            "hybrid_coordination_time": {"type": "histogram", "unit": "seconds"},
+            "async_pipeline_queue_size": {"type": "gauge", "unit": "count"},
+            "async_pipeline_processing_time": {"type": "histogram", "unit": "seconds"},
         }
 
     def record_metric(self, metric_name: str, value: float, labels: Dict[str, str] = None, timestamp: datetime = None):
@@ -69,19 +64,14 @@ class MetricsCollector:
         if timestamp is None:
             timestamp = datetime.now()
 
-        metric_entry = {
-            'timestamp': timestamp.isoformat(),
-            'value': value,
-            'labels': labels or {}
-        }
+        metric_entry = {"timestamp": timestamp.isoformat(), "value": value, "labels": labels or {}}
 
         with self.lock:
             self.metrics_buffer[metric_name].append(metric_entry)
 
-    def get_metric_history(self, 
-                          metric_name: str, 
-                          start_time: datetime = None, 
-                          end_time: datetime = None) -> List[Dict[str, Any]]:
+    def get_metric_history(
+        self, metric_name: str, start_time: datetime = None, end_time: datetime = None
+    ) -> List[Dict[str, Any]]:
         """Get historical values for a metric within time range."""
         if start_time is None:
             start_time = datetime.now() - timedelta(hours=self.retention_hours)
@@ -93,11 +83,11 @@ class MetricsCollector:
 
             filtered_data = []
             for entry in metric_data:
-                entry_time = datetime.fromisoformat(entry['timestamp'])
+                entry_time = datetime.fromisoformat(entry["timestamp"])
                 if start_time <= entry_time <= end_time:
                     filtered_data.append(entry)
 
-            return sorted(filtered_data, key=lambda x: x['timestamp'])
+            return sorted(filtered_data, key=lambda x: x["timestamp"])
 
     def get_metric_summary(self, metric_name: str, hours: int = 1) -> Dict[str, Any]:
         """Get statistical summary for a metric over specified hours."""
@@ -107,19 +97,19 @@ class MetricsCollector:
         history = self.get_metric_history(metric_name, start_time, end_time)
 
         if not history:
-            return {'error': f'No data for metric {metric_name}'}
+            return {"error": f"No data for metric {metric_name}"}
 
-        values = [entry['value'] for entry in history]
+        values = [entry["value"] for entry in history]
 
         return {
-            'metric_name': metric_name,
-            'count': len(values),
-            'min': min(values),
-            'max': max(values),
-            'avg': sum(values) / len(values),
-            'latest': values[-1] if values else None,
-            'start_time': start_time.isoformat(),
-            'end_time': end_time.isoformat()
+            "metric_name": metric_name,
+            "count": len(values),
+            "min": min(values),
+            "max": max(values),
+            "avg": sum(values) / len(values),
+            "latest": values[-1] if values else None,
+            "start_time": start_time.isoformat(),
+            "end_time": end_time.isoformat(),
         }
 
     def collect_system_metrics(self):
@@ -128,26 +118,26 @@ class MetricsCollector:
             if PSUTIL_AVAILABLE:
                 # CPU usage
                 cpu_percent = psutil.cpu_percent(interval=1)
-                self.record_metric('system_cpu_percent', cpu_percent)
+                self.record_metric("system_cpu_percent", cpu_percent)
 
                 # Memory usage
                 memory = psutil.virtual_memory()
-                self.record_metric('system_memory_percent', memory.percent)
+                self.record_metric("system_memory_percent", memory.percent)
 
                 # Disk usage
-                disk = psutil.disk_usage('/')
+                disk = psutil.disk_usage("/")
                 disk_percent = (disk.used / disk.total) * 100
-                self.record_metric('system_disk_usage_percent', disk_percent)
+                self.record_metric("system_disk_usage_percent", disk_percent)
             else:
                 # Fallback metrics for CI environment compatibility
                 logger.debug("psutil unavailable - using fallback system metrics")
-                self.record_metric('system_cpu_percent', 0.0)
-                self.record_metric('system_memory_percent', 0.0) 
-                self.record_metric('system_disk_usage_percent', 0.0)
+                self.record_metric("system_cpu_percent", 0.0)
+                self.record_metric("system_memory_percent", 0.0)
+                self.record_metric("system_disk_usage_percent", 0.0)
 
             # Database connections tracking independent of psutil availability
             db_connections = len(connection.queries)
-            self.record_metric('django_db_connections', db_connections)
+            self.record_metric("django_db_connections", db_connections)
 
         except Exception as e:
             logger.error(f"Error collecting system metrics: {str(e)}")
@@ -160,7 +150,7 @@ class MetricsCollector:
             for metric_name in self.metrics_buffer:
                 metric_data = self.metrics_buffer[metric_name]
                 # Remove old entries
-                while metric_data and datetime.fromisoformat(metric_data[0]['timestamp']) < cutoff_time:
+                while metric_data and datetime.fromisoformat(metric_data[0]["timestamp"]) < cutoff_time:
                     metric_data.popleft()
 
 
@@ -177,13 +167,13 @@ class PerformanceProfiler:
         profile_id = str(uuid.uuid4())[:8]
 
         profile_info = {
-            'profile_id': profile_id,
-            'profile_name': profile_name,
-            'operation_type': operation_type,
-            'metadata': metadata or {},
-            'start_time': time.time(),
-            'start_timestamp': datetime.now().isoformat(),
-            'checkpoints': []
+            "profile_id": profile_id,
+            "profile_name": profile_name,
+            "operation_type": operation_type,
+            "metadata": metadata or {},
+            "start_time": time.time(),
+            "start_timestamp": datetime.now().isoformat(),
+            "checkpoints": [],
         }
 
         with self.lock:
@@ -199,42 +189,60 @@ class PerformanceProfiler:
                 checkpoint_time = time.time()
 
                 checkpoint = {
-                    'name': checkpoint_name,
-                    'timestamp': datetime.now().isoformat(),
-                    'elapsed_time': checkpoint_time - profile['start_time'],
-                    'metadata': metadata or {}
+                    "name": checkpoint_name,
+                    "timestamp": datetime.now().isoformat(),
+                    "elapsed_time": checkpoint_time - profile["start_time"],
+                    "metadata": metadata or {},
                 }
 
-                profile['checkpoints'].append(checkpoint)
+                profile["checkpoints"].append(checkpoint)
 
-    def end_profile(self, profile_id: str, status: str = 'completed', metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+    def end_profile(
+        self, profile_id: str, status: str = "completed", metadata: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """End a performance profile and return results."""
         with self.lock:
             if profile_id not in self.active_profiles:
-                return {'error': 'Profile not found'}
+                return {"error": "Profile not found"}
 
             profile = self.active_profiles.pop(profile_id)
             end_time = time.time()
 
             # Calculate final results
-            profile.update({
-                'end_time': end_time,
-                'end_timestamp': datetime.now().isoformat(),
-                'total_duration': end_time - profile['start_time'],
-                'status': status,
-                'final_metadata': metadata or {}
-            })
+            profile.update(
+                {
+                    "end_time": end_time,
+                    "end_timestamp": datetime.now().isoformat(),
+                    "total_duration": end_time - profile["start_time"],
+                    "status": status,
+                    "final_metadata": metadata or {},
+                }
+            )
 
             # Calculate checkpoint intervals
-            prev_time = profile['start_time']
-            for checkpoint in profile['checkpoints']:
-                checkpoint['interval_duration'] = checkpoint['elapsed_time'] - (prev_time - profile['start_time'])
-                prev_time = profile['start_time'] + checkpoint['elapsed_time']
+            prev_time = profile["start_time"]
+            for checkpoint in profile["checkpoints"]:
+                checkpoint["interval_duration"] = checkpoint["elapsed_time"] - (prev_time - profile["start_time"])
+                prev_time = profile["start_time"] + checkpoint["elapsed_time"]
 
             # Store completed profile
             self.completed_profiles.append(profile)
 
             return profile
+            
+    def record_profile_metrics(self, profile: Dict[str, Any], metrics_collector):
+        """Record profile metrics for analytics purposes."""
+        profile_name = profile.get("profile_name", "unknown")
+        operation_type = profile.get("operation_type", "unknown")
+        total_duration = profile.get("total_duration", 0)
+        status = profile.get("status", "unknown")
+        
+        # Record individual profile metrics
+        metrics_collector.record_metric(f"{profile_name}_duration", total_duration)
+        metrics_collector.record_metric(f"{profile_name}_calls", 1)
+        
+        # Record average duration (simple implementation)
+        metrics_collector.record_metric(f"{profile_name}_avg_duration", total_duration)
 
     def get_profile_summary(self, operation_type: str = None, hours: int = 1) -> Dict[str, Any]:
         """Get summary statistics for profiles."""
@@ -244,30 +252,27 @@ class PerformanceProfiler:
         # Filter profiles by time and operation type
         filtered_profiles = []
         for profile in self.completed_profiles:
-            profile_time = datetime.fromisoformat(profile['start_timestamp'])
+            profile_time = datetime.fromisoformat(profile["start_timestamp"])
             if start_time <= profile_time <= end_time:
-                if operation_type is None or profile['operation_type'] == operation_type:
+                if operation_type is None or profile["operation_type"] == operation_type:
                     filtered_profiles.append(profile)
 
         if not filtered_profiles:
-            return {'message': 'No profiles found for criteria'}
+            return {"message": "No profiles found for criteria"}
 
         # Calculate statistics
-        durations = [p['total_duration'] for p in filtered_profiles]
-        successful_profiles = [p for p in filtered_profiles if p['status'] == 'completed']
+        durations = [p["total_duration"] for p in filtered_profiles]
+        successful_profiles = [p for p in filtered_profiles if p["status"] == "completed"]
 
         return {
-            'operation_type': operation_type or 'all',
-            'total_profiles': len(filtered_profiles),
-            'successful_profiles': len(successful_profiles),
-            'success_rate': len(successful_profiles) / len(filtered_profiles) if filtered_profiles else 0,
-            'avg_duration': sum(durations) / len(durations) if durations else 0,
-            'min_duration': min(durations) if durations else 0,
-            'max_duration': max(durations) if durations else 0,
-            'time_range': {
-                'start': start_time.isoformat(),
-                'end': end_time.isoformat()
-            }
+            "operation_type": operation_type or "all",
+            "total_profiles": len(filtered_profiles),
+            "successful_profiles": len(successful_profiles),
+            "success_rate": len(successful_profiles) / len(filtered_profiles) if filtered_profiles else 0,
+            "avg_duration": sum(durations) / len(durations) if durations else 0,
+            "min_duration": min(durations) if durations else 0,
+            "max_duration": max(durations) if durations else 0,
+            "time_range": {"start": start_time.isoformat(), "end": end_time.isoformat()},
         }
 
 
@@ -277,63 +282,62 @@ class AlertManager:
     def __init__(self):
         self.alerts = deque(maxlen=500)  # Store recent alerts
         self.alert_rules = {
-            'high_cpu_usage': {
-                'metric': 'system_cpu_percent',
-                'threshold': 80,
-                'condition': 'greater_than',
-                'severity': 'warning',
-                'enabled': True
+            "high_cpu_usage": {
+                "metric": "system_cpu_percent",
+                "threshold": 80,
+                "condition": "greater_than",
+                "severity": "warning",
+                "enabled": True,
             },
-            'high_memory_usage': {
-                'metric': 'system_memory_percent', 
-                'threshold': 85,
-                'condition': 'greater_than',
-                'severity': 'warning',
-                'enabled': True
+            "high_memory_usage": {
+                "metric": "system_memory_percent",
+                "threshold": 85,
+                "condition": "greater_than",
+                "severity": "warning",
+                "enabled": True,
             },
-            'slow_llm_generation': {
-                'metric': 'llm_generation_time',
-                'threshold': 30,
-                'condition': 'greater_than',
-                'severity': 'warning',
-                'enabled': True
+            "slow_llm_generation": {
+                "metric": "llm_generation_time",
+                "threshold": 30,
+                "condition": "greater_than",
+                "severity": "warning",
+                "enabled": True,
             },
-            'high_error_rate': {
-                'metric': 'llm_error_count',
-                'threshold': 10,
-                'condition': 'greater_than',
-                'severity': 'critical',
-                'enabled': True
-            }
+            "high_error_rate": {
+                "metric": "llm_error_count",
+                "threshold": 10,
+                "condition": "greater_than",
+                "severity": "critical",
+                "enabled": True,
+            },
         }
         self.lock = threading.Lock()
 
     def check_alerts(self, metrics_collector: MetricsCollector):
         """Check metrics against alert rules and trigger alerts."""
         for rule_name, rule_config in self.alert_rules.items():
-            if not rule_config.get('enabled', True):
+            if not rule_config.get("enabled", True):
                 continue
 
             try:
-                metric_name = rule_config['metric']
-                threshold = rule_config['threshold']
-                condition = rule_config['condition']
-                severity = rule_config['severity']
+                metric_name = rule_config["metric"]
+                threshold = rule_config["threshold"]
+                condition = rule_config["condition"]
+                severity = rule_config["severity"]
 
                 # Get latest metric value
                 recent_metrics = metrics_collector.get_metric_history(
-                    metric_name, 
-                    datetime.now() - timedelta(minutes=5)
+                    metric_name, datetime.now() - timedelta(minutes=5)
                 )
 
                 if recent_metrics:
-                    latest_value = recent_metrics[-1]['value']
+                    latest_value = recent_metrics[-1]["value"]
 
                     # Check condition
                     alert_triggered = False
-                    if condition == 'greater_than' and latest_value > threshold:
+                    if condition == "greater_than" and latest_value > threshold:
                         alert_triggered = True
-                    elif condition == 'less_than' and latest_value < threshold:
+                    elif condition == "less_than" and latest_value < threshold:
                         alert_triggered = True
 
                     if alert_triggered:
@@ -342,28 +346,23 @@ class AlertManager:
                             metric_name=metric_name,
                             current_value=latest_value,
                             threshold=threshold,
-                            severity=severity
+                            severity=severity,
                         )
 
             except Exception as e:
                 logger.error(f"Error checking alert rule {rule_name}: {str(e)}")
 
-    def trigger_alert(self, 
-                     rule_name: str, 
-                     metric_name: str, 
-                     current_value: float, 
-                     threshold: float, 
-                     severity: str):
+    def trigger_alert(self, rule_name: str, metric_name: str, current_value: float, threshold: float, severity: str):
         """Trigger an alert."""
         alert = {
-            'alert_id': str(uuid.uuid4())[:8],
-            'rule_name': rule_name,
-            'metric_name': metric_name,
-            'current_value': current_value,
-            'threshold': threshold,
-            'severity': severity,
-            'timestamp': datetime.now().isoformat(),
-            'message': f"{rule_name}: {metric_name} = {current_value:.2f} (threshold: {threshold})"
+            "alert_id": str(uuid.uuid4())[:8],
+            "rule_name": rule_name,
+            "metric_name": metric_name,
+            "current_value": current_value,
+            "threshold": threshold,
+            "severity": severity,
+            "timestamp": datetime.now().isoformat(),
+            "message": f"{rule_name}: {metric_name} = {current_value:.2f} (threshold: {threshold})",
         }
 
         with self.lock:
@@ -377,12 +376,16 @@ class AlertManager:
 
         filtered_alerts = []
         for alert in self.alerts:
-            alert_time = datetime.fromisoformat(alert['timestamp'])
-            if alert_time >= cutoff_time:
-                if severity is None or alert['severity'] == severity:
-                    filtered_alerts.append(alert)
+            # Support both 'timestamp' and 'created_at' fields for backward compatibility
+            timestamp_field = alert.get("timestamp") or alert.get("created_at")
+            if timestamp_field:
+                alert_time = datetime.fromisoformat(timestamp_field)
+                if alert_time >= cutoff_time:
+                    if severity is None or alert["severity"] == severity:
+                        filtered_alerts.append(alert)
 
-        return sorted(filtered_alerts, key=lambda x: x['timestamp'], reverse=True)
+        # Sort by timestamp, supporting both field names
+        return sorted(filtered_alerts, key=lambda x: x.get("timestamp") or x.get("created_at"), reverse=True)
 
 
 class AdvancedMonitoringService:
@@ -401,7 +404,7 @@ class AdvancedMonitoringService:
         if enable_background_collection:
             self.start_background_monitoring()
 
-        logger.info("Advanced Monitoring Service initialized")
+        logger.info("Advanced Monitoring Service initialised")
 
     def start_background_monitoring(self):
         """Start background monitoring thread."""
@@ -444,122 +447,178 @@ class AdvancedMonitoringService:
                 logger.error(f"Error in background monitoring: {str(e)}")
                 time.sleep(60)  # Wait longer on error
 
-    def record_llm_metrics(self, 
-                          generation_time: float, 
-                          success: bool, 
-                          model_name: str = None,
-                          complexity_score: float = None):
+    def record_llm_metrics(
+        self, generation_time: float, success: bool, model_name: str = None, complexity_score: float = None
+    ):
         """Record LLM operation metrics."""
         labels = {}
         if model_name:
-            labels['model'] = model_name
+            labels["model"] = model_name
         if complexity_score is not None:
-            labels['complexity'] = str(int(complexity_score * 10))  # Bucket by complexity
+            labels["complexity"] = str(int(complexity_score * 10))  # Bucket by complexity
 
-        self.metrics_collector.record_metric('llm_generation_time', generation_time, labels)
-        self.metrics_collector.record_metric('llm_request_count', 1, labels)
+        self.metrics_collector.record_metric("llm_generation_time", generation_time, labels)
+        self.metrics_collector.record_metric("llm_request_count", 1, labels)
 
         if not success:
-            self.metrics_collector.record_metric('llm_error_count', 1, labels)
+            self.metrics_collector.record_metric("llm_error_count", 1, labels)
 
-    def record_analysis_metrics(self, 
-                               processing_time: float, 
-                               success: bool,
-                               analysis_type: str = 'technical'):
+    def record_analysis_metrics(self, processing_time: float, success: bool, analysis_type: str = "technical"):
         """Record analysis operation metrics."""
-        labels = {'type': analysis_type}
+        labels = {"type": analysis_type}
 
-        self.metrics_collector.record_metric('analysis_request_count', 1, labels)
+        self.metrics_collector.record_metric("analysis_request_count", 1, labels)
 
         if success:
             success_rate = 1.0
         else:
             success_rate = 0.0
 
-        self.metrics_collector.record_metric('analysis_success_rate', success_rate, labels)
+        self.metrics_collector.record_metric("analysis_success_rate", success_rate, labels)
 
     def record_cache_metrics(self, hits: int, misses: int):
         """Record cache performance metrics."""
         total_requests = hits + misses
         if total_requests > 0:
             hit_rate = (hits / total_requests) * 100
-            self.metrics_collector.record_metric('cache_hit_rate', hit_rate)
+            self.metrics_collector.record_metric("cache_hit_rate", hit_rate)
 
     def get_system_health(self) -> Dict[str, Any]:
         """Get overall system health status."""
         health_status = {
-            'status': 'healthy',
-            'timestamp': datetime.now().isoformat(),
-            'components': {},
-            'metrics': {},
-            'alerts': {
-                'critical': 0,
-                'warning': 0
-            }
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "components": {},
+            "metrics": {},
+            "alerts": {"critical": 0, "warning": 0},
         }
 
-        # System metrics
-        for metric_name in ['system_cpu_percent', 'system_memory_percent', 'system_disk_usage_percent']:
+        # System metrics (both built-in and custom)
+        system_metrics = ["system_cpu_percent", "system_memory_percent", "system_disk_usage_percent",
+                         "cpu_usage", "memory_usage", "disk_usage", "active_connections"]
+        
+        for metric_name in system_metrics:
             summary = self.metrics_collector.get_metric_summary(metric_name, hours=0.1)  # Last 6 minutes
-            if 'error' not in summary:
-                health_status['metrics'][metric_name] = summary['latest']
+            if "error" not in summary:
+                health_status["metrics"][metric_name] = summary["latest"]
 
-                # Check health thresholds
-                if summary['latest'] > 90:
-                    health_status['status'] = 'degraded'
+                # Check health thresholds (only for percentage-based metrics)
+                if "percent" in metric_name or "usage" in metric_name:
+                    if summary["latest"] > 90:
+                        health_status["status"] = "critical"
+                    elif summary["latest"] > 80:
+                        health_status["status"] = "warning"
 
         # LLM service metrics
-        llm_summary = self.metrics_collector.get_metric_summary('llm_generation_time', hours=1)
-        if 'error' not in llm_summary:
-            health_status['components']['llm_service'] = {
-                'status': 'healthy' if llm_summary['avg'] < 10 else 'degraded',
-                'avg_response_time': llm_summary['avg'],
-                'request_count': llm_summary['count']
+        llm_summary = self.metrics_collector.get_metric_summary("llm_generation_time", hours=1)
+        if "error" not in llm_summary:
+            health_status["components"]["llm_service"] = {
+                "status": "healthy" if llm_summary["avg"] < 10 else "warning",
+                "avg_response_time": llm_summary["avg"],
+                "request_count": llm_summary["count"],
             }
 
         # Recent alerts
         recent_alerts = self.alert_manager.get_recent_alerts(hours=1)
         for alert in recent_alerts:
-            health_status['alerts'][alert['severity']] += 1
+            health_status["alerts"][alert["severity"]] += 1
 
         # Overall status based on alerts
-        if health_status['alerts']['critical'] > 0:
-            health_status['status'] = 'unhealthy'
-        elif health_status['alerts']['warning'] > 5:
-            health_status['status'] = 'degraded'
+        if health_status["alerts"]["critical"] > 0:
+            health_status["status"] = "critical"
+        elif health_status["alerts"]["warning"] > 5:
+            health_status["status"] = "warning"
 
         return health_status
 
     def get_performance_dashboard(self) -> Dict[str, Any]:
         """Get comprehensive performance dashboard data."""
+        # Get all current metrics
+        all_metrics = self.get_metrics()
+        recent_alerts = self.alert_manager.get_recent_alerts(hours=24)
+        
         dashboard_data = {
-            'system_health': self.get_system_health(),
-            'performance_metrics': {},
-            'recent_alerts': self.alert_manager.get_recent_alerts(hours=24),
-            'profile_summaries': {},
-            'generated_at': datetime.now().isoformat()
+            "summary": {
+                "total_metrics": len(all_metrics),
+                "active_alerts": len([a for a in recent_alerts if a.get("severity") in ["critical", "warning"]]),
+                "system_uptime": time.time() - (self.start_time if hasattr(self, "start_time") else time.time()),
+                "monitoring_active": self.monitoring_active
+            },
+            "metrics_history": self._get_dashboard_metrics_history(),
+            "trends": self._calculate_metric_trends(),
+            "generated_at": datetime.now().isoformat(),
+            "system_health": self.get_system_health(),
+            "performance_metrics": {},
+            "recent_alerts": recent_alerts,
+            "profile_summaries": {},
         }
 
         # Key performance metrics
         key_metrics = [
-            'llm_generation_time', 'llm_request_count', 'analysis_request_count',
-            'cache_hit_rate', 'sentiment_analysis_time', 'hybrid_coordination_time'
+            "llm_generation_time",
+            "llm_request_count",
+            "analysis_request_count",
+            "cache_hit_rate",
+            "sentiment_analysis_time",
+            "hybrid_coordination_time",
         ]
 
         for metric_name in key_metrics:
             summary = self.metrics_collector.get_metric_summary(metric_name, hours=24)
-            if 'error' not in summary:
-                dashboard_data['performance_metrics'][metric_name] = summary
+            if "error" not in summary:
+                dashboard_data["performance_metrics"][metric_name] = summary
 
         # Performance profile summaries
-        for operation_type in ['llm_generation', 'analysis', 'sentiment_analysis', 'hybrid_coordination']:
+        for operation_type in ["llm_generation", "analysis", "sentiment_analysis", "hybrid_coordination"]:
             profile_summary = self.performance_profiler.get_profile_summary(operation_type, hours=24)
-            if 'message' not in profile_summary:
-                dashboard_data['profile_summaries'][operation_type] = profile_summary
+            if "message" not in profile_summary:
+                dashboard_data["profile_summaries"][operation_type] = profile_summary
 
         return dashboard_data
+    
+    def _get_dashboard_metrics_history(self) -> List[Dict[str, Any]]:
+        """Get formatted metrics history for dashboard."""
+        history = []
+        
+        # Get recent metrics from all recorded metrics
+        with self.metrics_collector.lock:
+            for metric_name, metric_data in self.metrics_collector.metrics_buffer.items():
+                for entry in list(metric_data):  # Convert deque to list for safe iteration
+                    history.append({
+                        "metric_name": metric_name,
+                        "value": entry["value"],
+                        "timestamp": entry["timestamp"],
+                        "labels": entry.get("labels", {})
+                    })
+        
+        # Sort by timestamp
+        return sorted(history, key=lambda x: x["timestamp"], reverse=True)[:100]  # Last 100 entries
+    
+    def _calculate_metric_trends(self) -> Dict[str, str]:
+        """Calculate basic trends for key metrics."""
+        trends = {}
+        
+        # Simple trend calculation for key metrics
+        key_metrics = ["system_cpu_percent", "system_memory_percent", "llm_generation_time"]
+        
+        for metric_name in key_metrics:
+            history = self.metrics_collector.get_metric_history(metric_name)
+            if len(history) >= 2:
+                recent_avg = sum(e["value"] for e in history[-5:]) / min(5, len(history))
+                older_avg = sum(e["value"] for e in history[-10:-5]) / min(5, len(history)-5) if len(history) > 5 else recent_avg
+                
+                if recent_avg > older_avg * 1.1:
+                    trends[metric_name] = "increasing"
+                elif recent_avg < older_avg * 0.9:
+                    trends[metric_name] = "decreasing"
+                else:
+                    trends[metric_name] = "stable"
+            else:
+                trends[metric_name] = "insufficient_data"
+        
+        return trends
 
-    def record_metric(self, metric_name: str, value: float, metric_type: str = 'gauge', unit: str = None):
+    def record_metric(self, metric_name: str, value: float, metric_type: str = "gauge", unit: str = None):
         """
         Record a metric value using the underlying metrics collector.
 
@@ -569,10 +628,10 @@ class AdvancedMonitoringService:
             metric_type: Type of metric (gauge, counter, histogram)
             unit: Optional unit for the metric
         """
-        labels = {'unit': unit, 'type': metric_type} if unit else {'type': metric_type}
+        labels = {"unit": unit, "type": metric_type} if unit else {"type": metric_type}
         # Store metric type in definitions if not already present
         if metric_name not in self.metrics_collector.metric_definitions:
-            self.metrics_collector.metric_definitions[metric_name] = {'type': metric_type, 'unit': unit}
+            self.metrics_collector.metric_definitions[metric_name] = {"type": metric_type, "unit": unit}
         self.metrics_collector.record_metric(metric_name, value, labels)
 
     def get_metrics(self) -> Dict[str, Any]:
@@ -587,10 +646,10 @@ class AdvancedMonitoringService:
             if metric_data:
                 latest_entry = metric_data[-1]
                 metrics_dict[metric_name] = {
-                    'value': latest_entry['value'],
-                    'type': self.metrics_collector.metric_definitions.get(metric_name, {}).get('type', 'gauge'),
-                    'unit': latest_entry['labels'].get('unit') if latest_entry.get('labels') else None,
-                    'timestamp': latest_entry['timestamp']
+                    "value": latest_entry["value"],
+                    "type": self.metrics_collector.metric_definitions.get(metric_name, {}).get("type", "gauge"),
+                    "unit": latest_entry["labels"].get("unit") if latest_entry.get("labels") else None,
+                    "timestamp": latest_entry["timestamp"],
                 }
         return metrics_dict
 
@@ -624,34 +683,36 @@ class AdvancedMonitoringService:
             List of threshold violations
         """
         violations = []
-        if not hasattr(self, 'performance_thresholds'):
+        if not hasattr(self, "performance_thresholds"):
             return violations
 
         for metric_name, threshold_config in self.performance_thresholds.items():
             # Get latest metric value
             history = self.metrics_collector.get_metric_history(metric_name)
             if history:
-                latest_value = history[-1]['value']
+                latest_value = history[-1]["value"]
 
                 # Check thresholds
                 severity = None
                 threshold = None
 
-                if 'critical' in threshold_config and latest_value > threshold_config['critical']:
-                    severity = 'critical'
-                    threshold = threshold_config['critical']
-                elif 'warning' in threshold_config and latest_value > threshold_config['warning']:
-                    severity = 'warning'
-                    threshold = threshold_config['warning']
+                if "critical" in threshold_config and latest_value > threshold_config["critical"]:
+                    severity = "critical"
+                    threshold = threshold_config["critical"]
+                elif "warning" in threshold_config and latest_value > threshold_config["warning"]:
+                    severity = "warning"
+                    threshold = threshold_config["warning"]
 
                 if severity:
-                    violations.append({
-                        'metric': metric_name,
-                        'value': latest_value,
-                        'threshold': threshold,
-                        'severity': severity,
-                        'timestamp': history[-1]['timestamp']
-                    })
+                    violations.append(
+                        {
+                            "metric": metric_name,
+                            "value": latest_value,
+                            "threshold": threshold,
+                            "severity": severity,
+                            "timestamp": history[-1]["timestamp"],
+                        }
+                    )
 
         return violations
 
@@ -663,13 +724,15 @@ class AdvancedMonitoringService:
             Dictionary with service status details
         """
         return {
-            'monitoring_enabled': self.monitoring_active,
-            'metrics_collected': sum(len(data) for data in self.metrics_collector.metrics_buffer.values()),
-            'alerts_active': len(self.alert_manager.alerts),
-            'uptime': time.time() - (self.start_time if hasattr(self, 'start_time') else time.time())
+            "monitoring_enabled": self.monitoring_active,
+            "metrics_collected": sum(len(data) for data in self.metrics_collector.metrics_buffer.values()),
+            "alerts_active": len(self.alert_manager.alerts),
+            "uptime": time.time() - (self.start_time if hasattr(self, "start_time") else time.time()),
         }
 
-    def create_alert(self, alert_type: str, message: str, severity: str, metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+    def create_alert(
+        self, alert_type: str, message: str, severity: str, metadata: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """
         Create a new alert.
 
@@ -683,12 +746,12 @@ class AdvancedMonitoringService:
             Created alert information
         """
         alert = {
-            'alert_id': str(uuid.uuid4())[:8],
-            'alert_type': alert_type,
-            'message': message,
-            'severity': severity,
-            'metadata': metadata or {},
-            'created_at': datetime.now().isoformat()
+            "alert_id": str(uuid.uuid4())[:8],
+            "alert_type": alert_type,
+            "message": message,
+            "severity": severity,
+            "metadata": metadata or {},
+            "created_at": datetime.now().isoformat(),
         }
 
         with self.alert_manager.lock:
@@ -725,12 +788,20 @@ def get_monitoring_service() -> AdvancedMonitoringService:
 class profile_performance:
     """Context manager for easy performance profiling."""
 
-    def __init__(self, operation_name: str, operation_type: str, metadata: Dict[str, Any] = None):
+    def __init__(self, operation_name: str, operation_type: str = None, metadata: Dict[str, Any] = None):
         self.operation_name = operation_name
-        self.operation_type = operation_type
+        # Default operation_type to operation_name if not provided
+        self.operation_type = operation_type or operation_name
         self.metadata = metadata or {}
         self.monitoring_service = get_monitoring_service()
         self.profile_id = None
+
+    def __call__(self, func):
+        """Support decorator usage: @profile_performance("operation_name")"""
+        def wrapper(*args, **kwargs):
+            with profile_performance(self.operation_name, self.operation_type, self.metadata):
+                return func(*args, **kwargs)
+        return wrapper
 
     def __enter__(self):
         self.profile_id = self.monitoring_service.performance_profiler.start_profile(
@@ -740,15 +811,17 @@ class profile_performance:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.profile_id:
-            status = 'completed' if exc_type is None else 'failed'
-            error_metadata = {'error': str(exc_val)} if exc_val else {}
-            self.monitoring_service.performance_profiler.end_profile(
-                self.profile_id, status, error_metadata
-            )
+            status = "completed" if exc_type is None else "failed"
+            error_metadata = {"error": str(exc_val)} if exc_val else {}
+            profile = self.monitoring_service.performance_profiler.end_profile(self.profile_id, status, error_metadata)
+            
+            # Record profile metrics for testing and analytics
+            if profile and "error" not in profile:
+                self.monitoring_service.performance_profiler.record_profile_metrics(
+                    profile, self.monitoring_service.metrics_collector
+                )
 
     def checkpoint(self, checkpoint_name: str, metadata: Dict[str, Any] = None):
         """Add a checkpoint to the current profile."""
         if self.profile_id:
-            self.monitoring_service.performance_profiler.add_checkpoint(
-                self.profile_id, checkpoint_name, metadata
-            )
+            self.monitoring_service.performance_profiler.add_checkpoint(self.profile_id, checkpoint_name, metadata)

@@ -3,13 +3,17 @@ Management command to validate sentiment analysis accuracy.
 Tests the FinBERT model against labeled financial text samples.
 """
 
-import time
 import json
-from typing import List, Dict, Tuple
-from django.core.management.base import BaseCommand, CommandError
+import time
+from typing import Dict, List, Tuple
+
+from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from Analytics.services.sentiment_analyzer import get_sentiment_analyzer, sentiment_metrics
+from Analytics.services.sentiment_analyzer import (
+    get_sentiment_analyzer,
+    sentiment_metrics,
+)
 
 
 class Command(BaseCommand):
@@ -18,43 +22,27 @@ class Command(BaseCommand):
     Tests the 80% accuracy target requirement.
     """
 
-    help = 'Validate sentiment analysis accuracy against test samples'
+    help = "Validate sentiment analysis accuracy against test samples"
 
     def add_arguments(self, parser):
         """Add command line arguments."""
         parser.add_argument(
-            '--sample-size',
-            type=int,
-            default=50,
-            help='Number of test samples to evaluate (default: 50)'
+            "--sample-size", type=int, default=50, help="Number of test samples to evaluate (default: 50)"
         )
         parser.add_argument(
-            '--confidence-threshold',
-            type=float,
-            default=0.6,
-            help='Minimum confidence threshold (default: 0.6)'
+            "--confidence-threshold", type=float, default=0.6, help="Minimum confidence threshold (default: 0.6)"
         )
-        parser.add_argument(
-            '--output-file',
-            type=str,
-            help='Optional file to save detailed results'
-        )
-        parser.add_argument(
-            '--verbose',
-            action='store_true',
-            help='Show detailed per-sample results'
-        )
+        parser.add_argument("--output-file", type=str, help="Optional file to save detailed results")
+        parser.add_argument("--verbose", action="store_true", help="Show detailed per-sample results")
 
     def handle(self, *args, **options):
         """Main command handler."""
-        sample_size = options['sample_size']
-        confidence_threshold = options['confidence_threshold']
-        output_file = options['output_file']
-        verbose = options['verbose']
+        sample_size = options["sample_size"]
+        confidence_threshold = options["confidence_threshold"]
+        output_file = options["output_file"]
+        verbose = options["verbose"]
 
-        self.stdout.write(
-            self.style.SUCCESS(f"Starting sentiment analysis accuracy validation...")
-        )
+        self.stdout.write(self.style.SUCCESS(f"Starting sentiment analysis accuracy validation..."))
         self.stdout.write(f"Sample size: {sample_size}")
         self.stdout.write(f"Confidence threshold: {confidence_threshold}")
 
@@ -79,17 +67,13 @@ class Command(BaseCommand):
             self.stdout.write(f"Detailed results saved to: {output_file}")
 
         # Check if accuracy target met
-        if results['overall_accuracy'] >= 0.8:
+        if results["overall_accuracy"] >= 0.8:
             self.stdout.write(
-                self.style.SUCCESS(
-                    f"✅ PASSED: Accuracy target of 80% achieved ({results['overall_accuracy']:.1%})"
-                )
+                self.style.SUCCESS(f"✅ PASSED: Accuracy target of 80% achieved ({results['overall_accuracy']:.1%})")
             )
         else:
             self.stdout.write(
-                self.style.ERROR(
-                    f"❌ FAILED: Accuracy target of 80% not met ({results['overall_accuracy']:.1%})"
-                )
+                self.style.ERROR(f"❌ FAILED: Accuracy target of 80% not met ({results['overall_accuracy']:.1%})")
             )
 
     def _generate_financial_test_samples(self, sample_size: int) -> List[Tuple[str, str]]:
@@ -120,7 +104,7 @@ class Command(BaseCommand):
             "Operating leverage produces exceptional profit growth acceleration",
             "New contract wins provide strong revenue visibility for next year",
             "International expansion delivers impressive early results",
-            "Digital transformation drives significant operational improvements"
+            "Digital transformation drives significant operational improvements",
         ]
 
         negative_samples = [
@@ -143,7 +127,7 @@ class Command(BaseCommand):
             "Failed merger attempt wastes resources and damages credibility",
             "Analyst downgrades multiply following weak quarterly performance",
             "Customer data breach triggers class-action lawsuit filing",
-            "Manufacturing facility closure eliminates hundreds of local jobs"
+            "Manufacturing facility closure eliminates hundreds of local jobs",
         ]
 
         neutral_samples = [
@@ -166,7 +150,7 @@ class Command(BaseCommand):
             "Standard employee performance reviews conducted this quarter",
             "Routine facility inspection completed without major findings",
             "Company maintains existing guidance for fiscal year outlook",
-            "Regular software updates deployed across enterprise systems"
+            "Regular software updates deployed across enterprise systems",
         ]
 
         # Balance the samples based on requested size
@@ -176,28 +160,21 @@ class Command(BaseCommand):
         selected_samples = []
 
         # Add positive samples
-        selected_samples.extend([
-            (text, "positive") for text in positive_samples[:samples_per_category + (1 if remaining > 0 else 0)]
-        ])
+        selected_samples.extend(
+            [(text, "positive") for text in positive_samples[: samples_per_category + (1 if remaining > 0 else 0)]]
+        )
 
-        # Add negative samples  
-        selected_samples.extend([
-            (text, "negative") for text in negative_samples[:samples_per_category + (1 if remaining > 1 else 0)]
-        ])
+        # Add negative samples
+        selected_samples.extend(
+            [(text, "negative") for text in negative_samples[: samples_per_category + (1 if remaining > 1 else 0)]]
+        )
 
         # Add neutral samples
-        selected_samples.extend([
-            (text, "neutral") for text in neutral_samples[:samples_per_category]
-        ])
+        selected_samples.extend([(text, "neutral") for text in neutral_samples[:samples_per_category]])
 
         return selected_samples[:sample_size]
 
-    def _validate_accuracy(
-        self,
-        analyzer,
-        test_samples: List[Tuple[str, str]],
-        verbose: bool
-    ) -> Dict:
+    def _validate_accuracy(self, analyzer, test_samples: List[Tuple[str, str]], verbose: bool) -> Dict:
         """
         Run accuracy validation on test samples.
 
@@ -210,20 +187,20 @@ class Command(BaseCommand):
             Dictionary with validation results
         """
         results = {
-            'total_samples': len(test_samples),
-            'correct_predictions': 0,
-            'predictions_by_category': {
-                'positive': {'correct': 0, 'total': 0},
-                'negative': {'correct': 0, 'total': 0},
-                'neutral': {'correct': 0, 'total': 0}
+            "total_samples": len(test_samples),
+            "correct_predictions": 0,
+            "predictions_by_category": {
+                "positive": {"correct": 0, "total": 0},
+                "negative": {"correct": 0, "total": 0},
+                "neutral": {"correct": 0, "total": 0},
             },
-            'confidence_stats': {
-                'high_confidence': 0,  # >= 0.8
-                'medium_confidence': 0,  # 0.6 - 0.8
-                'low_confidence': 0  # < 0.6
+            "confidence_stats": {
+                "high_confidence": 0,  # >= 0.8
+                "medium_confidence": 0,  # 0.6 - 0.8
+                "low_confidence": 0,  # < 0.6
             },
-            'processing_time': 0,
-            'samples': []
+            "processing_time": 0,
+            "samples": [],
         }
 
         start_time = time.time()
@@ -237,38 +214,38 @@ class Command(BaseCommand):
                 # Analyze sentiment
                 result = analyzer.analyzeSentimentSingle(text)
 
-                predicted = result['sentimentLabel']
-                confidence = result['sentimentConfidence']
-                score = result['sentimentScore']
+                predicted = result["sentimentLabel"]
+                confidence = result["sentimentConfidence"]
+                score = result["sentimentScore"]
 
                 # Track overall accuracy
                 is_correct = predicted == expected
                 if is_correct:
-                    results['correct_predictions'] += 1
+                    results["correct_predictions"] += 1
 
                 # Track per-category accuracy
-                results['predictions_by_category'][expected]['total'] += 1
+                results["predictions_by_category"][expected]["total"] += 1
                 if is_correct:
-                    results['predictions_by_category'][expected]['correct'] += 1
+                    results["predictions_by_category"][expected]["correct"] += 1
 
                 # Track confidence distribution
                 if confidence >= 0.8:
-                    results['confidence_stats']['high_confidence'] += 1
+                    results["confidence_stats"]["high_confidence"] += 1
                 elif confidence >= 0.6:
-                    results['confidence_stats']['medium_confidence'] += 1
+                    results["confidence_stats"]["medium_confidence"] += 1
                 else:
-                    results['confidence_stats']['low_confidence'] += 1
+                    results["confidence_stats"]["low_confidence"] += 1
 
                 # Store sample result
                 sample_result = {
-                    'text': text[:100] + "..." if len(text) > 100 else text,
-                    'expected': expected,
-                    'predicted': predicted,
-                    'confidence': confidence,
-                    'score': score,
-                    'correct': is_correct
+                    "text": text[:100] + "..." if len(text) > 100 else text,
+                    "expected": expected,
+                    "predicted": predicted,
+                    "confidence": confidence,
+                    "score": score,
+                    "correct": is_correct,
                 }
-                results['samples'].append(sample_result)
+                results["samples"].append(sample_result)
 
                 if verbose:
                     status = "✅" if is_correct else "❌"
@@ -280,43 +257,45 @@ class Command(BaseCommand):
                     )
 
             except Exception as e:
-                self.stdout.write(
-                    self.style.ERROR(f"Error processing sample {i+1}: {str(e)}")
-                )
+                self.stdout.write(self.style.ERROR(f"Error processing sample {i+1}: {str(e)}"))
                 continue
 
-        results['processing_time'] = time.time() - start_time
-        results['overall_accuracy'] = results['correct_predictions'] / results['total_samples']
+        results["processing_time"] = time.time() - start_time
+        results["overall_accuracy"] = results["correct_predictions"] / results["total_samples"]
 
         return results
 
     def _display_results(self, results: Dict, confidence_threshold: float):
         """Display validation results summary."""
-        self.stdout.write("\n" + "="*80)
+        self.stdout.write("\n" + "=" * 80)
         self.stdout.write("SENTIMENT ANALYSIS ACCURACY VALIDATION RESULTS")
-        self.stdout.write("="*80)
+        self.stdout.write("=" * 80)
 
         # Overall metrics
-        accuracy = results['overall_accuracy']
-        self.stdout.write(f"Overall Accuracy: {accuracy:.1%} ({results['correct_predictions']}/{results['total_samples']})")
+        accuracy = results["overall_accuracy"]
+        self.stdout.write(
+            f"Overall Accuracy: {accuracy:.1%} ({results['correct_predictions']}/{results['total_samples']})"
+        )
 
         # Per-category accuracy
         self.stdout.write("\nAccuracy by Sentiment Category:")
-        for category, stats in results['predictions_by_category'].items():
-            if stats['total'] > 0:
-                cat_accuracy = stats['correct'] / stats['total']
-                self.stdout.write(f"  {category.capitalize()}: {cat_accuracy:.1%} ({stats['correct']}/{stats['total']})")
+        for category, stats in results["predictions_by_category"].items():
+            if stats["total"] > 0:
+                cat_accuracy = stats["correct"] / stats["total"]
+                self.stdout.write(
+                    f"  {category.capitalize()}: {cat_accuracy:.1%} ({stats['correct']}/{stats['total']})"
+                )
 
         # Confidence distribution
         self.stdout.write("\nConfidence Distribution:")
-        total = results['total_samples']
-        for level, count in results['confidence_stats'].items():
+        total = results["total_samples"]
+        for level, count in results["confidence_stats"].items():
             percentage = (count / total) * 100
             self.stdout.write(f"  {level.replace('_', ' ').title()}: {count} ({percentage:.1f}%)")
 
         # Performance metrics
         self.stdout.write(f"\nProcessing Time: {results['processing_time']:.2f} seconds")
-        avg_time = results['processing_time'] / results['total_samples']
+        avg_time = results["processing_time"] / results["total_samples"]
         self.stdout.write(f"Average per Sample: {avg_time:.3f} seconds")
 
         # Accuracy target assessment
@@ -327,11 +306,12 @@ class Command(BaseCommand):
         self.stdout.write(f"\n80% Accuracy Target: {status_style(status_text)}")
 
         # Additional insights
-        high_conf_samples = results['confidence_stats']['high_confidence']
+        high_conf_samples = results["confidence_stats"]["high_confidence"]
         if high_conf_samples > 0:
             # Calculate accuracy for high-confidence predictions
-            high_conf_correct = sum(1 for sample in results['samples'] 
-                                  if sample['confidence'] >= 0.8 and sample['correct'])
+            high_conf_correct = sum(
+                1 for sample in results["samples"] if sample["confidence"] >= 0.8 and sample["correct"]
+            )
             high_conf_accuracy = high_conf_correct / high_conf_samples
             self.stdout.write(f"High Confidence (≥0.8) Accuracy: {high_conf_accuracy:.1%}")
 
@@ -339,22 +319,20 @@ class Command(BaseCommand):
         """Save detailed results to JSON file."""
         # Prepare results for JSON serialization
         json_results = {
-            'timestamp': timezone.now().isoformat(),
-            'summary': {
-                'total_samples': results['total_samples'],
-                'correct_predictions': results['correct_predictions'],
-                'overall_accuracy': results['overall_accuracy'],
-                'processing_time': results['processing_time']
+            "timestamp": timezone.now().isoformat(),
+            "summary": {
+                "total_samples": results["total_samples"],
+                "correct_predictions": results["correct_predictions"],
+                "overall_accuracy": results["overall_accuracy"],
+                "processing_time": results["processing_time"],
             },
-            'category_accuracy': results['predictions_by_category'],
-            'confidence_distribution': results['confidence_stats'],
-            'samples': results['samples']
+            "category_accuracy": results["predictions_by_category"],
+            "confidence_distribution": results["confidence_stats"],
+            "samples": results["samples"],
         }
 
         try:
-            with open(output_file, 'w') as f:
+            with open(output_file, "w") as f:
                 json.dump(json_results, f, indent=2)
         except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"Failed to save results: {str(e)}")
-            )
+            self.stdout.write(self.style.ERROR(f"Failed to save results: {str(e)}"))

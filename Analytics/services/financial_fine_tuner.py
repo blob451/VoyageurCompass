@@ -7,13 +7,13 @@ import json
 import logging
 import os
 import time
-from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
-from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 # Conditional imports for ML dependencies to support CI environments
 try:
     import torch
+
     TORCH_AVAILABLE = True
 except ImportError:
     torch = None
@@ -21,26 +21,27 @@ except ImportError:
 
 # Fine-tuning dependencies (these would need to be installed)
 try:
-    from transformers import (
-        AutoTokenizer, 
-        AutoModelForCausalLM, 
-        TrainingArguments, 
-        DataCollatorForLanguageModeling
-    )
-    from peft import LoraConfig, get_peft_model, PeftModel, TaskType
-    from trl import SFTTrainer
     from datasets import Dataset, load_dataset
+    from peft import LoraConfig, PeftModel, TaskType, get_peft_model
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoTokenizer,
+        DataCollatorForLanguageModeling,
+        TrainingArguments,
+    )
+    from trl import SFTTrainer
+
     FINE_TUNING_AVAILABLE = True
     import wandb
+
     FINE_TUNING_AVAILABLE = True
 except ImportError:
     # Create dummy classes for type hints when dependencies unavailable
     class Dataset:
         pass
+
     FINE_TUNING_AVAILABLE = False
 
-from django.conf import settings
-from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -71,53 +72,57 @@ class FinancialDomainFineTuner:
 
         # LoRA configuration optimized for financial domain
         self.lora_config = LoraConfig(
-            r=16,                              # Low-rank dimension
-            lora_alpha=32,                     # Scaling parameter
-            target_modules=[                   # Target attention modules
-                "q_proj", "v_proj", "o_proj", 
-                "gate_proj", "up_proj", "down_proj"
+            r=16,  # Low-rank dimension
+            lora_alpha=32,  # Scaling parameter
+            target_modules=[  # Target attention modules
+                "q_proj",
+                "v_proj",
+                "o_proj",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
             ],
-            lora_dropout=0.1,                  # Dropout for regularization
-            bias="none",                       # No bias adaptation
-            task_type=TaskType.CAUSAL_LM,      # Causal language modeling
-            inference_mode=False               # Training mode
+            lora_dropout=0.1,  # Dropout for regularization
+            bias="none",  # No bias adaptation
+            task_type=TaskType.CAUSAL_LM,  # Causal language modeling
+            inference_mode=False,  # Training mode
         )
 
         # Training configuration
         self.training_config = {
-            'output_dir': './financial-llama-lora',
-            'num_train_epochs': 3,
-            'per_device_train_batch_size': 4,
-            'per_device_eval_batch_size': 4,
-            'warmup_steps': 100,
-            'learning_rate': 2e-4,
-            'fp16': TORCH_AVAILABLE and torch.cuda.is_available(),
-            'logging_steps': 10,
-            'evaluation_strategy': "steps",
-            'eval_steps': 500,
-            'save_strategy': "steps",
-            'save_steps': 500,
-            'load_best_model_at_end': True,
-            'metric_for_best_model': 'eval_loss',
-            'greater_is_better': False,
-            'dataloader_num_workers': 4,
-            'remove_unused_columns': False,
-            'gradient_accumulation_steps': 2,
-            'max_grad_norm': 1.0,
-            'weight_decay': 0.01,
-            'adam_epsilon': 1e-8,
-            'lr_scheduler_type': 'cosine',
-            'save_total_limit': 3,
-            'prediction_loss_only': True
+            "output_dir": "./financial-llama-lora",
+            "num_train_epochs": 3,
+            "per_device_train_batch_size": 4,
+            "per_device_eval_batch_size": 4,
+            "warmup_steps": 100,
+            "learning_rate": 2e-4,
+            "fp16": TORCH_AVAILABLE and torch.cuda.is_available(),
+            "logging_steps": 10,
+            "evaluation_strategy": "steps",
+            "eval_steps": 500,
+            "save_strategy": "steps",
+            "save_steps": 500,
+            "load_best_model_at_end": True,
+            "metric_for_best_model": "eval_loss",
+            "greater_is_better": False,
+            "dataloader_num_workers": 4,
+            "remove_unused_columns": False,
+            "gradient_accumulation_steps": 2,
+            "max_grad_norm": 1.0,
+            "weight_decay": 0.01,
+            "adam_epsilon": 1e-8,
+            "lr_scheduler_type": "cosine",
+            "save_total_limit": 3,
+            "prediction_loss_only": True,
         }
 
         # Quality validation metrics
         self.quality_metrics = {
-            'recommendation_keywords': ['BUY', 'SELL', 'HOLD', 'buy', 'sell', 'hold'],
-            'technical_indicators': ['RSI', 'MACD', 'SMA', 'Bollinger', 'Volume', 'Support', 'Resistance'],
-            'financial_terms': ['analysis', 'recommendation', 'technical', 'momentum', 'trend', 'signals'],
-            'min_explanation_length': 50,
-            'max_explanation_length': 500
+            "recommendation_keywords": ["BUY", "SELL", "HOLD", "buy", "sell", "hold"],
+            "technical_indicators": ["RSI", "MACD", "SMA", "Bollinger", "Volume", "Support", "Resistance"],
+            "financial_terms": ["analysis", "recommendation", "technical", "momentum", "trend", "signals"],
+            "min_explanation_length": 50,
+            "max_explanation_length": 500,
         }
 
         logger.info("Financial Domain Fine-Tuner initialized")
@@ -129,9 +134,7 @@ class FinancialDomainFineTuner:
 
             # Load tokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(
-                self.base_model_path,
-                trust_remote_code=True,
-                padding_side="right"  # Important for training
+                self.base_model_path, trust_remote_code=True, padding_side="right"  # Important for training
             )
 
             # Add padding token if not present
@@ -140,14 +143,19 @@ class FinancialDomainFineTuner:
 
             # Load model with optimization for training
             model_kwargs = {
-                'trust_remote_code': True,
-                'torch_dtype': torch.float16 if (TORCH_AVAILABLE and torch.cuda.is_available()) else (torch.float32 if TORCH_AVAILABLE else None),
-                'device_map': 'auto' if (TORCH_AVAILABLE and torch.cuda.is_available()) else None,
+                "trust_remote_code": True,
+                "torch_dtype": (
+                    torch.float16
+                    if (TORCH_AVAILABLE and torch.cuda.is_available())
+                    else (torch.float32 if TORCH_AVAILABLE else None)
+                ),
+                "device_map": "auto" if (TORCH_AVAILABLE and torch.cuda.is_available()) else None,
             }
 
             # Use 4-bit quantization if available for memory efficiency
             try:
                 from transformers import BitsAndBytesConfig
+
                 if TORCH_AVAILABLE and torch.cuda.is_available():
                     bnb_config = BitsAndBytesConfig(
                         load_in_4bit=True,
@@ -155,15 +163,12 @@ class FinancialDomainFineTuner:
                         bnb_4bit_compute_dtype=torch.float16,
                         bnb_4bit_use_double_quant=True,
                     )
-                    model_kwargs['quantization_config'] = bnb_config
+                    model_kwargs["quantization_config"] = bnb_config
                     logger.info("Using 4-bit quantization for memory efficiency")
             except ImportError:
                 logger.info("BitsAndBytes not available, using standard precision")
 
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.base_model_path,
-                **model_kwargs
-            )
+            self.model = AutoModelForCausalLM.from_pretrained(self.base_model_path, **model_kwargs)
 
             # Apply LoRA
             self.model = get_peft_model(self.model, self.lora_config)
@@ -194,10 +199,10 @@ class FinancialDomainFineTuner:
             logger.info(f"Loading dataset from: {dataset_path}")
 
             # Load dataset
-            if dataset_path.endswith('.jsonl'):
-                raw_dataset = load_dataset('json', data_files=dataset_path)['train']
+            if dataset_path.endswith(".jsonl"):
+                raw_dataset = load_dataset("json", data_files=dataset_path)["train"]
             else:
-                with open(dataset_path, 'r', encoding='utf-8') as f:
+                with open(dataset_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 raw_dataset = Dataset.from_list(data)
 
@@ -217,22 +222,22 @@ class FinancialDomainFineTuner:
             # Format samples for training
             def format_instruction_sample(sample):
                 """Format instruction sample for fine-tuning."""
-                instruction = sample['instruction']
-                input_data = json.dumps(sample['input'], separators=(',', ':'))
-                output = sample['output']
+                instruction = sample["instruction"]
+                input_data = json.dumps(sample["input"], separators=(",", ":"))
+                output = sample["output"]
 
                 # Create formatted text for training
                 text = f"### Instruction:\n{instruction}\n\n### Input:\n{input_data}\n\n### Response:\n{output}"
 
-                return {'text': text}
+                return {"text": text}
 
             formatted_dataset = dataset.map(format_instruction_sample, remove_columns=dataset.column_names)
 
             # Split into train and validation
             if validation_split > 0:
                 split_dataset = formatted_dataset.train_test_split(test_size=validation_split, seed=42)
-                train_dataset = split_dataset['train']
-                eval_dataset = split_dataset['test']
+                train_dataset = split_dataset["train"]
+                eval_dataset = split_dataset["test"]
             else:
                 train_dataset = formatted_dataset
                 eval_dataset = None
@@ -259,28 +264,25 @@ class FinancialDomainFineTuner:
         """
         try:
             # Check required fields
-            required_fields = ['instruction', 'input', 'output']
+            required_fields = ["instruction", "input", "output"]
             if not all(field in sample for field in required_fields):
                 return False
 
-            output = sample['output']
+            output = sample["output"]
 
             # Length validation
-            if len(output) < self.quality_metrics['min_explanation_length']:
+            if len(output) < self.quality_metrics["min_explanation_length"]:
                 return False
-            if len(output) > self.quality_metrics['max_explanation_length']:
+            if len(output) > self.quality_metrics["max_explanation_length"]:
                 return False
 
             # Check for recommendation
-            has_recommendation = any(
-                keyword in output 
-                for keyword in self.quality_metrics['recommendation_keywords']
-            )
+            has_recommendation = any(keyword in output for keyword in self.quality_metrics["recommendation_keywords"])
 
             # Check for technical content
             has_technical_content = any(
-                term.lower() in output.lower() 
-                for term in self.quality_metrics['technical_indicators'] + self.quality_metrics['financial_terms']
+                term.lower() in output.lower()
+                for term in self.quality_metrics["technical_indicators"] + self.quality_metrics["financial_terms"]
             )
 
             return has_recommendation and has_technical_content
@@ -299,8 +301,7 @@ class FinancialDomainFineTuner:
         try:
             # Training arguments
             training_args = TrainingArguments(
-                **self.training_config,
-                run_name=f"financial-llama-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                **self.training_config, run_name=f"financial-llama-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
             )
 
             # Create trainer
@@ -314,8 +315,7 @@ class FinancialDomainFineTuner:
                 tokenizer=self.tokenizer,
                 args=training_args,
                 data_collator=DataCollatorForLanguageModeling(
-                    tokenizer=self.tokenizer,
-                    mlm=False  # Causal language modeling
+                    tokenizer=self.tokenizer, mlm=False  # Causal language modeling
                 ),
                 packing=False,  # Don't pack sequences
             )
@@ -326,10 +326,9 @@ class FinancialDomainFineTuner:
             logger.error(f"Failed to create trainer: {str(e)}")
             raise
 
-    def start_fine_tuning(self, 
-                         dataset_path: str,
-                         output_dir: Optional[str] = None,
-                         use_wandb: bool = True) -> Dict[str, Any]:
+    def start_fine_tuning(
+        self, dataset_path: str, output_dir: Optional[str] = None, use_wandb: bool = True
+    ) -> Dict[str, Any]:
         """
         Start the fine-tuning process.
 
@@ -351,10 +350,10 @@ class FinancialDomainFineTuner:
                         project="financial-llama-finetune",
                         name=f"financial-lora-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
                         config={
-                            'base_model': self.base_model_path,
-                            'lora_config': self.lora_config.__dict__,
-                            'training_config': self.training_config
-                        }
+                            "base_model": self.base_model_path,
+                            "lora_config": self.lora_config.__dict__,
+                            "training_config": self.training_config,
+                        },
                     )
                     logger.info("Weights & Biases initialized")
                 except Exception as e:
@@ -370,7 +369,7 @@ class FinancialDomainFineTuner:
 
             # Update output directory if provided
             if output_dir:
-                self.training_config['output_dir'] = output_dir
+                self.training_config["output_dir"] = output_dir
 
             # Create trainer
             self.create_trainer(train_dataset, eval_dataset)
@@ -385,7 +384,7 @@ class FinancialDomainFineTuner:
             logger.info(f"Fine-tuning completed in {training_time:.2f} seconds")
 
             # Save final model
-            final_model_path = os.path.join(self.training_config['output_dir'], 'final_model')
+            final_model_path = os.path.join(self.training_config["output_dir"], "final_model")
             self.trainer.save_model(final_model_path)
             logger.info(f"Final model saved to: {final_model_path}")
 
@@ -398,16 +397,16 @@ class FinancialDomainFineTuner:
 
             # Compile results
             results = {
-                'training_completed': True,
-                'training_time_seconds': training_time,
-                'final_model_path': final_model_path,
-                'training_history': training_result.log_history if hasattr(training_result, 'log_history') else [],
-                'evaluation_results': eval_results,
-                'training_config': self.training_config,
-                'lora_config': self.lora_config.__dict__,
-                'dataset_size': len(train_dataset),
-                'validation_size': len(eval_dataset) if eval_dataset else 0,
-                'completion_time': datetime.now().isoformat()
+                "training_completed": True,
+                "training_time_seconds": training_time,
+                "final_model_path": final_model_path,
+                "training_history": training_result.log_history if hasattr(training_result, "log_history") else [],
+                "evaluation_results": eval_results,
+                "training_config": self.training_config,
+                "lora_config": self.lora_config.__dict__,
+                "dataset_size": len(train_dataset),
+                "validation_size": len(eval_dataset) if eval_dataset else 0,
+                "completion_time": datetime.now().isoformat(),
             }
 
             # Close W&B run
@@ -438,11 +437,7 @@ class FinancialDomainFineTuner:
                 self.load_base_model()
 
             # Load adapter
-            self.model = PeftModel.from_pretrained(
-                self.model,
-                adapter_path,
-                is_trainable=False  # For inference
-            )
+            self.model = PeftModel.from_pretrained(self.model, adapter_path, is_trainable=False)  # For inference
 
             logger.info("Fine-tuned model loaded successfully")
 
@@ -450,10 +445,9 @@ class FinancialDomainFineTuner:
             logger.error(f"Failed to load fine-tuned model: {str(e)}")
             raise
 
-    def generate_explanation(self, 
-                           analysis_data: Dict[str, Any],
-                           detail_level: str = 'standard',
-                           max_new_tokens: int = 200) -> Optional[str]:
+    def generate_explanation(
+        self, analysis_data: Dict[str, Any], detail_level: str = "standard", max_new_tokens: int = 200
+    ) -> Optional[str]:
         """
         Generate explanation using fine-tuned model.
 
@@ -471,22 +465,16 @@ class FinancialDomainFineTuner:
 
         try:
             # Format input
-            symbol = analysis_data.get('symbol', 'UNKNOWN')
-            score = analysis_data.get('score_0_10', 0)
+            symbol = analysis_data.get("symbol", "UNKNOWN")
+            score = analysis_data.get("score_0_10", 0)
 
             instruction = f"Generate a comprehensive investment analysis for {symbol} with score {score}/10 based on the provided technical indicators."
-            input_data = json.dumps(analysis_data, separators=(',', ':'))
+            input_data = json.dumps(analysis_data, separators=(",", ":"))
 
             prompt = f"### Instruction:\n{instruction}\n\n### Input:\n{input_data}\n\n### Response:\n"
 
             # Tokenize input
-            inputs = self.tokenizer(
-                prompt,
-                return_tensors="pt",
-                truncation=True,
-                max_length=512,
-                padding=False
-            )
+            inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512, padding=False)
 
             # Move to device
             if TORCH_AVAILABLE and torch.cuda.is_available():
@@ -502,7 +490,7 @@ class FinancialDomainFineTuner:
                     do_sample=True,
                     pad_token_id=self.tokenizer.eos_token_id,
                     eos_token_id=self.tokenizer.eos_token_id,
-                    repetition_penalty=1.1
+                    repetition_penalty=1.1,
                 )
 
             # Decode response
@@ -536,45 +524,42 @@ class FinancialDomainFineTuner:
             logger.info("Evaluating fine-tuned model quality...")
 
             # Load test dataset
-            with open(test_dataset_path, 'r', encoding='utf-8') as f:
+            with open(test_dataset_path, "r", encoding="utf-8") as f:
                 test_data = json.load(f)
 
             # Sample subset for evaluation (to save time)
-            test_samples = test_data[:min(100, len(test_data))]
+            test_samples = test_data[: min(100, len(test_data))]
 
             quality_scores = {
-                'recommendation_accuracy': 0,
-                'technical_coverage': 0,
-                'content_quality': 0,
-                'total_samples': len(test_samples),
-                'successful_generations': 0
+                "recommendation_accuracy": 0,
+                "technical_coverage": 0,
+                "content_quality": 0,
+                "total_samples": len(test_samples),
+                "successful_generations": 0,
             }
 
             for i, sample in enumerate(test_samples):
                 try:
                     # Generate explanation
-                    generated_explanation = self.generate_explanation(
-                        sample['input'],
-                        max_new_tokens=300
-                    )
+                    generated_explanation = self.generate_explanation(sample["input"], max_new_tokens=300)
 
                     if not generated_explanation:
                         continue
 
-                    quality_scores['successful_generations'] += 1
+                    quality_scores["successful_generations"] += 1
 
                     # Evaluate recommendation accuracy
-                    expected_output = sample['output']
+                    expected_output = sample["output"]
                     if self._has_consistent_recommendation(generated_explanation, expected_output):
-                        quality_scores['recommendation_accuracy'] += 1
+                        quality_scores["recommendation_accuracy"] += 1
 
                     # Evaluate technical coverage
-                    if self._has_technical_coverage(generated_explanation, sample['input']):
-                        quality_scores['technical_coverage'] += 1
+                    if self._has_technical_coverage(generated_explanation, sample["input"]):
+                        quality_scores["technical_coverage"] += 1
 
                     # Evaluate content quality
                     if self._assess_content_quality(generated_explanation):
-                        quality_scores['content_quality'] += 1
+                        quality_scores["content_quality"] += 1
 
                     if (i + 1) % 10 == 0:
                         logger.info(f"Evaluated {i + 1}/{len(test_samples)} samples...")
@@ -584,16 +569,14 @@ class FinancialDomainFineTuner:
                     continue
 
             # Calculate final scores
-            if quality_scores['successful_generations'] > 0:
-                for metric in ['recommendation_accuracy', 'technical_coverage', 'content_quality']:
-                    quality_scores[f'{metric}_rate'] = (
-                        quality_scores[metric] / quality_scores['successful_generations']
-                    )
+            if quality_scores["successful_generations"] > 0:
+                for metric in ["recommendation_accuracy", "technical_coverage", "content_quality"]:
+                    quality_scores[f"{metric}_rate"] = quality_scores[metric] / quality_scores["successful_generations"]
 
-                quality_scores['overall_quality_score'] = (
-                    quality_scores['recommendation_accuracy_rate'] * 0.4 +
-                    quality_scores['technical_coverage_rate'] * 0.3 +
-                    quality_scores['content_quality_rate'] * 0.3
+                quality_scores["overall_quality_score"] = (
+                    quality_scores["recommendation_accuracy_rate"] * 0.4
+                    + quality_scores["technical_coverage_rate"] * 0.3
+                    + quality_scores["content_quality_rate"] * 0.3
                 )
 
             logger.info(f"Quality evaluation complete: {quality_scores}")
@@ -612,21 +595,21 @@ class FinancialDomainFineTuner:
     def _extract_recommendation(self, text: str) -> Optional[str]:
         """Extract recommendation from text."""
         text_upper = text.upper()
-        if 'STRONG BUY' in text_upper:
-            return 'STRONG BUY'
-        elif 'STRONG SELL' in text_upper:
-            return 'STRONG SELL'
-        elif 'BUY' in text_upper:
-            return 'BUY'
-        elif 'SELL' in text_upper:
-            return 'SELL'
-        elif 'HOLD' in text_upper:
-            return 'HOLD'
+        if "STRONG BUY" in text_upper:
+            return "STRONG BUY"
+        elif "STRONG SELL" in text_upper:
+            return "STRONG SELL"
+        elif "BUY" in text_upper:
+            return "BUY"
+        elif "SELL" in text_upper:
+            return "SELL"
+        elif "HOLD" in text_upper:
+            return "HOLD"
         return None
 
     def _has_technical_coverage(self, generated: str, input_data: Dict[str, Any]) -> bool:
         """Check if generated text covers technical indicators from input."""
-        weighted_scores = input_data.get('weighted_scores', {})
+        weighted_scores = input_data.get("weighted_scores", {})
         if not weighted_scores:
             return True
 
@@ -635,13 +618,17 @@ class FinancialDomainFineTuner:
 
         coverage_count = 0
         for indicator, _ in top_indicators:
-            indicator_name = indicator.replace('w_', '').replace('_', ' ')
-            if any(term in generated.lower() for term in [
-                indicator_name.lower(), 
-                'rsi' if 'rsi' in indicator_name.lower() else '',
-                'sma' if 'sma' in indicator_name.lower() else '',
-                'macd' if 'macd' in indicator_name.lower() else ''
-            ] if term):
+            indicator_name = indicator.replace("w_", "").replace("_", " ")
+            if any(
+                term in generated.lower()
+                for term in [
+                    indicator_name.lower(),
+                    "rsi" if "rsi" in indicator_name.lower() else "",
+                    "sma" if "sma" in indicator_name.lower() else "",
+                    "macd" if "macd" in indicator_name.lower() else "",
+                ]
+                if term
+            ):
                 coverage_count += 1
 
         return coverage_count >= 1  # At least one indicator mentioned
@@ -652,8 +639,9 @@ class FinancialDomainFineTuner:
             return False
 
         # Check for professional financial language
-        financial_terms_present = sum(1 for term in self.quality_metrics['financial_terms'] 
-                                    if term.lower() in text.lower())
+        financial_terms_present = sum(
+            1 for term in self.quality_metrics["financial_terms"] if term.lower() in text.lower()
+        )
 
         return financial_terms_present >= 2
 

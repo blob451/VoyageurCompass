@@ -4,11 +4,12 @@ Validates historical performance and calculates key metrics
 """
 
 import logging
-import pandas as pd
-import numpy as np
-from typing import Dict, List, Tuple, Optional, Any
-from datetime import datetime, timedelta
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, Tuple
+
+import numpy as np
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BacktestResult:
     """Container for backtest results."""
+
     total_return: float
     sharpe_ratio: float
     max_drawdown: float
@@ -32,7 +34,6 @@ class BacktestResult:
     calmar_ratio: float  # Return / Max Drawdown
 
 
-
 class BacktestEngine:
     """
     Engine for backtesting prediction models on historical data.
@@ -44,7 +45,7 @@ class BacktestEngine:
         position_size: float = 0.1,  # 10% of capital per position
         max_positions: int = 10,
         commission: float = 0.001,  # 0.1% commission
-        slippage: float = 0.0005  # 0.05% slippage
+        slippage: float = 0.0005,  # 0.05% slippage
     ):
         """
         Initialize backtest engine.
@@ -77,9 +78,9 @@ class BacktestEngine:
         self,
         predictions: pd.DataFrame,
         prices: pd.DataFrame,
-        strategy: str = 'threshold',
+        strategy: str = "threshold",
         threshold: float = 0.01,  # 1% threshold for trading
-        confidence_min: float = 0.6  # Minimum confidence to trade
+        confidence_min: float = 0.6,  # Minimum confidence to trade
     ) -> BacktestResult:
         """
         Run backtest on historical predictions.
@@ -97,38 +98,38 @@ class BacktestEngine:
         self.reset()
 
         # Sort by date
-        predictions = predictions.sort_values('date')
-        dates = predictions['date'].unique()
+        predictions = predictions.sort_values("date")
+        dates = predictions["date"].unique()
 
         logger.info(f"Running backtest on {len(dates)} trading days")
 
         for date in dates:
             # Get predictions for this date
-            daily_predictions = predictions[predictions['date'] == date]
+            daily_predictions = predictions[predictions["date"] == date]
 
             # Process each prediction
             for _, pred in daily_predictions.iterrows():
-                symbol = pred['symbol']
-                predicted_price = pred.get('predicted_price', 0)
-                confidence = pred.get('confidence', 0.5)
+                symbol = pred["symbol"]
+                predicted_price = pred.get("predicted_price", 0)
+                confidence = pred.get("confidence", 0.5)
 
                 # Get current price
-                price_data = prices[(prices['date'] == date) & (prices['symbol'] == symbol)]
+                price_data = prices[(prices["date"] == date) & (prices["symbol"] == symbol)]
                 if price_data.empty:
                     continue
 
-                current_price = price_data.iloc[0]['close']
+                current_price = price_data.iloc[0]["close"]
 
                 # Calculate expected return
                 expected_return = (predicted_price - current_price) / current_price
 
                 # Apply trading strategy
-                if strategy == 'threshold':
+                if strategy == "threshold":
                     should_trade = abs(expected_return) > threshold and confidence >= confidence_min
-                elif strategy == 'confidence_weighted':
+                elif strategy == "confidence_weighted":
                     should_trade = abs(expected_return * confidence) > threshold
-                elif strategy == 'ta_weighted':
-                    ta_weight = pred.get('ta_weight', 1.0)
+                elif strategy == "ta_weighted":
+                    ta_weight = pred.get("ta_weight", 1.0)
                     should_trade = abs(expected_return * confidence * ta_weight) > threshold
                 else:
                     should_trade = False
@@ -136,11 +137,11 @@ class BacktestEngine:
                 if should_trade:
                     if expected_return > 0:
                         # Buy signal
-                        self._execute_trade(symbol, 'buy', current_price, confidence, date)
+                        self._execute_trade(symbol, "buy", current_price, confidence, date)
                     else:
                         # Sell signal (or short if allowed)
                         if symbol in self.positions:
-                            self._execute_trade(symbol, 'sell', current_price, confidence, date)
+                            self._execute_trade(symbol, "sell", current_price, confidence, date)
 
             # Update equity
             self._update_equity(date, prices)
@@ -151,17 +152,10 @@ class BacktestEngine:
         # Calculate metrics
         return self._calculate_metrics()
 
-    def _execute_trade(
-        self,
-        symbol: str,
-        action: str,
-        price: float,
-        confidence: float,
-        date: datetime
-    ):
+    def _execute_trade(self, symbol: str, action: str, price: float, confidence: float, date: datetime):
         """Execute a trade."""
         # Apply slippage
-        if action == 'buy':
+        if action == "buy":
             execution_price = price * (1 + self.slippage)
         else:
             execution_price = price * (1 - self.slippage)
@@ -176,36 +170,38 @@ class BacktestEngine:
         # Apply commission
         commission_cost = position_value * self.commission
 
-        if action == 'buy' and symbol not in self.positions:
+        if action == "buy" and symbol not in self.positions:
             # Open new position
             if len(self.positions) < self.max_positions:
                 self.positions[symbol] = {
-                    'shares': shares,
-                    'entry_price': execution_price,
-                    'entry_date': date,
-                    'confidence': confidence
+                    "shares": shares,
+                    "entry_price": execution_price,
+                    "entry_date": date,
+                    "confidence": confidence,
                 }
-                self.capital -= (shares * execution_price + commission_cost)
+                self.capital -= shares * execution_price + commission_cost
 
-        elif action == 'sell' and symbol in self.positions:
+        elif action == "sell" and symbol in self.positions:
             # Close position
             position = self.positions[symbol]
             exit_value = shares * execution_price - commission_cost
 
             # Calculate return
-            entry_value = position['shares'] * position['entry_price']
+            entry_value = position["shares"] * position["entry_price"]
             trade_return = (exit_value - entry_value) / entry_value
 
-            self.trades.append({
-                'symbol': symbol,
-                'entry_date': position['entry_date'],
-                'exit_date': date,
-                'entry_price': position['entry_price'],
-                'exit_price': execution_price,
-                'shares': position['shares'],
-                'return': trade_return,
-                'confidence': position['confidence']
-            })
+            self.trades.append(
+                {
+                    "symbol": symbol,
+                    "entry_date": position["entry_date"],
+                    "exit_date": date,
+                    "entry_price": position["entry_price"],
+                    "exit_price": execution_price,
+                    "shares": position["shares"],
+                    "return": trade_return,
+                    "confidence": position["confidence"],
+                }
+            )
 
             self.capital += exit_value
             del self.positions[symbol]
@@ -216,10 +212,10 @@ class BacktestEngine:
 
         # Add value of open positions
         for symbol, position in self.positions.items():
-            price_data = prices[(prices['date'] == date) & (prices['symbol'] == symbol)]
+            price_data = prices[(prices["date"] == date) & (prices["symbol"] == symbol)]
             if not price_data.empty:
-                current_price = price_data.iloc[0]['close']
-                total_value += position['shares'] * current_price
+                current_price = price_data.iloc[0]["close"]
+                total_value += position["shares"] * current_price
 
         self.equity_curve.append(total_value)
         self.timestamps.append(date)
@@ -227,10 +223,10 @@ class BacktestEngine:
     def _close_all_positions(self, date: datetime, prices: pd.DataFrame):
         """Close all remaining positions."""
         for symbol in list(self.positions.keys()):
-            price_data = prices[(prices['date'] == date) & (prices['symbol'] == symbol)]
+            price_data = prices[(prices["date"] == date) & (prices["symbol"] == symbol)]
             if not price_data.empty:
-                current_price = price_data.iloc[0]['close']
-                self._execute_trade(symbol, 'sell', current_price, 1.0, date)
+                current_price = price_data.iloc[0]["close"]
+                self._execute_trade(symbol, "sell", current_price, 1.0, date)
 
     def _calculate_metrics(self) -> BacktestResult:
         """Calculate performance metrics."""
@@ -254,7 +250,7 @@ class BacktestEngine:
 
         # Trade statistics
         if self.trades:
-            trade_returns = [t['return'] for t in self.trades]
+            trade_returns = [t["return"] for t in self.trades]
             winning_trades = [r for r in trade_returns if r > 0]
             losing_trades = [r for r in trade_returns if r <= 0]
 
@@ -265,7 +261,7 @@ class BacktestEngine:
             # Profit factor
             gross_profit = sum(winning_trades)
             gross_loss = abs(sum(losing_trades))
-            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
             best_trade = max(trade_returns)
             worst_trade = min(trade_returns)
@@ -292,12 +288,12 @@ class BacktestEngine:
             avg_loss=avg_loss,
             profit_factor=profit_factor,
             total_trades=len(self.trades),
-            winning_trades=len([t for t in self.trades if t['return'] > 0]),
-            losing_trades=len([t for t in self.trades if t['return'] <= 0]),
+            winning_trades=len([t for t in self.trades if t["return"] > 0]),
+            losing_trades=len([t for t in self.trades if t["return"] <= 0]),
             best_trade=best_trade,
             worst_trade=worst_trade,
             volatility=volatility,
-            calmar_ratio=calmar_ratio
+            calmar_ratio=calmar_ratio,
         )
 
     def plot_results(self) -> Dict[str, Any]:
@@ -308,18 +304,15 @@ class BacktestEngine:
             Dictionary with plot data
         """
         return {
-            'equity_curve': self.equity_curve,
-            'timestamps': self.timestamps,
-            'trades': self.trades,
-            'positions': self.positions
+            "equity_curve": self.equity_curve,
+            "timestamps": self.timestamps,
+            "trades": self.trades,
+            "positions": self.positions,
         }
 
 
 def run_model_comparison_backtest(
-    predictions_base: pd.DataFrame,
-    predictions_enhanced: pd.DataFrame,
-    prices: pd.DataFrame,
-    **kwargs
+    predictions_base: pd.DataFrame, predictions_enhanced: pd.DataFrame, prices: pd.DataFrame, **kwargs
 ) -> Tuple[BacktestResult, BacktestResult]:
     """
     Compare base model vs enhanced model performance.
@@ -342,9 +335,7 @@ def run_model_comparison_backtest(
     # Run enhanced model backtest
     logger.info("Running backtest for enhanced model...")
     enhanced_results = engine.run_backtest(
-        predictions_enhanced, 
-        prices,
-        strategy='ta_weighted'  # Use TA-weighted strategy
+        predictions_enhanced, prices, strategy="ta_weighted"  # Use TA-weighted strategy
     )
 
     # Print comparison
@@ -365,8 +356,8 @@ def run_model_comparison_backtest(
 
     # Determine winner
     print("\n🏆 Winner:")
-    base_score = (base_results.sharpe_ratio + base_results.calmar_ratio + base_results.profit_factor)
-    enhanced_score = (enhanced_results.sharpe_ratio + enhanced_results.calmar_ratio + enhanced_results.profit_factor)
+    base_score = base_results.sharpe_ratio + base_results.calmar_ratio + base_results.profit_factor
+    enhanced_score = enhanced_results.sharpe_ratio + enhanced_results.calmar_ratio + enhanced_results.profit_factor
 
     if enhanced_score > base_score:
         improvement = ((enhanced_score - base_score) / base_score) * 100
