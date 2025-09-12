@@ -85,15 +85,18 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # Static file serving middleware
+    "Core.middleware.compression.IntelligentCompressionMiddleware",  # Response compression
+    "Core.middleware.compression.StaticFileCompressionMiddleware",  # Static file compression
     "corsheaders.middleware.CorsMiddleware",  # Standard CORS middleware
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "Core.backends.BlacklistCheckMiddleware",  # JWT token blacklist verification
+    "Core.middleware.deduplication.RequestDeduplicationMiddleware",  # Request deduplication
+    "Core.middleware.database_optimizer.DatabaseQueryAnalyzerMiddleware",  # Database query optimisation
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "Core.middleware.RequestLoggingMiddleware",
 ]
 
 ROOT_URLCONF = "VoyageurCompass.urls"
@@ -162,6 +165,18 @@ def checkDatabaseEngine():
 
 checkDatabaseEngine()
 
+# Database optimisation settings
+SLOW_QUERY_THRESHOLD = env("SLOW_QUERY_THRESHOLD", default=1.0)  # seconds
+CACHE_EXPENSIVE_QUERIES = env("CACHE_EXPENSIVE_QUERIES", default=True)
+EXPENSIVE_QUERY_THRESHOLD = env("EXPENSIVE_QUERY_THRESHOLD", default=0.5)  # seconds
+
+# Connection pooling settings for external APIs
+API_POOL_CONNECTIONS = env("API_POOL_CONNECTIONS", default=100)
+API_POOL_MAXSIZE = env("API_POOL_MAXSIZE", default=100)
+API_MAX_RETRIES = env("API_MAX_RETRIES", default=3)
+API_BACKOFF_FACTOR = env("API_BACKOFF_FACTOR", default=0.3)
+API_TIMEOUT = (10, 30)  # (connect_timeout, read_timeout)
+
 # Test database configuration - PostgreSQL for consistency
 if "test" in sys.argv or "pytest" in sys.modules:
     # Test database password configuration
@@ -189,24 +204,34 @@ REDIS_HOST = env("REDIS_HOST", default="redis")
 REDIS_PORT = env("REDIS_PORT", default="6379")
 REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
+# Temporarily use local memory cache for development (Redis connection issue)
 CACHES = {
     "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_URL,
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {
-                "max_connections": 50,
-                "retry_on_timeout": True,
-            },
-            "SOCKET_CONNECT_TIMEOUT": 5,
-            "SOCKET_TIMEOUT": 5,
-            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
-            "IGNORE_EXCEPTIONS": True,
-        },
-        "KEY_PREFIX": "voyageur",
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-snowflake",
         "TIMEOUT": 300,
-    }
+        "OPTIONS": {
+            "MAX_ENTRIES": 10000,
+        },
+    },
+    # L2 cache for longer-term storage (temporarily using local memory)
+    "l2_cache": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "l2-cache",
+        "TIMEOUT": 3600,
+        "OPTIONS": {
+            "MAX_ENTRIES": 5000,
+        },
+    },
+    # Session cache (temporarily using local memory)
+    "sessions": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "session-cache",
+        "TIMEOUT": 86400,
+        "OPTIONS": {
+            "MAX_ENTRIES": 1000,
+        },
+    },
 }
 
 # Celery Configuration

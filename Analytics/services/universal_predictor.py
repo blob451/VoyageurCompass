@@ -4,7 +4,9 @@ Universal LSTM prediction service for real-time stock price forecasting.
 
 import logging
 import os
+import pickle
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -64,7 +66,7 @@ class UniversalLSTMAnalyticsService:
 
         self._load_universal_model()
 
-        logger.info(f"Universal LSTM Analytics service initialized on device: {self.device}")
+        logger.info(f"Universal LSTM Analytics service initialised on device: {self.device}")
 
     def _load_universal_model(self) -> bool:
         """Load trained Universal LSTM model and preprocessor components."""
@@ -129,7 +131,9 @@ class UniversalLSTMAnalyticsService:
 
         if sector_name:
             sector_id = self.sector_mapper.get_sector_id(sector_name)
-            industry_id = self.sector_mapper.infer_sector_from_industry(sector_id)
+            # Get the first industry ID for this sector as a default
+            sector_industries = self.sector_mapper.get_sector_industries(sector_name)
+            industry_id = sector_industries[0] if sector_industries else 0
         else:
             # Unknown stock - use default classifications
             sector_id = 10  # Unknown sector
@@ -153,13 +157,21 @@ class UniversalLSTMAnalyticsService:
         try:
             # Fetch recent price data (convert datetime to date for price_reader)
             end_date = datetime.now().date()
-            start_date = (datetime.now() - timedelta(days=self.sequence_length + 30)).date()  # Extra buffer
+            start_date = (datetime.now() - timedelta(days=self.sequence_length + 60)).date()  # Extra buffer for data gaps
 
             price_data = self.price_reader.get_stock_prices(symbol=symbol, start_date=start_date, end_date=end_date)
 
-            if not price_data or len(price_data) < self.sequence_length + 5:
+            # Check for minimal viable data (prefer full sequence + buffer, but accept minimal sequence)
+            min_required = self.sequence_length
+            preferred_required = self.sequence_length + 5
+            
+            if not price_data or len(price_data) < min_required:
                 logger.warning(
-                    f"Insufficient price data for {symbol}: got {len(price_data) if price_data else 0}, need {self.sequence_length + 5}"
+                    f"Insufficient price data for {symbol}: got {len(price_data) if price_data else 0}, need minimum {min_required}"
+                )
+            elif len(price_data) < preferred_required:
+                logger.info(
+                    f"Limited price data for {symbol}: got {len(price_data)}, preferred {preferred_required}, proceeding with available data"
                 )
 
                 # Try auto-sync if no data
@@ -216,9 +228,15 @@ class UniversalLSTMAnalyticsService:
             # Get only the required sequence data directly to avoid copying full array
             features = feature_df[feature_cols].iloc[-self.sequence_length :].values
 
-            # Transform using fitted scalers
-            if self.preprocessor.fitted:
+            # Load and apply stock-specific scalers if available
+            stock_scalers = self._load_stock_scalers(symbol)
+            if stock_scalers:
+                features = self._apply_stock_scalers(features, stock_scalers)
+                logger.debug(f"Applied fitted scalers for {symbol}")
+            elif self.preprocessor.fitted:
                 features = self.preprocessor.transform_features(features)
+            else:
+                logger.warning(f"Scalers not fitted for {symbol} - using fallback prediction")
 
             # Convert to tensors
             features_tensor = torch.FloatTensor(features).unsqueeze(0).to(self.device)  # Add batch dimension
@@ -479,6 +497,55 @@ class UniversalLSTMAnalyticsService:
         """Reload the Universal LSTM model (useful for model updates)."""
         logger.info("Reloading Universal LSTM model...")
         return self._load_universal_model()
+
+    def _load_stock_scalers(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Load fitted scalers for a specific stock from cache or file."""
+        # First try cache (serialized version)
+        cache_key = f'lstm_scaler_{symbol}_serialized'
+        cached_data = cache.get(cache_key)
+        
+        if cached_data:
+            try:
+                import base64
+                scalers = pickle.loads(base64.b64decode(cached_data.encode('utf-8')))
+                logger.debug(f"Loaded scalers for {symbol} from cache")
+                return scalers
+            except Exception as e:
+                logger.debug(f"Failed to deserialize cached scalers for {symbol}: {str(e)}")
+        
+        # Try loading from file
+        try:
+            scaler_dir = Path('Data/ml_models/universal_lstm/scalers')
+            scaler_file = scaler_dir / f'{symbol}_scalers.pkl'
+            
+            if scaler_file.exists():
+                with open(scaler_file, 'rb') as f:
+                    scalers = pickle.load(f)
+                
+                # Cache for future use (30 day TTL)
+                cache.set(cache_key, scalers, 30 * 24 * 3600)
+                logger.debug(f"Loaded scalers for {symbol} from file and cached")
+                return scalers
+                
+        except Exception as e:
+            logger.debug(f"Could not load scalers for {symbol}: {str(e)}")
+        
+        return None
+
+    def _apply_stock_scalers(self, features: np.ndarray, scaler_data: Dict[str, Any]) -> np.ndarray:
+        """Apply fitted scalers to features using cached scaler data."""
+        try:
+            # Use the standard scaler from the cached data
+            scaler = scaler_data.get('standard_scaler')
+            if scaler:
+                return scaler.transform(features)
+            else:
+                logger.warning("No standard scaler found in scaler data")
+                return features
+                
+        except Exception as e:
+            logger.error(f"Failed to apply stock scalers: {str(e)}")
+            return features
 
 
 # Singleton instance for Analytics Engine

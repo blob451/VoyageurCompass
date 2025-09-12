@@ -517,3 +517,261 @@ def cleanup_expired_yahoo_cache():
     except Exception as exc:
         logger.error(f"Yahoo Finance cache cleanup failed: {exc}")
         raise
+
+
+@shared_task(bind=True, max_retries=3)
+def async_stock_backfill(self, symbol: str, required_years: int = 2, user_id: int = None):
+    """
+    Perform async stock data backfill and trigger analysis when complete.
+    
+    Args:
+        symbol: Stock ticker symbol to backfill
+        required_years: Years of historical data required 
+        user_id: User ID who requested the analysis
+        
+    Returns:
+        Dict with backfill results and analysis trigger status
+    """
+    try:
+        logger.info(f"Starting async backfill for {symbol} ({required_years} years)")
+        
+        # Set status in cache for UI tracking
+        status_key = f"backfill_status_{symbol}_{user_id or 'system'}"
+        cache.set(status_key, {
+            "status": "running", 
+            "symbol": symbol,
+            "started_at": timezone.now().isoformat(),
+            "task_id": self.request.id
+        }, timeout=3600)
+        
+        from Data.services.yahoo_finance import yahoo_finance_service
+        
+        # Perform the backfill
+        backfill_result = yahoo_finance_service.backfill_eod_gaps_concurrent(
+            symbol=symbol,
+            required_years=required_years,
+            max_attempts=3
+        )
+        
+        if backfill_result.get('success'):
+            logger.info(f"Async backfill successful for {symbol}: {backfill_result['stock_backfilled']} records")
+            
+            # Update status - backfill complete
+            cache.set(status_key, {
+                "status": "backfill_complete",
+                "symbol": symbol,
+                "backfill_result": backfill_result,
+                "completed_at": timezone.now().isoformat(),
+                "task_id": self.request.id
+            }, timeout=3600)
+            
+            # Trigger analysis if user requested it
+            if user_id:
+                try:
+                    # Trigger async analysis
+                    analysis_task = async_stock_analysis.delay(symbol, user_id)
+                    logger.info(f"Triggered async analysis for {symbol}, task_id: {analysis_task.id}")
+                    
+                    # Update status - analysis triggered
+                    cache.set(status_key, {
+                        "status": "analysis_triggered",
+                        "symbol": symbol,
+                        "backfill_result": backfill_result,
+                        "analysis_task_id": analysis_task.id,
+                        "analysis_triggered_at": timezone.now().isoformat(),
+                        "task_id": self.request.id
+                    }, timeout=3600)
+                    
+                except Exception as analysis_error:
+                    logger.error(f"Failed to trigger analysis for {symbol}: {analysis_error}")
+                    # Still return success for backfill, but note analysis failure
+                    cache.set(status_key, {
+                        "status": "backfill_complete_analysis_failed",
+                        "symbol": symbol,
+                        "backfill_result": backfill_result,
+                        "analysis_error": str(analysis_error),
+                        "task_id": self.request.id
+                    }, timeout=3600)
+            
+            return {
+                "success": True,
+                "symbol": symbol,
+                "backfill_result": backfill_result,
+                "analysis_triggered": bool(user_id)
+            }
+        else:
+            # Backfill failed
+            error_msg = f"Backfill failed for {symbol}: {backfill_result.get('errors', ['Unknown error'])}"
+            logger.error(error_msg)
+            
+            cache.set(status_key, {
+                "status": "failed",
+                "symbol": symbol,
+                "error": error_msg,
+                "backfill_result": backfill_result,
+                "failed_at": timezone.now().isoformat(),
+                "task_id": self.request.id
+            }, timeout=3600)
+            
+            # Retry with exponential backoff
+            raise self.retry(exc=Exception(error_msg), countdown=60 * (2**self.request.retries))
+            
+    except Exception as exc:
+        logger.error(f"Async backfill failed for {symbol}: {exc}")
+        
+        # Update cache with error status
+        status_key = f"backfill_status_{symbol}_{user_id or 'system'}"
+        cache.set(status_key, {
+            "status": "failed",
+            "symbol": symbol,
+            "error": str(exc),
+            "failed_at": timezone.now().isoformat(),
+            "task_id": self.request.id
+        }, timeout=3600)
+        
+        # Retry with exponential backoff
+        raise self.retry(exc=exc, countdown=60 * (2**self.request.retries))
+
+
+@shared_task(bind=True, max_retries=2)
+def async_stock_analysis(self, symbol: str, user_id: int):
+    """
+    Perform async stock analysis after data is available.
+    
+    Args:
+        symbol: Stock ticker symbol to analyze
+        user_id: User ID who requested the analysis
+        
+    Returns:
+        Dict with analysis results
+    """
+    try:
+        logger.info(f"Starting async analysis for {symbol} (user: {user_id})")
+        
+        # Set status in cache for UI tracking  
+        status_key = f"analysis_status_{symbol}_{user_id}"
+        cache.set(status_key, {
+            "status": "running",
+            "symbol": symbol, 
+            "user_id": user_id,
+            "started_at": timezone.now().isoformat(),
+            "task_id": self.request.id
+        }, timeout=3600)
+        
+        from Analytics.engine.ta_engine import TechnicalAnalysisEngine
+        from django.contrib.auth import get_user_model
+        
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        
+        # Run the analysis
+        engine = TechnicalAnalysisEngine()
+        analysis_result = engine.analyze_stock(symbol, user=user, fast_mode=False)
+        
+        logger.info(f"Async analysis complete for {symbol}: {analysis_result['score_0_10']}/10")
+        
+        # Update status with results
+        cache.set(status_key, {
+            "status": "completed",
+            "symbol": symbol,
+            "user_id": user_id, 
+            "analysis_result": analysis_result,
+            "completed_at": timezone.now().isoformat(),
+            "task_id": self.request.id
+        }, timeout=3600)
+        
+        return {
+            "success": True,
+            "symbol": symbol,
+            "user_id": user_id,
+            "analysis_result": analysis_result
+        }
+        
+    except Exception as exc:
+        logger.error(f"Async analysis failed for {symbol}: {exc}")
+        
+        # Update cache with error status
+        status_key = f"analysis_status_{symbol}_{user_id}"
+        cache.set(status_key, {
+            "status": "failed",
+            "symbol": symbol,
+            "user_id": user_id,
+            "error": str(exc),
+            "failed_at": timezone.now().isoformat(),
+            "task_id": self.request.id
+        }, timeout=3600)
+        
+        # Retry with exponential backoff
+        raise self.retry(exc=exc, countdown=120 * (2**self.request.retries))
+
+
+@shared_task(bind=True)
+def monitor_data_quality_task(self):
+    """
+    Automated data quality monitoring task.
+    
+    Runs comprehensive data quality checks and stores results for dashboard.
+    Scheduled to run daily to monitor system health.
+    """
+    try:
+        logger.info("Starting automated data quality monitoring")
+        
+        from Data.services.data_quality_monitor import data_quality_monitor
+        
+        # Run comprehensive quality check
+        result = data_quality_monitor.run_comprehensive_check()
+        
+        if 'error' not in result:
+            overall_score = result.get('overall_quality_score', 0)
+            issues_count = len(result.get('recommendations', []))
+            
+            # Log key metrics
+            logger.info(f"Data quality check completed - Score: {overall_score:.1f}/10, Issues: {issues_count}")
+            
+            # Store historical metrics for trending
+            cache.set(
+                f"data_quality_history_{timezone.now().date().isoformat()}",
+                {
+                    'date': timezone.now().date().isoformat(),
+                    'overall_score': overall_score,
+                    'issues_count': issues_count,
+                    'timestamp': timezone.now().isoformat()
+                },
+                timeout=604800  # Keep for 7 days
+            )
+            
+            # Alert on critical issues
+            if overall_score < 4.0:
+                logger.error(f"CRITICAL: Data quality score is critically low: {overall_score:.1f}/10")
+            elif overall_score < 6.0:
+                logger.warning(f"WARNING: Data quality score is concerning: {overall_score:.1f}/10")
+            
+            return {
+                'success': True,
+                'overall_score': overall_score,
+                'issues_count': issues_count,
+                'timestamp': timezone.now().isoformat()
+            }
+        else:
+            logger.error(f"Data quality monitoring failed: {result['error']}")
+            return {
+                'success': False,
+                'error': result['error'],
+                'timestamp': timezone.now().isoformat()
+            }
+            
+    except Exception as exc:
+        logger.error(f"Data quality monitoring task failed: {exc}")
+        
+        # Cache error status
+        cache.set(
+            "data_quality_monitor_error", 
+            {
+                'error': str(exc),
+                'timestamp': timezone.now().isoformat(),
+                'task_id': self.request.id
+            },
+            timeout=3600
+        )
+        
+        raise

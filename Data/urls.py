@@ -19,6 +19,12 @@ from Data.views import (
     StockPriceViewSet,
     StockViewSet,
 )
+from Data.quality_views import (
+    data_quality_alerts,
+    data_quality_dashboard,
+    data_quality_trends,
+    run_data_quality_check,
+)
 
 app_name = "data"
 
@@ -41,4 +47,9 @@ urlpatterns = [
     path("sync/bulk-update/", bulk_price_update, name="bulk-price-update"),
     # Comparison endpoint
     path("compare/", compare_stocks, name="compare-stocks"),
+    # Data Quality Monitoring endpoints
+    path("quality/dashboard/", data_quality_dashboard, name="data-quality-dashboard"),
+    path("quality/check/", run_data_quality_check, name="run-data-quality-check"),
+    path("quality/trends/", data_quality_trends, name="data-quality-trends"),
+    path("quality/alerts/", data_quality_alerts, name="data-quality-alerts"),
 ]

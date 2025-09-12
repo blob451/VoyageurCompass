@@ -1,12 +1,11 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
 import { CircularProgress, Box, Typography } from '@mui/material';
 import Layout from './components/Layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import SessionProvider from './components/SessionProvider';
 import AuthInitializer from './components/AuthInitializer';
+import { ThemeModeProvider } from './theme/ThemeModeContext.jsx';
 
 // Lazy-loaded page components for code splitting optimisation
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -77,53 +76,9 @@ const NotFound = () => (
   </Box>
 );
 
-// Material-UI theme configuration
-const theme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: {
-      main: '#1a1a2e',
-    },
-    secondary: {
-      main: '#16213e',
-    },
-    background: {
-      default: '#f5f5f5',
-    },
-  },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h4: {
-      fontWeight: 600,
-    },
-    h6: {
-      fontWeight: 600,
-    },
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          borderRadius: 8,
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        },
-      },
-    },
-  },
-});
-
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <ThemeModeProvider>
       <Router>
         <AuthInitializer>
           <SessionProvider>
@@ -158,7 +113,7 @@ function App() {
           </SessionProvider>
         </AuthInitializer>
       </Router>
-    </ThemeProvider>
+    </ThemeModeProvider>
   );
 }
 

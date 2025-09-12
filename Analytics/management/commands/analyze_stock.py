@@ -59,6 +59,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "--skip-sentiment", action="store_true", help="Skip sentiment analysis to speed up processing"
         )
+        parser.add_argument(
+            "--fast-mode", action="store_true", 
+            help="Fast analysis mode: skip backfill, use cached data, 6-month lookback (target <30s)"
+        )
 
     def handle(self, *args, **options):
         """Main command handler implementing the orchestration workflow."""
@@ -67,6 +71,15 @@ class Command(BaseCommand):
         max_attempts = options["max_backfill_attempts"]
         required_years = options["required_years"]
         skip_backfill = options["skip_backfill"]
+        fast_mode = options["fast_mode"]
+        
+        # Fast mode overrides
+        if fast_mode:
+            skip_backfill = True
+            required_years = 1  # Reduce to 6 months for speed
+            self.stdout.write(
+                self.style.WARNING('FAST MODE: Skipping backfill, using 1-year lookback for speed')
+            )
 
         # Generate timestamp-based analysis ID for logging
         timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
@@ -118,7 +131,7 @@ class Command(BaseCommand):
 
             # Step 5: Run Analytics Engine
             self.stdout.write("Step 5: Running technical analysis...")
-            analysis_result = self.run_analytics(symbol, horizon)
+            analysis_result = self.run_analytics(symbol, horizon, fast_mode)
             logger.info(f"Analysis complete: {analysis_result['score_0_10']}/10")
 
             # Step 6: Print Verification Results
@@ -348,7 +361,7 @@ class Command(BaseCommand):
     def perform_backfill(self, symbol: str, required_years: int, max_attempts: int) -> Dict[str, Any]:
         """Perform backfill with retry logic."""
         try:
-            backfill_result = yahoo_finance_service.backfill_eod_gaps(
+            backfill_result = yahoo_finance_service.backfill_eod_gaps_concurrent(
                 symbol=symbol, required_years=required_years, max_attempts=max_attempts
             )
 
@@ -396,11 +409,11 @@ class Command(BaseCommand):
 
         logger.info(f"Final coverage validation passed for {symbol}")
 
-    def run_analytics(self, symbol: str, horizon: str) -> Dict[str, Any]:
+    def run_analytics(self, symbol: str, horizon: str, fast_mode: bool = False) -> Dict[str, Any]:
         """Run the technical analysis engine."""
         try:
             engine = TechnicalAnalysisEngine()
-            result = engine.analyze_stock(symbol, horizon=horizon)
+            result = engine.analyze_stock(symbol, horizon=horizon, fast_mode=fast_mode)
 
             logger.info(f"Technical analysis completed for {symbol}")
             logger.info(f"Composite score: {result['score_0_10']}/10")

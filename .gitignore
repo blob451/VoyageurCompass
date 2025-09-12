@@ -64,8 +64,13 @@ Design/frontend/.env.production.local
 
 # Docker generated directories that may be created during runtime
 celerybeat-schedule/
+celerybeat-schedule.dat
 staticfiles/
 certs/
+
+# Quality reports and runtime artifacts
+final_quality_report.json
+*.json.report
 
 # Optional: Django static files (uncomment if you want to regenerate)
 # Design/staticfiles/

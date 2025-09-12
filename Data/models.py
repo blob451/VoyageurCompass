@@ -453,23 +453,6 @@ class StockPrice(models.Model):
         """Determine if daily price movement was positive."""
         return self.close > self.open
 
-    @property
-    def change_amount(self):
-        """Daily price change amount (deprecated - use daily_change)."""
-        import warnings
-
-        warnings.warn("change_amount is deprecated, use daily_change instead", DeprecationWarning, stacklevel=2)
-        return self.daily_change
-
-    @property
-    def change_percent(self):
-        """Daily price change percentage (deprecated - use daily_change_percent)."""
-        import warnings
-
-        warnings.warn(
-            "change_percent is deprecated, use daily_change_percent instead", DeprecationWarning, stacklevel=2
-        )
-        return self.daily_change_percent
 
 
 class Portfolio(models.Model):

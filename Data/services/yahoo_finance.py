@@ -23,6 +23,9 @@ import yfinance as yf
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+# Import connection pooling
+from Core.connection_pool import get_connection_pool, PooledHTTPClient
+
 # Module-level timeout for explicit HTTP call configuration
 DEFAULT_TIMEOUT = 30
 
@@ -121,60 +124,20 @@ class YahooFinanceService:
         self.baseDelay = 2
         self.maxBackoff = 60
 
-        # Create instance-specific session for thread safety
-        self._create_session()
+        # Use connection pooling for HTTP requests
+        self.http_client = PooledHTTPClient()
+        self.connection_pool = get_connection_pool()
 
-        logger.info("Yahoo Finance Service initialized with yfinance integration and multi-level caching")
+        logger.info("Yahoo Finance Service initialized with connection pooling and multi-level caching")
 
-    def _create_session(self):
-        """Create a resilient requests session with retries, pooling, and modern headers."""
-        self.session = requests.Session()
-
-        # Enhanced headers with modern encoding and refined accept headers
-        self.session.headers.update(
-            {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,image/webp,*/*;q=0.7",
-                "Accept-Language": "en-US,en;q=0.9,*;q=0.5",
-                "Accept-Encoding": "gzip, deflate, br",  # Added brotli support
-                "DNT": "1",
-                "Connection": "keep-alive",
-                "Upgrade-Insecure-Requests": "1",
-                "Cache-Control": "no-cache",
-            }
-        )
-
-        # Configure retry strategy with exponential backoff
-        retry_strategy = Retry(
-            total=3,  # Total number of retries
-            backoff_factor=1.0,  # Backoff factor (1 second, then 2, then 4)
-            status_forcelist=[429, 500, 502, 503, 504],  # Retry on these HTTP status codes
-            allowed_methods=["HEAD", "GET", "OPTIONS"],  # Only retry safe methods
-            raise_on_status=False,  # Don't raise exception on final failure
-        )
-
-        # Create HTTP adapter with retry strategy and connection pooling
-        adapter = HTTPAdapter(
-            max_retries=retry_strategy,
-            pool_connections=10,  # Number of connection pools to cache
-            pool_maxsize=20,  # Maximum connections in each pool
-            pool_block=False,  # Don't block if pool is full
-        )
-
-        # Mount adapters for both HTTP and HTTPS
-        self.session.mount("https://", adapter)
-        self.session.mount("http://", adapter)
+    def get_connection_metrics(self):
+        """Get connection pool metrics for monitoring."""
+        return self.connection_pool.get_metrics()
 
     def close(self):
-        """Close the requests session and cleanup resources."""
-        if hasattr(self, "session") and self.session:
-            self.session.close()
-            self.session = None
-
-    def _ensure_session(self):
-        """Ensure session exists, recreating if necessary."""
-        if not hasattr(self, "session") or self.session is None:
-            self._create_session()
+        """Close connections and cleanup resources."""
+        # Connection pool will handle cleanup automatically
+        logger.info("Yahoo Finance service closed")
 
     def __enter__(self):
         """Enter the context manager, returning the service instance."""
@@ -267,13 +230,7 @@ class YahooFinanceService:
 
         return validatedSymbols
 
-    # =====================================================================
-    # camelCase wrapper methods
-    # =====================================================================
 
-    def getStockData(self, symbol: str, period: str = "1mo", syncDb: bool = True) -> Dict:
-        """camelCase wrapper for get_stock_data"""
-        return self.get_stock_data(symbol, period, syncDb)
 
     def get_stock_data(self, symbol: str, period: str = "1mo", sync_db: bool = True) -> Dict:
         """
@@ -372,9 +329,6 @@ class YahooFinanceService:
             logger.error(f"Error fetching stock data for {symbol}: {str(e)}")
             return {"error": str(e)}
 
-    def getStockInfo(self, symbol: str) -> Dict:
-        """camelCase wrapper for get_stock_info"""
-        return self.get_stock_info(symbol)
 
     def get_stock_info(self, symbol: str) -> Dict:
         """
@@ -2230,6 +2184,277 @@ class YahooFinanceService:
 
         logger.info(f"Database engine verified: {engine}")
 
+    def backfill_eod_gaps_concurrent(self, symbol: str, required_years: int = 2, max_attempts: int = 3) -> Dict[str, Any]:
+        """
+        Enhanced concurrent backfill with intelligent caching and pre-validation.
+        
+        Performance optimizations:
+        1. Pre-check stock existence to avoid expensive failed fetches
+        2. Concurrent data fetching for stock, sector, industry
+        3. Intelligent caching with 24h TTL
+        4. Early exit if recent backfill completed
+        
+        Args:
+            symbol: Stock ticker symbol
+            required_years: Years of history required
+            max_attempts: Maximum retry attempts
+            
+        Returns:
+            Dict with backfill results and performance metrics
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        start_time = time.time()
+        
+        result = {
+            "success": False,
+            "stock_backfilled": 0,
+            "sector_backfilled": 0,
+            "industry_backfilled": 0,
+            "attempts_used": 0,
+            "errors": [],
+            "performance": {
+                "total_time": 0,
+                "cache_hits": 0,
+                "api_calls": 0,
+                "concurrent_fetches": 0
+            }
+        }
+        
+        try:
+            from django.core.cache import cache
+            from Data.repo.price_reader import PriceReader
+            
+            # Step 1: Check backfill cache (24h TTL)
+            cache_key = f"backfill_status:{symbol}:{required_years}"
+            cached_result = cache.get(cache_key)
+            
+            if cached_result and cached_result.get("success"):
+                hours_old = (time.time() - cached_result.get("cached_timestamp", 0)) / 3600
+                if hours_old < 24:
+                    logger.info(f"Using cached backfill result for {symbol} (age: {hours_old:.1f}h)")
+                    result["performance"]["cache_hits"] = 1
+                    result.update(cached_result)
+                    return result
+            
+            # Step 2: Pre-validate stock existence (quick Yahoo Finance check)
+            logger.info(f"Pre-validating {symbol} existence")
+            if not self._quick_stock_validation(symbol):
+                result["errors"].append(f"Stock {symbol} not found on Yahoo Finance")
+                return result
+            
+            result["performance"]["api_calls"] += 1
+            
+            # Ensure PostgreSQL engine
+            self.ensure_postgresql_engine()
+            price_reader = PriceReader()
+            
+            # Calculate optimized date range
+            end_date = timezone.now()
+            target_trading_days = required_years * 252
+            calendar_days_needed = int(target_trading_days / 0.690420)
+            start_date = end_date - timezone.timedelta(days=calendar_days_needed)
+            
+            # Step 3: Concurrent backfill execution
+            for attempt in range(1, max_attempts + 1):
+                result["attempts_used"] = attempt
+                logger.info(f"Concurrent backfill attempt {attempt}/{max_attempts} for {symbol}")
+                
+                try:
+                    # Check current coverage
+                    coverage = price_reader.check_data_coverage(symbol, required_years)
+                    
+                    # Prepare concurrent tasks
+                    tasks = []
+                    
+                    # Task 1: Stock data backfill
+                    if not coverage["stock"]["has_data"] or coverage["stock"]["gap_count"] > 50:
+                        tasks.append(("stock", self._concurrent_stock_backfill, (symbol, start_date, end_date)))
+                    
+                    # Task 2: Sector/Industry classification (parallel with stock fetch)
+                    tasks.append(("classification", self._concurrent_classification_backfill, (symbol,)))
+                    
+                    # Execute concurrent tasks
+                    if tasks:
+                        logger.info(f"Executing {len(tasks)} concurrent backfill tasks for {symbol}")
+                        result["performance"]["concurrent_fetches"] = len(tasks)
+                        
+                        with ThreadPoolExecutor(max_workers=min(3, len(tasks)), thread_name_prefix="Backfill") as executor:
+                            future_to_task = {
+                                executor.submit(task_func, *args): task_name 
+                                for task_name, task_func, args in tasks
+                            }
+                            
+                            for future in as_completed(future_to_task):
+                                task_name = future_to_task[future]
+                                try:
+                                    task_result = future.result(timeout=45)  # 45s timeout per task
+                                    
+                                    if task_name == "stock" and task_result:
+                                        result["stock_backfilled"] = task_result
+                                        logger.info(f"Concurrent stock backfill completed: {task_result} records")
+                                    elif task_name == "classification" and task_result:
+                                        logger.info("Concurrent classification completed successfully")
+                                        
+                                except Exception as e:
+                                    logger.warning(f"Concurrent task {task_name} failed: {str(e)}")
+                                    result["errors"].append(f"Task {task_name}: {str(e)}")
+                    
+                    # Task 3: Sector/Industry composites (after classification completes)
+                    if result["stock_backfilled"] > 0:
+                        sector_key, industry_key = price_reader.get_stock_sector_industry_keys(symbol)
+                        
+                        composite_tasks = []
+                        if sector_key and not coverage["sector"]["has_data"]:
+                            composite_tasks.append(("sector", sector_key))
+                        if industry_key and not coverage["industry"]["has_data"]:
+                            composite_tasks.append(("industry", industry_key))
+                        
+                        if composite_tasks:
+                            logger.info(f"Executing composite backfill for {len(composite_tasks)} entities")
+                            composite_result = self.composeSectorIndustryEod((start_date, end_date))
+                            result["sector_backfilled"] += composite_result.get("sector_prices_created", 0)
+                            result["industry_backfilled"] += composite_result.get("industry_prices_created", 0)
+                    
+                    # Validate final coverage
+                    final_coverage = price_reader.check_data_coverage(symbol, required_years)
+                    stock_adequate = final_coverage["stock"]["has_data"] and final_coverage["stock"]["gap_count"] <= 50
+                    
+                    if stock_adequate:
+                        result["success"] = True
+                        
+                        # Auto-fit Universal LSTM scalers for this stock after successful backfill
+                        try:
+                            self._fit_scalers_for_stock(symbol)
+                            logger.info(f"Auto-fitted scalers for {symbol} after successful backfill")
+                        except Exception as e:
+                            logger.warning(f"Could not auto-fit scalers for {symbol}: {str(e)}")
+                        
+                        # Cache successful result for 24 hours
+                        cache_data = dict(result)
+                        cache_data["cached_timestamp"] = time.time()
+                        cache.set(cache_key, cache_data, 86400)  # 24 hours
+                        
+                        break
+                    else:
+                        logger.warning(f"Coverage still inadequate after attempt {attempt}")
+                        
+                except Exception as e:
+                    error_msg = f"Attempt {attempt} failed: {str(e)}"
+                    logger.error(error_msg)
+                    result["errors"].append(error_msg)
+                    
+                    if attempt == max_attempts:
+                        break
+                    
+                    # Exponential backoff
+                    time.sleep(2 ** attempt)
+            
+            # Final performance metrics
+            result["performance"]["total_time"] = time.time() - start_time
+            result["performance"]["api_calls"] += result["attempts_used"]
+            
+            if result["success"]:
+                logger.info(f"Concurrent backfill completed for {symbol} in {result['performance']['total_time']:.2f}s")
+            else:
+                logger.error(f"Concurrent backfill failed for {symbol} after {result['attempts_used']} attempts")
+                
+            return result
+            
+        except Exception as e:
+            error_msg = f"Concurrent backfill error for {symbol}: {str(e)}"
+            logger.error(error_msg)
+            result["errors"].append(error_msg)
+            result["performance"]["total_time"] = time.time() - start_time
+            return result
+
+    def _quick_stock_validation(self, symbol: str) -> bool:
+        """Quick validation to check if stock exists before expensive backfill."""
+        try:
+            import yfinance as yf
+            
+            # Quick info fetch (much faster than full history)
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            
+            # Basic validation - stock should have a market cap or sector
+            if info and (info.get('marketCap') or info.get('sector')):
+                return True
+            
+            logger.warning(f"Stock validation failed for {symbol}: no market data found")
+            return False
+            
+        except Exception as e:
+            logger.warning(f"Quick stock validation failed for {symbol}: {str(e)}")
+            return False
+
+    def _concurrent_stock_backfill(self, symbol: str, start_date, end_date) -> int:
+        """Concurrent stock data backfill task."""
+        try:
+            logger.debug(f"Starting concurrent stock backfill for {symbol}")
+            
+            stock_data = self.fetchStockEodHistory(symbol, start_date, end_date)
+            if not stock_data:
+                return 0
+            
+            # Convert to StockPrice format
+            stock_rows = []
+            for item in stock_data:
+                stock_rows.append({
+                    "symbol": symbol,
+                    "date": item["date"],
+                    "open": item["open"],
+                    "high": item["high"],
+                    "low": item["low"],
+                    "close": item["close"],
+                    "adjusted_close": item["adjusted_close"],
+                    "volume": item["volume"],
+                    "data_source": "yahoo",
+                })
+            
+            backfilled = self._upsert_stock_prices(stock_rows)
+            logger.debug(f"Concurrent stock backfill completed for {symbol}: {backfilled} records")
+            return backfilled
+            
+        except Exception as e:
+            logger.warning(f"Concurrent stock backfill failed for {symbol}: {str(e)}")
+            raise
+
+    def _concurrent_classification_backfill(self, symbol: str) -> bool:
+        """Concurrent classification backfill task."""
+        try:
+            from Data.models import Stock
+            
+            logger.debug(f"Starting concurrent classification for {symbol}")
+            
+            stock_record = Stock.objects.get(symbol=symbol)
+            
+            # Create classification if needed
+            if (stock_record.sector and stock_record.industry and 
+                not stock_record.sector_id and not stock_record.industry_id):
+                
+                sector_key = self._normalizeSectorKey(stock_record.sector)
+                industry_key = self._normalizeIndustryKey(f"{stock_record.industry}_{stock_record.sector}")
+                
+                classification_row = {
+                    "symbol": symbol,
+                    "sectorKey": sector_key,
+                    "sectorName": stock_record.sector,
+                    "industryKey": industry_key,
+                    "industryName": stock_record.industry,
+                    "updatedAt": timezone.now(),
+                }
+                
+                self.upsertClassification([classification_row])
+                logger.debug(f"Concurrent classification completed for {symbol}")
+                return True
+                
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Concurrent classification failed for {symbol}: {str(e)}")
+            raise
+
     def backfill_eod_gaps(self, symbol: str, required_years: int = 2, max_attempts: int = 3) -> Dict[str, Any]:
         """
         Backfill missing EOD data for stock, sector, and industry with retry logic.
@@ -2350,17 +2575,20 @@ class YahooFinanceService:
                     # Get sector/industry keys (should now exist after classification)
                     sector_key, industry_key = price_reader.get_stock_sector_industry_keys(symbol)
 
-                    # Backfill sector composite if needed and available
-                    if sector_key and not coverage["sector"]["has_data"]:
-                        logger.info(f"Backfilling sector composite for {sector_key}")
-                        sector_result = self.composeSectorIndustryEod((start_date, end_date))
-                        result["sector_backfilled"] += sector_result.get("sector_prices_created", 0)
-
-                    # Backfill industry composite if needed and available
-                    if industry_key and not coverage["industry"]["has_data"]:
-                        logger.info(f"Backfilling industry composite for {industry_key}")
-                        industry_result = self.composeSectorIndustryEod((start_date, end_date))
-                        result["industry_backfilled"] += industry_result.get("industry_prices_created", 0)
+                    # Backfill sector and industry composites in one call to avoid duplicate fetches
+                    needs_sector_backfill = sector_key and not coverage["sector"]["has_data"]
+                    needs_industry_backfill = industry_key and not coverage["industry"]["has_data"]
+                    
+                    if needs_sector_backfill or needs_industry_backfill:
+                        if needs_sector_backfill:
+                            logger.info(f"Backfilling sector composite for {sector_key}")
+                        if needs_industry_backfill:
+                            logger.info(f"Backfilling industry composite for {industry_key}")
+                        
+                        # Single call to avoid duplicate data fetching
+                        composite_result = self.composeSectorIndustryEod((start_date, end_date))
+                        result["sector_backfilled"] += composite_result.get("sector_prices_created", 0)
+                        result["industry_backfilled"] += composite_result.get("industry_prices_created", 0)
 
                     # Check if gaps are adequately filled
                     final_coverage = price_reader.check_data_coverage(symbol, required_years)
@@ -2521,6 +2749,202 @@ class YahooFinanceService:
             logger.error(f"Error upserting history bars: {str(e)}")
             return 0
 
+    def _fetch_news_with_fallbacks(self, symbol: str, days: int = 90, max_items: int = 100) -> Optional[List[Dict]]:
+        """
+        Fetch news with multiple fallback mechanisms for improved reliability.
+        
+        Fallback order:
+        1. Standard yfinance ticker.news
+        2. yfinance with custom DNS configuration
+        3. Direct requests with alternative DNS
+        4. Cached news from previous successful fetch (if available)
+        
+        Args:
+            symbol: Stock ticker symbol
+            days: Number of days of history
+            max_items: Maximum news items to return
+            
+        Returns:
+            List of raw news items or None if all fallbacks fail
+        """
+        import socket
+        import urllib3
+        
+        # Attempt 1: Standard yfinance approach
+        try:
+            logger.info(f"Attempt 1/4: Standard yfinance news fetch for {symbol}")
+            ticker = yf.Ticker(symbol)
+            raw_news = ticker.news
+            
+            if raw_news:
+                logger.info(f"Standard fetch succeeded for {symbol}: {len(raw_news)} items")
+                # Cache successful result
+                self._cache_successful_news(symbol, raw_news)
+                return raw_news
+                
+        except Exception as e:
+            logger.warning(f"Standard news fetch failed for {symbol}: {str(e)}")
+        
+        # Attempt 2: yfinance with custom DNS settings
+        try:
+            logger.info(f"Attempt 2/4: yfinance with DNS fallback for {symbol}")
+            
+            # Configure custom DNS servers
+            self._configure_dns_fallback()
+            
+            # Retry with DNS configuration
+            ticker = yf.Ticker(symbol)
+            raw_news = ticker.news
+            
+            if raw_news:
+                logger.info(f"DNS fallback succeeded for {symbol}: {len(raw_news)} items")
+                self._cache_successful_news(symbol, raw_news)
+                return raw_news
+                
+        except Exception as e:
+            logger.warning(f"DNS fallback failed for {symbol}: {str(e)}")
+        
+        # Attempt 3: Direct requests with alternative approach
+        try:
+            logger.info(f"Attempt 3/4: Direct HTTP request for {symbol}")
+            raw_news = self._direct_news_fetch(symbol, days, max_items)
+            
+            if raw_news:
+                logger.info(f"Direct HTTP fetch succeeded for {symbol}: {len(raw_news)} items")
+                self._cache_successful_news(symbol, raw_news)
+                return raw_news
+                
+        except Exception as e:
+            logger.warning(f"Direct HTTP fetch failed for {symbol}: {str(e)}")
+        
+        # Attempt 4: Use cached news from previous successful fetch
+        try:
+            logger.info(f"Attempt 4/4: Using cached news for {symbol}")
+            cached_news = self._get_cached_news(symbol, days)
+            
+            if cached_news:
+                logger.info(f"Using cached news for {symbol}: {len(cached_news)} items")
+                return cached_news
+                
+        except Exception as e:
+            logger.warning(f"Cached news fetch failed for {symbol}: {str(e)}")
+        
+        logger.error(f"All news fetch attempts failed for {symbol}")
+        return None
+
+    def _configure_dns_fallback(self):
+        """Configure DNS fallback servers for improved reliability."""
+        try:
+            # Set alternative DNS servers
+            import dns.resolver
+            resolver = dns.resolver.Resolver()
+            resolver.nameservers = ['8.8.8.8', '1.1.1.1', '208.67.222.222']  # Google, Cloudflare, OpenDNS
+            dns.resolver.default_resolver = resolver
+            logger.debug("DNS fallback configured successfully")
+        except ImportError:
+            logger.debug("dnspython not available, skipping DNS configuration")
+        except Exception as e:
+            logger.debug(f"DNS fallback configuration failed: {str(e)}")
+
+    def _direct_news_fetch(self, symbol: str, days: int = 90, max_items: int = 100) -> Optional[List[Dict]]:
+        """
+        Direct HTTP request to Yahoo Finance news API with custom headers and retry logic.
+        """
+        try:
+            import urllib3
+            from urllib3.util.retry import Retry
+            
+            # Create session with retry strategy
+            retry_strategy = Retry(
+                total=3,
+                backoff_factor=1,
+                status_forcelist=[429, 500, 502, 503, 504],
+            )
+            
+            http = urllib3.PoolManager(retries=retry_strategy)
+            
+            # Yahoo Finance news endpoint
+            url = f"https://query2.finance.yahoo.com/v1/finance/search"
+            params = {
+                'q': symbol,
+                'type': 'news',
+                'count': max_items,
+                'region': 'US',
+                'lang': 'en-US'
+            }
+            
+            # Custom headers to mimic browser request
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'application/json',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Cache-Control': 'no-cache',
+            }
+            
+            # Make request
+            response = http.request('GET', url, fields=params, headers=headers, timeout=30)
+            
+            if response.status == 200:
+                import json
+                data = json.loads(response.data.decode('utf-8'))
+                
+                # Extract news items from response
+                if 'news' in data and isinstance(data['news'], list):
+                    return data['news'][:max_items]
+            
+            logger.warning(f"Direct HTTP request returned status {response.status} for {symbol}")
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Direct HTTP news fetch error for {symbol}: {str(e)}")
+            return None
+
+    def _cache_successful_news(self, symbol: str, news_data: List[Dict]):
+        """Cache successful news fetch for emergency fallback."""
+        try:
+            from django.core.cache import cache
+            
+            cache_key = f"emergency_news:{symbol}"
+            cache_data = {
+                'news': news_data,
+                'cached_at': datetime.now(dt_timezone.utc).isoformat(),
+                'symbol': symbol
+            }
+            
+            # Cache for 24 hours
+            cache.set(cache_key, cache_data, 86400)
+            logger.debug(f"Cached emergency news for {symbol}: {len(news_data)} items")
+            
+        except Exception as e:
+            logger.debug(f"Failed to cache emergency news for {symbol}: {str(e)}")
+
+    def _get_cached_news(self, symbol: str, days: int = 90) -> Optional[List[Dict]]:
+        """Retrieve cached news for emergency fallback."""
+        try:
+            from django.core.cache import cache
+            
+            cache_key = f"emergency_news:{symbol}"
+            cache_data = cache.get(cache_key)
+            
+            if cache_data and 'news' in cache_data:
+                # Check if cache is not too old
+                cached_at = datetime.fromisoformat(cache_data['cached_at'])
+                age_hours = (datetime.now(dt_timezone.utc) - cached_at).total_seconds() / 3600
+                
+                if age_hours < 48:  # Use cache if less than 48 hours old
+                    logger.info(f"Using emergency cached news for {symbol} (age: {age_hours:.1f}h)")
+                    return cache_data['news']
+                else:
+                    logger.debug(f"Emergency cache too old for {symbol}: {age_hours:.1f}h")
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Failed to retrieve cached news for {symbol}: {str(e)}")
+            return None
+
     def fetchNewsForStock(self, symbol: str, days: int = 90, max_items: int = 100) -> List[Dict[str, Any]]:
         """
         Fetch news articles for a stock symbol for sentiment analysis.
@@ -2541,13 +2965,9 @@ class YahooFinanceService:
 
             logger.info(f"Fetching news for {symbol} (last {days} days)")
 
-            # Get stock ticker object - let yfinance handle session creation
-            ticker = yf.Ticker(symbol)
-
-            # Fetch news from yfinance
+            # Fetch news with multiple fallback mechanisms
             news_items = []
-            logger.info(f"Attempting to fetch news from ticker for {symbol}")
-            raw_news = ticker.news
+            raw_news = self._fetch_news_with_fallbacks(symbol, days, max_items)
 
             logger.info(
                 f"Raw news result for {symbol}: {type(raw_news)}, length: {len(raw_news) if raw_news else 'None'}"
@@ -2797,6 +3217,53 @@ class YahooFinanceService:
         except Exception as e:
             logger.error(f"Error syncing stock data for {symbol}: {str(e)}")
             return False
+
+
+    def _fit_scalers_for_stock(self, symbol: str):
+        """Fit Universal LSTM scalers for the stock after successful backfill."""
+        try:
+            from Data.models import Stock, StockPrice
+            from Analytics.management.commands.fit_universal_scalers import Command as ScalerCommand
+            
+            # Get stock and ensure we have enough data
+            stock = Stock.objects.get(symbol=symbol)
+            prices = StockPrice.objects.filter(
+                stock=stock
+            ).order_by('-date')[:252]  # 1 year of data
+            
+            if prices.count() < 60:
+                logger.debug(f"Not enough data to fit scalers for {symbol}: {prices.count()} records")
+                return
+            
+            # Create instance of scaler fitting command
+            scaler_cmd = ScalerCommand()
+            
+            # Build features for scaler fitting
+            features = []
+            for i in range(len(prices) - 1):
+                price_data = prices[i]
+                prev_price = prices[i + 1] if i + 1 < len(prices) else None
+                
+                if prev_price:
+                    feature_dict = {
+                        'price': float(price_data.close),
+                        'volume': float(price_data.volume),
+                        'price_change': float(price_data.close - prev_price.close),
+                        'volume_ratio': float(price_data.volume / prev_price.volume) if prev_price.volume > 0 else 1.0,
+                        'high_low_ratio': float(price_data.high / price_data.low) if price_data.low > 0 else 1.0,
+                        'close_open_ratio': float(price_data.close / price_data.open) if price_data.open > 0 else 1.0,
+                    }
+                    features.append(feature_dict)
+            
+            if len(features) >= 30:
+                # Fit and save scalers
+                scaler_data = scaler_cmd._fit_scalers_for_stock(symbol, features)
+                if scaler_data:
+                    scaler_cmd._save_scalers_to_file(symbol, scaler_data)
+                    logger.debug(f'Auto-fitted and saved scalers for {symbol}')
+                    
+        except Exception as e:
+            logger.warning(f'Could not auto-fit scalers for {symbol}: {str(e)}')
 
 
 # Singleton instance

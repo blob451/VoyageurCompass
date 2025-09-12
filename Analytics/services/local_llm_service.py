@@ -185,13 +185,13 @@ class SentimentEnhancedPromptBuilder:
         symbol = analysis_data.get("symbol", "UNKNOWN")
         score = analysis_data.get("score_0_10", 0)
 
-        # Build base technical context
+        # Technical context construction
         base_context = self._build_technical_context(analysis_data, detail_level)
 
-        # Add sentiment context if available
+        # Sentiment context integration
         sentiment_context = self._build_sentiment_context(sentiment_data) if sentiment_data else ""
 
-        # Build instruction based on detail level and sentiment confidence
+        # Detail-level instruction construction
         instruction = self._build_enhanced_instruction(symbol, score, detail_level, sentiment_data)
 
         # Combine all components
@@ -214,7 +214,7 @@ class SentimentEnhancedPromptBuilder:
             # Comprehensive technical overview
             context = f"Technical Analysis for {symbol} (Score: {score}/10)\n\nKey Technical Indicators:"
 
-            # Add top 4 indicators with values
+            # Primary indicator integration
             if weighted_scores:
                 sorted_indicators = sorted(weighted_scores.items(), key=lambda x: abs(x[1]), reverse=True)[:4]
                 for indicator, value in sorted_indicators:
@@ -297,14 +297,14 @@ class SentimentEnhancedPromptBuilder:
                 elif (score >= 6.5 and sentiment_score < -0.2) or (score <= 4.5 and sentiment_score > 0.2):
                     sentiment_alignment = " Address the divergence between technical analysis and market sentiment."
 
-        # Add consistency rules header
+        # Consistency rules application
         consistency_rules = f"""
 IMPORTANT: Based on the {score}/10 score, your recommendation MUST be {expected_rec}.
 - Scores 7-10 = BUY
 - Scores 4-6.9 = HOLD
 - Scores 0-3.9 = SELL"""
 
-        # Build instruction based on detail level with word count targets
+        # Detail-level instruction with word count targets
         if detail_level == "summary":
             instruction = f"{consistency_rules}\n\nProvide a clear {expected_rec} recommendation for {symbol} with the primary reason. Target: 50-60 words for complete sentences."
             if sentiment_influence:
@@ -475,8 +475,8 @@ class LocalLLMService:
 
     def __init__(self):
         # Model hierarchy for performance optimisation - read from settings
-        self.primary_model = getattr(settings, "OLLAMA_PRIMARY_MODEL", "llama3.1:8b")
-        self.detailed_model = getattr(settings, "OLLAMA_DETAILED_MODEL", "llama3.1:70b")
+        self.primary_model = getattr(settings, "OLLAMA_PRIMARY_MODEL", "mistral:7b")
+        self.detailed_model = getattr(settings, "OLLAMA_DETAILED_MODEL", "mistral:7b")
         self.current_model = self.primary_model  # Start with fast model
 
         # Enhanced configuration - read from settings
@@ -500,7 +500,7 @@ class LocalLLMService:
         self.connection_retry_attempts = getattr(settings, "OLLAMA_RETRY_ATTEMPTS", 3)
         self.connection_retry_delay = getattr(settings, "OLLAMA_RETRY_DELAY", 1)
 
-        # Add circuit breaker and monitoring
+        # Circuit breaker and monitoring initialisation
         self.circuit_breaker = LLMCircuitBreaker()
         self.performance_monitor = LLMPerformanceMonitor()
 
@@ -511,7 +511,7 @@ class LocalLLMService:
         self._active_requests = 0
         self._max_concurrent_requests = 5
 
-        # Add sentiment-enhanced components
+        # Sentiment enhancement component initialisation
         self.sentiment_prompt_builder = SentimentEnhancedPromptBuilder()
         self.confidence_adaptive_generator = ConfidenceAdaptiveGeneration()
 
@@ -519,7 +519,7 @@ class LocalLLMService:
         self.sentiment_integration_enabled = True
         self.sentiment_cache_prefix = "sentiment_enhanced:"
 
-        # Don't initialize client in __init__ - use lazy property instead
+        # Client initialisation deferred to lazy property
 
     @property
     def client(self):
@@ -530,7 +530,7 @@ class LocalLLMService:
         if self._client is None:
             with self._client_lock:
                 if self._client is None:  # Double-check locking
-                    self._client = self._initialize_client_with_retry()
+                    self._client = self._initialise_client_with_retry()
         return self._client
 
     @client.setter
@@ -538,7 +538,7 @@ class LocalLLMService:
         """Set the client (mainly for testing purposes)."""
         self._client = value
 
-    def _initialize_client_with_retry(self):
+    def _initialise_client_with_retry(self):
         """Initialize Ollama client connection with retry logic."""
         for attempt in range(self.connection_retry_attempts):
             try:
@@ -550,7 +550,7 @@ class LocalLLMService:
                 # Test connection by listing models
                 try:
                     models = client.list()
-                    logger.info(f"Local LLM client initialized successfully on attempt {attempt + 1}")
+                    logger.info(f"Local LLM client initialised successfully on attempt {attempt + 1}")
 
                     # Log available models without checking individual model availability yet
                     available_models = [m["name"] for m in models.get("models", [])]
@@ -567,11 +567,11 @@ class LocalLLMService:
                         raise test_error
 
             except Exception as e:
-                logger.error(f"Failed to initialize Ollama client on attempt {attempt + 1}: {str(e)}")
+                logger.error(f"Failed to initialise Ollama client on attempt {attempt + 1}: {str(e)}")
                 if attempt < self.connection_retry_attempts - 1:
                     time.sleep(self.connection_retry_delay * (2**attempt))  # Exponential backoff
                 else:
-                    logger.error(f"Failed to initialize Ollama client after {self.connection_retry_attempts} attempts")
+                    logger.error(f"Failed to initialise Ollama client after {self.connection_retry_attempts} attempts")
                     return None
 
         return None
@@ -581,14 +581,14 @@ class LocalLLMService:
         target_model = model_name or self.current_model
         cache_key = f"model_availability_{target_model}"
 
-        # Check cache first
+        # Cache verification
         current_time = time.time()
         if cache_key in self._availability_cache:
             cached_result, cached_time = self._availability_cache[cache_key]
             if current_time - cached_time < self._availability_cache_timeout:
                 return cached_result
 
-        # Check availability
+        # Availability assessment
         try:
             if not self.client:
                 logger.warning(f"No client available to check model {target_model}")
@@ -640,7 +640,7 @@ class LocalLLMService:
 
     def _generate_with_timeout(self, model: str, prompt: str, options: dict, timeout: int) -> dict:
         """Generate LLM response with proper timeout handling and resource management."""
-        # Check resource availability
+        # Resource availability assessment
         if not self._check_resource_availability():
             raise Exception("LLM service at maximum capacity, please try again later")
 
@@ -675,7 +675,7 @@ class LocalLLMService:
         if not self.performance_mode:
             return self.detailed_model
 
-        # Check model load and availability first
+        # Model availability verification
         primary_available = self._verify_model_availability(self.primary_model)
         detailed_available = self._verify_model_availability(self.detailed_model)
 
@@ -698,7 +698,7 @@ class LocalLLMService:
 
         elif detail_level == "detailed":
             # Detailed explanations benefit from 70B model's superior capabilities
-            # Use 70B for complex detailed analysis, 8B for simpler ones
+            # Model selection based on analysis complexity
             if complexity_score > 0.6:  # Lowered threshold for detailed mode
                 logger.info(
                     f"[MODEL SELECTION] Using 70B for complex detailed analysis (complexity: {complexity_score:.3f})"
@@ -744,7 +744,7 @@ class LocalLLMService:
             # Time-based load balancing: avoid peak usage times
             current_hour = datetime.now().hour
 
-            # Define peak hours when we should prefer 8B model (9 AM - 5 PM)
+            # Peak hour model preference definition
             peak_hours = range(9, 17)
             is_peak_time = current_hour in peak_hours
 
@@ -752,7 +752,7 @@ class LocalLLMService:
             recent_performance = self.performance_monitor.get_recent_performance()
             avg_generation_time = recent_performance.get("avg_generation_time", 0)
 
-            # Use premium model if:
+            # Premium model selection criteria
             # 1. Off-peak hours OR
             # 2. Recent 8B performance is poor (slow) AND not severely overloaded
             use_premium = not is_peak_time or (avg_generation_time > 30 and avg_generation_time < 120)  # 30s-2min range
@@ -808,7 +808,7 @@ class LocalLLMService:
                 1, max(positive_signals, negative_signals)
             )
 
-            # Check for extreme technical score that may need nuanced explanation
+            # Extreme score nuanced explanation assessment
             technical_score = analysis_data.get("score_0_10", 5)
             extreme_score_factor = 0
             if technical_score >= 8.5 or technical_score <= 1.5:
@@ -837,7 +837,7 @@ class LocalLLMService:
         """Pull the specified model if not available."""
         try:
             if not self.client:
-                raise Exception("Ollama client not initialized")
+                raise Exception("Ollama client not initialised")
 
             target_model = model_name or self.primary_model
             logger.info(f"Pulling model {target_model}...")
@@ -853,7 +853,7 @@ class LocalLLMService:
         if not self.client:
             return False
 
-        # Check if any model is available
+        # Model availability verification
         return self._verify_model_availability(self.primary_model) or self._verify_model_availability(
             self.detailed_model
         )
@@ -882,13 +882,13 @@ class LocalLLMService:
             logger.warning("Local LLM service not available")
             return None
 
-        # Create enhanced cache key that includes sentiment context
+        # Sentiment-enhanced cache key generation
         cache_key = self._create_sentiment_enhanced_cache_key(
             analysis_data, sentiment_data, detail_level, explanation_type
         )
         dynamic_ttl = self._get_sentiment_aware_ttl(analysis_data, sentiment_data)
 
-        # Check cache first
+        # Cache verification
         cached_result = cache.get(cache_key)
         if cached_result:
             logger.info(f"Retrieved sentiment-enhanced explanation from cache (TTL: {dynamic_ttl}s)")
@@ -900,7 +900,7 @@ class LocalLLMService:
             complexity_score = self._calculate_complexity_score(analysis_data)
             selected_model = self._select_optimal_model(detail_level, complexity_score)
 
-            # Build sentiment-enhanced prompt
+            # Sentiment-enhanced prompt construction
             enhanced_prompt = self.sentiment_prompt_builder.build_sentiment_aware_prompt(
                 analysis_data, sentiment_data, detail_level, explanation_type
             )
@@ -1052,7 +1052,7 @@ class LocalLLMService:
         cache_key = self._create_cache_key(analysis_data, detail_level, explanation_type)
         dynamic_ttl = self._get_dynamic_ttl(analysis_data)
 
-        # Check cache first
+        # Cache verification
         cached_result = cache.get(cache_key)
         if cached_result:
             logger.info(f"Retrieved explanation from cache (TTL: {dynamic_ttl}s)")
@@ -1546,7 +1546,7 @@ Use professional investment language with complete sentences."""
         """Get current service status and model information."""
         try:
             if not self.client:
-                return {"available": False, "error": "Client not initialized"}
+                return {"available": False, "error": "Client not initialised"}
 
             models = self.client.list()
             model_available = self._verify_model_availability()
@@ -1562,7 +1562,7 @@ Use professional investment language with complete sentences."""
                 "detailed_model_available": detailed_available,
                 "current_model": self.current_model,
                 "models_count": len(models.get("models", [])),
-                "client_initialized": True,
+                "client_initialised": True,
                 "cache_enabled": hasattr(cache, "get"),
                 "performance_mode": self.performance_mode,
                 "generation_timeout": self.generation_timeout,
@@ -1571,7 +1571,7 @@ Use professional investment language with complete sentences."""
             }
 
         except Exception as e:
-            return {"available": False, "error": str(e), "client_initialized": self.client is not None}
+            return {"available": False, "error": str(e), "client_initialised": self.client is not None}
 
 
 # Singleton instance

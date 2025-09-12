@@ -157,7 +157,7 @@ class SentimentMetrics:
         # Update performance window
         self._update_performance_window(processing_time)
 
-        # Check for performance anomalies
+        # Performance anomaly detection
         is_anomaly = self._detect_performance_anomaly(processing_time)
 
         # Categorize confidence
@@ -454,7 +454,7 @@ class SentimentAnalyzer:
         self.model = None
         self.tokenizer = None
         self.pipeline = None
-        self._initialized = False
+        self._initialised = False
         self._last_used = None
         self._usage_count = 0
         self._model_lock = threading.Lock()
@@ -501,25 +501,25 @@ class SentimentAnalyzer:
         self.total_batches_processed = 0
 
     @property
-    def is_initialized(self) -> bool:
+    def is_initialised(self) -> bool:
         """Check if model is loaded and ready."""
-        return self._initialized
+        return self._initialised
 
     def _check_model_lifecycle(self):
         """Check if model should be unloaded based on usage or idle time."""
-        if not self._initialized:
+        if not self._initialised:
             return
 
         with self._model_lock:
             current_time = time.time()
 
-            # Check idle timeout
+            # Idle timeout verification
             if self._last_used and (current_time - self._last_used) > self.MODEL_IDLE_TIMEOUT:
                 logger.info(f"Model idle for {self.MODEL_IDLE_TIMEOUT}s, unloading to save memory")
                 self._unload_model()
                 return
 
-            # Check usage count
+            # Usage count verification
             if self._usage_count > self.MODEL_MAX_USAGE:
                 logger.info(f"Model usage count ({self._usage_count}) exceeded, unloading to prevent memory leaks")
                 self._unload_model()
@@ -547,7 +547,7 @@ class SentimentAnalyzer:
 
             gc.collect()
 
-            self._initialized = False
+            self._initialised = False
             self._last_used = None
             self._usage_count = 0
 
@@ -823,7 +823,7 @@ class SentimentAnalyzer:
             return {"label": "neutral", "score": 0.6}
 
     def _lazy_init(self):
-        """Lazy initialization of the model to save memory."""
+        """Lazy initialization of the model to save memory with thread safety."""
         global _FINBERT_DISABLED
 
         if _FINBERT_DISABLED:
@@ -835,7 +835,16 @@ class SentimentAnalyzer:
             _FINBERT_DISABLED = True
             return
 
-        if not self._initialized:
+        # Check without lock first (double-checked locking pattern)
+        if self._initialized:
+            return
+
+        with self._model_lock:
+            # Check again inside the lock to prevent race conditions
+            if self._initialized:
+                logger.debug("Model already initialized by another thread")
+                return
+
             try:
                 logger.info("Loading FinBERT model for sentiment analysis...")
                 start_time = time.time()
@@ -1027,31 +1036,56 @@ class SentimentAnalyzer:
         valid_texts = []
         valid_indices = []
 
-        # Check cache and filter valid texts
+        # Preprocess texts and prepare cache keys for bulk operations
+        cache_keys = []
+        processed_texts = []
+        
         for i, text in enumerate(texts):
             if not text or not text.strip():
                 results.append(self._neutral_sentiment())
+                cache_keys.append(None)
+                processed_texts.append(None)
             else:
                 # Preprocess text to handle problematic characters
                 processed_text = self._preprocess_text(text)
                 if not processed_text:
                     results.append(self._neutral_sentiment())
+                    cache_keys.append(None)
+                    processed_texts.append(None)
                     continue
-
-                if use_cache:
-                    cache_key = f"sentiment:single:{hashlib.blake2b(processed_text.encode(), digest_size=16).hexdigest()}"
-                    cached_result = cache.get(cache_key)
-                    if cached_result:
-                        results.append(cached_result)
-                        continue
 
                 # Truncate if needed
                 if len(processed_text) > 5000:
                     processed_text = processed_text[:5000]
 
-                valid_texts.append(processed_text)
-                valid_indices.append(i)
+                processed_texts.append(processed_text)
+                cache_key = f"sentiment:single:{hashlib.blake2b(processed_text.encode(), digest_size=16).hexdigest()}" if use_cache else None
+                cache_keys.append(cache_key)
                 results.append(None)  # Placeholder
+
+        # Bulk cache lookup for better performance
+        if use_cache:
+            valid_cache_keys = [k for k in cache_keys if k is not None]
+            if valid_cache_keys:
+                cached_results = cache.get_many(valid_cache_keys)
+                for i, cache_key in enumerate(cache_keys):
+                    if cache_key and cache_key in cached_results:
+                        results[i] = cached_results[cache_key]
+                    elif cache_key:  # Not in cache, need processing
+                        valid_texts.append(processed_texts[i])
+                        valid_indices.append(i)
+            else:
+                # No cache keys, process all valid texts
+                for i, processed_text in enumerate(processed_texts):
+                    if processed_text:
+                        valid_texts.append(processed_text)
+                        valid_indices.append(i)
+        else:
+            # No caching, process all valid texts
+            for i, processed_text in enumerate(processed_texts):
+                if processed_text:
+                    valid_texts.append(processed_text)
+                    valid_indices.append(i)
 
         # Process valid texts in adaptive batches
         if valid_texts:
@@ -1101,13 +1135,20 @@ class SentimentAnalyzer:
 
                         results[idx] = result_dict
 
-                        # Cache individual results
-                        if use_cache:
-                            cache_key = f"sentiment:single:{hashlib.blake2b(batch_texts[j].encode(), digest_size=16).hexdigest()}"
-                            cache.set(cache_key, result_dict, self.CACHE_TTL_RECENT)
+                        # Results will be cached in bulk after processing all batches
 
                 batch_time = time.time() - start_time
                 logger.info(f"Batch sentiment analysis completed: {len(valid_texts)} texts in {batch_time:.2f}s")
+
+                # Bulk cache setting for better performance
+                if use_cache:
+                    cache_data = {}
+                    for i, cache_key in enumerate(cache_keys):
+                        if cache_key and results[i] and results[i].get("sentimentScore") is not None:
+                            cache_data[cache_key] = results[i]
+                    if cache_data:
+                        cache.set_many(cache_data, self.CACHE_TTL_RECENT)
+                        logger.debug(f"Cached {len(cache_data)} sentiment results in bulk")
 
             except Exception as e:
                 logger.error(f"Error in batch sentiment analysis: {str(e)}")
@@ -2144,8 +2185,9 @@ class SentimentAnalyzer:
 
                 start_time = time.time()
 
-                # Process batch
-                batch_results = self.pipeline(texts, truncation=True, max_length=self.MAX_LENGTH, batch_size=len(texts))
+                # Process batch with optimal batch size (not all texts at once)
+                optimal_batch_size = min(self.current_batch_size, len(texts), 8)  # Cap at 8 for memory efficiency
+                batch_results = self.pipeline(texts, truncation=True, max_length=self.MAX_LENGTH, batch_size=optimal_batch_size)
 
                 processing_time = time.time() - start_time
                 self._update_batch_performance(processing_time, had_error=False)

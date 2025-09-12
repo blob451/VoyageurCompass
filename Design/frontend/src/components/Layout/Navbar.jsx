@@ -23,8 +23,11 @@ import {
   ShoppingCart,
   Settings,
   Help,
-  Assessment
+  Assessment,
+  DarkMode,
+  LightMode
 } from '@mui/icons-material';
+import { useThemeMode } from '../../theme/ThemeModeContext.jsx';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -33,6 +36,7 @@ const Navbar = () => {
   const [logoutApi] = useLogoutMutation();
   const [toolsMenuAnchor, setToolsMenuAnchor] = useState(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
+  const { mode, toggleMode } = useThemeMode();
 
   // User credits display (temporary mock data)
   const userCredits = 25;
@@ -41,7 +45,7 @@ const Navbar = () => {
     try {
       setUserMenuAnchor(null);
       
-      // Retrieve refresh token for secure API logout
+      // Refresh token retrieval for secure API logout
       const refreshToken = localStorage.getItem('refreshToken');
       
       // Call logout API
@@ -50,7 +54,7 @@ const Navbar = () => {
           await logoutApi(refreshToken).unwrap();
         } catch (error) {
           console.warn('Logout API call failed:', error);
-          // Continue with client-side logout even if API fails
+          // Client-side logout continuation despite API failure
         }
       }
       
@@ -65,7 +69,7 @@ const Navbar = () => {
       
     } catch (error) {
       console.error('Logout error:', error);
-      // Fallback: force logout regardless of API failures
+      // Fallback logout enforcement regardless of API failures
       dispatch(logout({ reason: 'manual' }));
       navigate('/logout', { 
         replace: true, 
@@ -164,6 +168,15 @@ const Navbar = () => {
                 Help
               </Button>
 
+              <IconButton
+                color="inherit"
+                aria-label={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}
+                onClick={toggleMode}
+                title={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}
+              >
+                {mode === 'light' ? <DarkMode /> : <LightMode />}
+              </IconButton>
+
               <Chip 
                 label={`${userCredits} Credits`}
                 size="small"
@@ -201,6 +214,14 @@ const Navbar = () => {
               <Button color="inherit" onClick={() => navigate('/help')}>
                 Help
               </Button>
+              <IconButton
+                color="inherit"
+                aria-label={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}
+                onClick={toggleMode}
+                title={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}
+              >
+                {mode === 'light' ? <DarkMode /> : <LightMode />}
+              </IconButton>
               <Button color="inherit" onClick={() => navigate('/login')}>
                 Login
               </Button>

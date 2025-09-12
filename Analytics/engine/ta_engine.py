@@ -5,11 +5,16 @@ Technical analysis engine with 12-indicator framework and normalised scoring.
 import logging
 import statistics
 import time
+import hashlib
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+from functools import wraps
 
 from django.utils import timezone
+from django.core.cache import cache
 
 from Analytics.services.sentiment_analyzer import get_sentiment_analyzer
 from Analytics.services.universal_predictor import get_universal_lstm_service
@@ -23,6 +28,47 @@ from Data.repo.price_reader import (
 from Data.services.yahoo_finance import yahoo_finance_service
 
 logger = logging.getLogger(__name__)
+
+
+def cache_indicator(cache_ttl: int = 300):
+    """
+    Decorator to cache expensive technical indicator calculations.
+    
+    Args:
+        cache_ttl: Cache time-to-live in seconds (default: 5 minutes)
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            # Generate cache key based on function name, symbol, and price data hash
+            symbol = getattr(self, '_current_symbol', 'unknown')
+            
+            # Price data hash generation for caching
+            price_data_str = ""
+            if args and hasattr(args[0], '__iter__'):
+                # First argument is usually price data
+                try:
+                    price_data_str = str([(p.date, float(p.close), int(p.volume)) for p in args[0][-50:]])  # Last 50 days
+                except (AttributeError, IndexError, TypeError):
+                    price_data_str = str(args)[:200]  # Fallback to string representation
+            
+            cache_key = f"ta_indicator:{func.__name__}:{symbol}:{hashlib.md5(price_data_str.encode()).hexdigest()[:12]}"
+            
+            # Cache retrieval attempt
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                logger.debug(f"Cache hit for {func.__name__} on {symbol}")
+                return cached_result
+            
+            # Calculate and cache result
+            result = func(self, *args, **kwargs)
+            if result:  # Only cache successful calculations
+                cache.set(cache_key, result, cache_ttl)
+                logger.debug(f"Cached {func.__name__} result for {symbol}")
+            
+            return result
+        return wrapper
+    return decorator
 
 
 class IndicatorResult(NamedTuple):
@@ -77,6 +123,7 @@ class TechnicalAnalysisEngine:
         """Initialise technical analysis engine with data repositories."""
         self.price_reader = PriceReader()
         self.analytics_writer = AnalyticsWriter()
+        self._current_symbol = None  # Track current symbol for caching
 
     def get_indicator_display_name(self, indicator_code: str, indicator_result=None) -> str:
         """Retrieve human-readable display name for indicator code.
@@ -102,6 +149,7 @@ class TechnicalAnalysisEngine:
         horizon: str = "blend",
         user=None,
         logger_instance=None,
+        fast_mode: bool = False,
     ) -> Dict[str, Any]:
         """
         Perform complete technical analysis for a stock.
@@ -112,11 +160,15 @@ class TechnicalAnalysisEngine:
             horizon: Analysis horizon ('short', 'medium', 'long', 'blend')
             user: User instance who initiated this analysis
             logger_instance: AnalysisLogger instance for web-based analysis logging
+            fast_mode: Enable fast mode (use cached data, shorter lookbacks)
 
         Returns:
             Dict containing all analysis results and composite score
         """
         try:
+            # Set current symbol for caching
+            self._current_symbol = symbol
+            
             logger.info(f"[TA ENGINE] Starting technical analysis for {symbol}")
             analysis_start_time = time.time()
 
@@ -128,7 +180,7 @@ class TechnicalAnalysisEngine:
                 logger_instance.log_analysis_start(analysis_date, horizon)
 
             logger.debug(f"Getting stock data for {symbol}")
-            # Get required data (3 years for comprehensive analysis)
+            # Required data retrieval (3-year comprehensive analysis)
             stock_prices = self._get_stock_data(symbol, analysis_date, logger_instance)
             logger.debug(f"Stock data retrieved: {len(stock_prices)} records")
 
@@ -139,7 +191,7 @@ class TechnicalAnalysisEngine:
             )
 
             if not stock_prices:
-                # Check if auto-sync was attempted and failed
+                # Auto-sync failure verification
                 auto_sync_attempted = hasattr(self, "_last_auto_sync") and self._last_auto_sync
                 if auto_sync_attempted:
                     error_msg = (f"No price data available for {symbol}. Auto-sync failed due to data provider issues. "
@@ -160,82 +212,11 @@ class TechnicalAnalysisEngine:
                 if hasattr(self, "_last_auto_sync"):
                     delattr(self, "_last_auto_sync")
 
-            logger.debug("Starting calculation of 12 indicators")
-            # Calculate all 12 indicators
-            indicators = {}
-
-            logger.debug("Calculating SMA50VS200 indicator")
-            indicators["sma50vs200"] = self._calculate_sma_crossover(stock_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("sma50vs200", indicators["sma50vs200"])
-                logger_instance.log_indicator_calculation(display_name, indicators["sma50vs200"])
-
-            indicators["pricevs50"] = self._calculate_price_vs_50d(stock_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("pricevs50", indicators["pricevs50"])
-                logger_instance.log_indicator_calculation(display_name, indicators["pricevs50"])
-
-            indicators["rsi14"] = self._calculate_rsi14(stock_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("rsi14", indicators["rsi14"])
-                logger_instance.log_indicator_calculation(display_name, indicators["rsi14"])
-
-            indicators["macd12269"] = self._calculate_macd_histogram(stock_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("macd12269", indicators["macd12269"])
-                logger_instance.log_indicator_calculation(display_name, indicators["macd12269"])
-
-            indicators["bbpos20"] = self._calculate_bollinger_position(stock_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("bbpos20", indicators["bbpos20"])
-                logger_instance.log_indicator_calculation(display_name, indicators["bbpos20"])
-
-            indicators["bbwidth20"] = self._calculate_bollinger_bandwidth(stock_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("bbwidth20", indicators["bbwidth20"])
-                logger_instance.log_indicator_calculation(display_name, indicators["bbwidth20"])
-
-            indicators["volsurge"] = self._calculate_volume_surge(stock_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("volsurge", indicators["volsurge"])
-                logger_instance.log_indicator_calculation(display_name, indicators["volsurge"])
-
-            indicators["obv20"] = self._calculate_obv_trend(stock_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("obv20", indicators["obv20"])
-                logger_instance.log_indicator_calculation(display_name, indicators["obv20"])
-
-            indicators["rel1y"] = self._calculate_relative_strength_1y(stock_prices, sector_prices, industry_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("rel1y", indicators["rel1y"])
-                logger_instance.log_indicator_calculation(display_name, indicators["rel1y"])
-
-            indicators["rel2y"] = self._calculate_relative_strength_2y(stock_prices, sector_prices, industry_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("rel2y", indicators["rel2y"])
-                logger_instance.log_indicator_calculation(display_name, indicators["rel2y"])
-
-            indicators["candlerev"] = self._calculate_candlestick_reversal(stock_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("candlerev", indicators["candlerev"])
-                logger_instance.log_indicator_calculation(display_name, indicators["candlerev"])
-
-            indicators["srcontext"] = self._calculate_support_resistance(stock_prices)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("srcontext", indicators["srcontext"])
-                logger_instance.log_indicator_calculation(display_name, indicators["srcontext"])
-
-            # Calculate sentiment analysis
-            indicators["sentiment"] = self._calculate_sentiment_analysis(symbol)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("sentiment", indicators["sentiment"])
-                logger_instance.log_indicator_calculation(display_name, indicators["sentiment"])
-
-            # Calculate LSTM price prediction
-            indicators["prediction"] = self._calculate_prediction_score(symbol)
-            if logger_instance:
-                display_name = self.get_indicator_display_name("prediction", indicators["prediction"])
-                logger_instance.log_indicator_calculation(display_name, indicators["prediction"])
+            logger.debug("Starting calculation of 14 indicators (parallelized)")
+            # Calculate all 14 indicators with parallel execution
+            indicators = self._calculate_indicators_parallel(
+                symbol, stock_prices, sector_prices, industry_prices, logger_instance, fast_mode
+            )
 
             # Calculate weighted scores and composite with dynamic weight reallocation
             weighted_scores = {}
@@ -257,7 +238,7 @@ class TechnicalAnalysisEngine:
                 logger.warning(f"Missing indicators: {missing_indicators} (total weight: {missing_weight:.3f})")
                 logger.warning(f"Redistributing {missing_weight:.3f} weight to available indicators")
 
-            # Create adjusted weights for available indicators
+            # Adjusted weight calculation for available indicators
             adjusted_weights = {}
             for indicator_name in indicators.keys():
                 if indicator_name in available_indicators:
@@ -290,14 +271,14 @@ class TechnicalAnalysisEngine:
                 weighted_score = Decimal(str(score)) * Decimal(str(weight))
 
                 weighted_scores[f"w_{indicator_name}"] = weighted_score
-                # Get display name for API response
+                # Display name retrieval for API response
                 display_name = self.get_indicator_display_name(indicator_name, result)
 
                 components[indicator_name] = {
                     "raw": raw_value,
                     "score": score,
                     "description": display_name,
-                    "weight_used": float(weight),  # Add weight used for transparency
+                    "weight_used": float(weight),  # Weight transparency inclusion
                     "original_weight": self.WEIGHTS[indicator_name],
                 }
                 composite_raw += weighted_score
@@ -413,11 +394,23 @@ class TechnicalAnalysisEngine:
             # Step 1: Get sector/industry keys with early validation
             sector_key, industry_key = self.price_reader.get_stock_sector_industry_keys(symbol)
 
-            # Early exit if no keys available - avoid unnecessary logging and processing
+            # Auto-populate missing sector/industry data
+            auto_populate_needed = False
             if not sector_key and not industry_key:
-                if symbol not in ["TEST", "INTEGRATION", "EMPTY_RESILIENCE"]:  # Skip test symbols
-                    logger.debug(f"No sector/industry keys found for {symbol}")
-                return [], []
+                auto_populate_needed = True
+                reason = "both sector and industry missing"
+            elif not industry_key and sector_key:
+                auto_populate_needed = True
+                reason = "industry missing"
+            
+            if auto_populate_needed and symbol not in ["TEST", "INTEGRATION", "EMPTY_RESILIENCE"]:
+                logger.info(f"Auto-populating {symbol} ({reason})")
+                self._auto_populate_sector_industry(symbol)
+                # Retry getting keys after auto-population
+                sector_key, industry_key = self.price_reader.get_stock_sector_industry_keys(symbol)
+                if not sector_key and not industry_key:
+                    logger.debug(f"Auto-population failed for {symbol}, proceeding with stock-only analysis")
+                    return [], []
 
             start_date = (analysis_date - timedelta(days=3 * 365 + 30)).date()
             end_date = analysis_date.date()
@@ -463,7 +456,7 @@ class TechnicalAnalysisEngine:
     def _auto_sync_stock_data(self, symbol: str) -> bool:
         """
         Automatically sync stock data when it's missing from the database.
-        Uses timeout handling and direct yfinance fallback for reliability.
+        Uses cross-platform timeout handling and direct yfinance fallback for reliability.
 
         Args:
             symbol: Stock ticker symbol to sync
@@ -471,25 +464,48 @@ class TechnicalAnalysisEngine:
         Returns:
             True if sync was successful, False otherwise
         """
-        import signal
+        import platform
+        import threading
         from contextlib import contextmanager
         
         @contextmanager
         def timeout_context(seconds):
-            """Context manager for timeout handling."""
-            def timeout_handler(signum, frame):
-                raise TimeoutError(f"Operation timed out after {seconds} seconds")
-            
-            # Set the signal handler and alarm
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(seconds)
-            
-            try:
-                yield
-            finally:
-                # Restore the old handler and cancel the alarm
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
+            """Cross-platform timeout context manager."""
+            if platform.system() == 'Windows' or not hasattr(__import__('signal'), 'SIGALRM'):
+                # Threading-based timeout for Windows systems
+                timer = None
+                timed_out = [False]  # List-based modification for nested functions
+                
+                def timeout_handler():
+                    timed_out[0] = True
+                    # Windows operation interruption limitation
+                    # Timeout tracking capability
+                
+                try:
+                    if seconds and seconds > 0:
+                        timer = threading.Timer(seconds, timeout_handler)
+                        timer.start()
+                    yield
+                    if timed_out[0]:
+                        raise TimeoutError(f"Operation timed out after {seconds} seconds")
+                finally:
+                    if timer:
+                        timer.cancel()
+            else:
+                # Signal-based timeout for Unix systems
+                import signal
+                
+                def timeout_handler(signum, frame):
+                    raise TimeoutError(f"Operation timed out after {seconds} seconds")
+                
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(seconds)
+                
+                try:
+                    yield
+                finally:
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
 
         try:
             logger.info(f"Auto-syncing data for {symbol}")
@@ -498,7 +514,7 @@ class TechnicalAnalysisEngine:
             from Data.models import Stock
             from Data.services.yahoo_finance import yahoo_finance_service
 
-            # Try service with timeout
+            # Service timeout attempt
             try:
                 with timeout_context(30):  # 30 second timeout
                     # First, validate that Yahoo Finance has data for this symbol
@@ -534,10 +550,10 @@ class TechnicalAnalysisEngine:
                     from decimal import Decimal
                     from django.db import transaction
 
-                    # Get stock info and history directly
+                    # Direct stock information and history retrieval
                     ticker = yf.Ticker(symbol)
                     
-                    # Get basic info (with timeout)
+                    # Basic information retrieval with timeout
                     with timeout_context(15):
                         try:
                             info = ticker.info
@@ -552,7 +568,7 @@ class TechnicalAnalysisEngine:
                                 'industry': ''
                             }
                     
-                    # Get historical data (with timeout)
+                    # Historical data retrieval with timeout
                     with timeout_context(15):
                         hist = ticker.history(period="2y")
                     
@@ -560,9 +576,9 @@ class TechnicalAnalysisEngine:
                         logger.error(f"No historical data available for {symbol}")
                         return False
 
-                    # Create stock and price records
+                    # Stock and price record creation
                     with transaction.atomic():
-                        # Create or update stock
+                        # Stock creation or update
                         stock, created = Stock.objects.get_or_create(
                             symbol=symbol.upper(),
                             defaults={
@@ -590,7 +606,7 @@ class TechnicalAnalysisEngine:
                         # Import StockPrice here to avoid circular imports
                         from Data.models import StockPrice
 
-                        # Create price records
+                        # Price record creation
                         prices_created = 0
                         for date, row in hist.iterrows():
                             try:
@@ -620,6 +636,188 @@ class TechnicalAnalysisEngine:
             logger.error(f"Error during auto-sync for {symbol}: {str(e)}")
             return False
 
+    def _calculate_indicators_parallel(self, symbol: str, stock_prices: List, sector_prices: List, 
+                                     industry_prices: List, logger_instance=None, fast_mode: bool = False) -> Dict[str, Any]:
+        """
+        Calculate all 14 indicators in parallel for improved performance.
+        
+        Groups indicators by dependency and execution characteristics:
+        - Group 1: Independent technical indicators (can run fully parallel)
+        - Group 2: Relative strength indicators (need sector/industry data)  
+        - Group 3: External data indicators (sentiment, prediction)
+        
+        Args:
+            symbol: Stock symbol
+            stock_prices: Stock price data
+            sector_prices: Sector price data
+            industry_prices: Industry price data
+            logger_instance: Optional web logger
+            
+        Returns:
+            Dict of calculated indicators
+        """
+        indicators = {}
+        start_time = time.time()
+        
+        logger.debug(f"Starting parallel indicator calculation for {symbol} (fast_mode: {fast_mode})")
+        
+        # Fast mode optimisations
+        if fast_mode:
+            # Fast mode: Use cached sentiment/prediction if available, otherwise skip
+            external_indicators = []
+            
+            # Try to get cached sentiment (24 hour TTL)
+            sentiment_cache_key = f"sentiment_cache_{symbol}_24h"
+            cached_sentiment = cache.get(sentiment_cache_key)
+            
+            # Try to get cached prediction (6 hour TTL)
+            prediction_cache_key = f"prediction_cache_{symbol}_6h"  
+            cached_prediction = cache.get(prediction_cache_key)
+            
+            if cached_sentiment or cached_prediction:
+                # Add cached indicators to external processing
+                if cached_sentiment:
+                    external_indicators.append(("sentiment", lambda s: cached_sentiment, (symbol,)))
+                    logger.info(f"Fast mode: Using cached sentiment analysis for {symbol}")
+                    
+                if cached_prediction:
+                    external_indicators.append(("prediction", lambda s: cached_prediction, (symbol,)))
+                    logger.info(f"Fast mode: Using cached prediction for {symbol}")
+                    
+                if not cached_sentiment and not cached_prediction:
+                    logger.info(f"Fast mode: No cached data available, skipping sentiment and prediction analysis for speed")
+            else:
+                logger.info(f"Fast mode: No cached sentiment/prediction available, skipping for speed")
+        else:
+            # Standard mode: Full sentiment and prediction analysis
+            external_indicators = [
+                ("sentiment", self._calculate_sentiment_analysis, (symbol,)),
+                ("prediction", self._calculate_prediction_score, (symbol,)),
+            ]
+        
+        # Group 1: Independent technical indicators (fully parallel)
+        technical_indicators = [
+            ("sma50vs200", self._calculate_sma_crossover, (stock_prices,)),
+            ("pricevs50", self._calculate_price_vs_50d, (stock_prices,)),
+            ("rsi14", self._calculate_rsi14, (stock_prices,)),
+            ("macd12269", self._calculate_macd_histogram, (stock_prices,)),
+            ("bbpos20", self._calculate_bollinger_position, (stock_prices,)),
+            ("bbwidth20", self._calculate_bollinger_bandwidth, (stock_prices,)),
+            ("volsurge", self._calculate_volume_surge, (stock_prices,)),
+            ("obv20", self._calculate_obv_trend, (stock_prices,)),
+            ("candlerev", self._calculate_candlestick_reversal, (stock_prices,)),
+            ("srcontext", self._calculate_support_resistance, (stock_prices,)),
+        ]
+        
+        # Group 2: Relative strength indicators (parallel within group)
+        relative_indicators = [
+            ("rel1y", self._calculate_relative_strength_1y, (stock_prices, sector_prices, industry_prices)),
+            ("rel2y", self._calculate_relative_strength_2y, (stock_prices, sector_prices, industry_prices)),
+        ]
+        
+        # Execute Group 1: Technical indicators (max parallelism)
+        with ThreadPoolExecutor(max_workers=4, thread_name_prefix="TechInd") as executor:
+            future_to_indicator = {
+                executor.submit(self._safe_indicator_calculation, name, func, args): name 
+                for name, func, args in technical_indicators
+            }
+            
+            for future in as_completed(future_to_indicator):
+                indicator_name = future_to_indicator[future]
+                try:
+                    result = future.result(timeout=30)  # 30 second timeout per indicator
+                    indicators[indicator_name] = result
+                    
+                    # Log to web interface if available
+                    if logger_instance and result is not None:
+                        display_name = self.get_indicator_display_name(indicator_name, result)
+                        logger_instance.log_indicator_calculation(display_name, result)
+                        
+                    logger.debug(f"Completed technical indicator: {indicator_name}")
+                    
+                except Exception as e:
+                    logger.warning(f"Technical indicator {indicator_name} failed: {str(e)}")
+                    indicators[indicator_name] = None
+        
+        # Execute Group 2: Relative strength indicators  
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="RelStr") as executor:
+            future_to_indicator = {
+                executor.submit(self._safe_indicator_calculation, name, func, args): name 
+                for name, func, args in relative_indicators
+            }
+            
+            for future in as_completed(future_to_indicator):
+                indicator_name = future_to_indicator[future]
+                try:
+                    result = future.result(timeout=15)  # 15 second timeout
+                    indicators[indicator_name] = result
+                    
+                    if logger_instance and result is not None:
+                        display_name = self.get_indicator_display_name(indicator_name, result)
+                        logger_instance.log_indicator_calculation(display_name, result)
+                        
+                    logger.debug(f"Completed relative strength indicator: {indicator_name}")
+                    
+                except Exception as e:
+                    logger.warning(f"Relative strength indicator {indicator_name} failed: {str(e)}")
+                    indicators[indicator_name] = None
+        
+        # Execute Group 3: External data indicators
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="ExtData") as executor:
+            future_to_indicator = {
+                executor.submit(self._safe_indicator_calculation, name, func, args): name 
+                for name, func, args in external_indicators
+            }
+            
+            for future in as_completed(future_to_indicator):
+                indicator_name = future_to_indicator[future]
+                try:
+                    result = future.result(timeout=45)  # 45 second timeout for external data
+                    indicators[indicator_name] = result
+                    
+                    if logger_instance and result is not None:
+                        display_name = self.get_indicator_display_name(indicator_name, result)
+                        logger_instance.log_indicator_calculation(display_name, result)
+                        
+                    logger.debug(f"Completed external data indicator: {indicator_name}")
+                    
+                except Exception as e:
+                    logger.warning(f"External data indicator {indicator_name} failed: {str(e)}")
+                    indicators[indicator_name] = None
+        
+        duration = time.time() - start_time
+        logger.info(f"Parallel indicator calculation completed for {symbol} in {duration:.2f}s")
+        
+        return indicators
+    
+    def _safe_indicator_calculation(self, name: str, func, args: tuple):
+        """
+        Safely execute an indicator calculation with proper error handling.
+        
+        Args:
+            name: Indicator name  
+            func: Calculation function
+            args: Function arguments
+            
+        Returns:
+            Indicator result or None if failed
+        """
+        try:
+            logger.debug(f"Starting calculation: {name}")
+            start_time = time.time()
+            
+            result = func(*args)
+            
+            duration = time.time() - start_time  
+            logger.debug(f"Completed {name} in {duration:.3f}s")
+            
+            return result
+            
+        except Exception as e:
+            logger.warning(f"Safe indicator calculation failed for {name}: {str(e)}")
+            return None
+
+    @cache_indicator(cache_ttl=600)  # 10 minutes cache for moving averages
     def _calculate_sma_crossover(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         SMA 50/200 Crossover: Score=1 if 50>200; 0 if 50<200. Weight 0.15.
@@ -628,16 +826,16 @@ class TechnicalAnalysisEngine:
             if len(prices) < 200:
                 return None
 
-            # Calculate SMAs using adjusted_close
-            closes = [float(p.adjusted_close or p.close) for p in prices[-200:]]
+            # Vectorized calculation using NumPy
+            closes = np.array([float(p.adjusted_close or p.close) for p in prices[-200:]])
 
-            sma50 = statistics.mean(closes[-50:])
-            sma200 = statistics.mean(closes[-200:])
+            sma50 = np.mean(closes[-50:])
+            sma200 = np.mean(closes)
 
             score = 1.0 if sma50 > sma200 else 0.0
 
             return IndicatorResult(
-                raw={"sma50": sma50, "sma200": sma200},
+                raw={"sma50": float(sma50), "sma200": float(sma200)},
                 score=score,
                 weight=self.WEIGHTS["sma50vs200"],
                 weighted_score=score * self.WEIGHTS["sma50vs200"],
@@ -655,32 +853,28 @@ class TechnicalAnalysisEngine:
             if len(prices) < 50:
                 return None
 
-            closes = [float(p.adjusted_close or p.close) for p in prices[-50:]]
+            # Vectorized calculation using NumPy
+            closes = np.array([float(p.adjusted_close or p.close) for p in prices[-50:]])
             current_price = closes[-1]
-            sma50 = statistics.mean(closes)
+            sma50 = np.mean(closes)
 
             pct_diff = (current_price / sma50) - 1.0
 
-            # Linear mapping: -10% → 0, 0% → 0.5, +10% → 1
-            if pct_diff <= -0.10:
-                score = 0.0
-            elif pct_diff >= 0.10:
-                score = 1.0
-            else:
-                # Linear interpolation
-                score = 0.5 + (pct_diff / 0.20)
+            # Vectorized linear mapping: -10% → 0, 0% → 0.5, +10% → 1
+            score = np.clip(0.5 + (pct_diff / 0.20), 0.0, 1.0)
 
             return IndicatorResult(
-                raw={"price": current_price, "sma50": sma50, "pct_diff": pct_diff},
-                score=score,
+                raw={"price": float(current_price), "sma50": float(sma50), "pct_diff": float(pct_diff)},
+                score=float(score),
                 weight=self.WEIGHTS["pricevs50"],
-                weighted_score=score * self.WEIGHTS["pricevs50"],
+                weighted_score=float(score) * self.WEIGHTS["pricevs50"],
             )
 
         except Exception as e:
             logger.warning(f"Error calculating price vs 50d: {str(e)}")
             return None
 
+    @cache_indicator(cache_ttl=300)  # 5 minutes cache for RSI
     def _calculate_rsi14(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         RSI(14): standard formula over adjusted close; Score=RSI/100 (cap 0..1). Weight 0.10.
@@ -689,26 +883,21 @@ class TechnicalAnalysisEngine:
             if len(prices) < 15:
                 return None
 
-            closes = [float(p.adjusted_close or p.close) for p in prices[-15:]]
+            # Vectorized calculation using NumPy
+            closes = np.array([float(p.adjusted_close or p.close) for p in prices[-15:]])
 
-            # Calculate price changes
-            gains = []
-            losses = []
+            # Calculate price changes using diff
+            changes = np.diff(closes)
+            
+            # Vectorized gains and losses calculation
+            gains = np.where(changes > 0, changes, 0)
+            losses = np.where(changes < 0, -changes, 0)
 
-            for i in range(1, len(closes)):
-                change = closes[i] - closes[i - 1]
-                if change > 0:
-                    gains.append(change)
-                    losses.append(0)
-                else:
-                    gains.append(0)
-                    losses.append(abs(change))
-
-            if not gains and not losses:
+            if len(gains) == 0:
                 return None
 
-            avg_gain = statistics.mean(gains)
-            avg_loss = statistics.mean(losses)
+            avg_gain = np.mean(gains)
+            avg_loss = np.mean(losses)
 
             if avg_loss == 0:
                 rsi = 100.0
@@ -716,19 +905,20 @@ class TechnicalAnalysisEngine:
                 rs = avg_gain / avg_loss
                 rsi = 100 - (100 / (1 + rs))
 
-            score = min(1.0, max(0.0, rsi / 100.0))
+            score = np.clip(rsi / 100.0, 0.0, 1.0)
 
             return IndicatorResult(
-                raw={"rsi": rsi},
-                score=score,
+                raw={"rsi": float(rsi)},
+                score=float(score),
                 weight=self.WEIGHTS["rsi14"],
-                weighted_score=score * self.WEIGHTS["rsi14"],
+                weighted_score=float(score) * self.WEIGHTS["rsi14"],
             )
 
         except Exception as e:
             logger.warning(f"Error calculating RSI14: {str(e)}")
             return None
 
+    @cache_indicator(cache_ttl=300)  # 5 minutes cache for MACD
     def _calculate_macd_histogram(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         MACD(12,26,9) histogram: Score=0.5+0.5*(hist/(1% of price)); clamp 0..1. Weight 0.10.
@@ -737,55 +927,65 @@ class TechnicalAnalysisEngine:
             if len(prices) < 35:  # Need at least 26 + 9 days
                 return None
 
-            closes = [float(p.adjusted_close or p.close) for p in prices[-35:]]
+            # Vectorized calculation using NumPy
+            closes = np.array([float(p.adjusted_close or p.close) for p in prices[-35:]])
             current_price = closes[-1]
 
-            # Calculate EMAs
-            def ema(data, period):
-                multiplier = 2 / (period + 1)
-                ema_values = [data[0]]
+            # Vectorized EMA calculation using pandas-style approach
+            def ema_vectorized(data, period):
+                alpha = 2 / (period + 1)
+                weights = (1 - alpha) ** np.arange(len(data))[::-1]
+                weights /= weights.sum()
+                return np.convolve(data, weights, mode='valid')[-1]
+
+            # Alternative vectorized EMA using NumPy cumulative approach
+            def ema_cumulative(data, period):
+                alpha = 2 / (period + 1)
+                result = np.zeros_like(data)
+                result[0] = data[0]
                 for i in range(1, len(data)):
-                    ema_val = (data[i] * multiplier) + (ema_values[-1] * (1 - multiplier))
-                    ema_values.append(ema_val)
-                return ema_values
+                    result[i] = alpha * data[i] + (1 - alpha) * result[i-1]
+                return result
 
-            ema12 = ema(closes, 12)
-            ema26 = ema(closes, 26)
+            ema12_values = ema_cumulative(closes, 12)
+            ema26_values = ema_cumulative(closes, 26)
 
-            # MACD line
-            macd_line = [ema12[i] - ema26[i] for i in range(len(ema12))]
+            # MACD line calculation
+            macd_line = ema12_values - ema26_values
 
             # Signal line (9-day EMA of MACD)
             if len(macd_line) >= 9:
-                signal_line = ema(macd_line[-9:], 9)
-                histogram = macd_line[-1] - signal_line[-1]
+                signal_line_values = ema_cumulative(macd_line[-9:], 9)
+                histogram = macd_line[-1] - signal_line_values[-1]
+                signal_value = signal_line_values[-1]
             else:
                 histogram = 0
+                signal_value = 0
 
-            # Normalize: 0.5 + 0.5 * (hist / 1% of price)
+            # Vectorized normalization: 0.5 + 0.5 * (hist / 1% of price)
             one_percent = current_price * 0.01
             if one_percent > 0:
                 normalized = histogram / one_percent
-                score = 0.5 + 0.5 * normalized
-                score = min(1.0, max(0.0, score))
+                score = np.clip(0.5 + 0.5 * normalized, 0.0, 1.0)
             else:
                 score = 0.5
 
             return IndicatorResult(
                 raw={
-                    "histogram": histogram,
-                    "macd": macd_line[-1],
-                    "signal": signal_line[-1] if len(macd_line) >= 9 else 0,
+                    "histogram": float(histogram),
+                    "macd": float(macd_line[-1]),
+                    "signal": float(signal_value),
                 },
-                score=score,
+                score=float(score),
                 weight=self.WEIGHTS["macd12269"],
-                weighted_score=score * self.WEIGHTS["macd12269"],
+                weighted_score=float(score) * self.WEIGHTS["macd12269"],
             )
 
         except Exception as e:
             logger.warning(f"Error calculating MACD histogram: {str(e)}")
             return None
 
+    @cache_indicator(cache_ttl=300)  # 5 minutes cache for Bollinger Bands
     def _calculate_bollinger_position(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         Bollinger %B (20,2): %B=(close−lower)/(upper−lower); Score=1−%B; clamp 0..1. Weight 0.10.
@@ -794,11 +994,12 @@ class TechnicalAnalysisEngine:
             if len(prices) < 20:
                 return None
 
-            closes = [float(p.adjusted_close or p.close) for p in prices[-20:]]
+            # Vectorized calculation using NumPy
+            closes = np.array([float(p.adjusted_close or p.close) for p in prices[-20:]])
             current_price = closes[-1]
 
-            mean_price = statistics.mean(closes)
-            std_dev = statistics.stdev(closes)
+            mean_price = np.mean(closes)
+            std_dev = np.std(closes, ddof=1)  # Sample standard deviation
 
             upper_band = mean_price + (2 * std_dev)
             lower_band = mean_price - (2 * std_dev)
@@ -808,14 +1009,18 @@ class TechnicalAnalysisEngine:
             else:
                 percent_b = (current_price - lower_band) / (upper_band - lower_band)
 
-            score = 1 - percent_b
-            score = min(1.0, max(0.0, score))
+            score = np.clip(1 - percent_b, 0.0, 1.0)
 
             return IndicatorResult(
-                raw={"percent_b": percent_b, "upper": upper_band, "lower": lower_band, "middle": mean_price},
-                score=score,
+                raw={
+                    "percent_b": float(percent_b), 
+                    "upper": float(upper_band), 
+                    "lower": float(lower_band), 
+                    "middle": float(mean_price)
+                },
+                score=float(score),
                 weight=self.WEIGHTS["bbpos20"],
-                weighted_score=score * self.WEIGHTS["bbpos20"],
+                weighted_score=float(score) * self.WEIGHTS["bbpos20"],
             )
 
         except Exception as e:
@@ -830,10 +1035,11 @@ class TechnicalAnalysisEngine:
             if len(prices) < 20:
                 return None
 
-            closes = [float(p.adjusted_close or p.close) for p in prices[-20:]]
+            # Vectorized calculation using NumPy
+            closes = np.array([float(p.adjusted_close or p.close) for p in prices[-20:]])
 
-            mean_price = statistics.mean(closes)
-            std_dev = statistics.stdev(closes)
+            mean_price = np.mean(closes)
+            std_dev = np.std(closes, ddof=1)  # Sample standard deviation
 
             upper_band = mean_price + (2 * std_dev)
             lower_band = mean_price - (2 * std_dev)
@@ -844,27 +1050,29 @@ class TechnicalAnalysisEngine:
                 bandwidth = upper_band - lower_band
                 bandwidth_pct = bandwidth / mean_price
 
-            # Linear mapping: ≤5% → 0.6, 12.5% → 0.5, ≥20% → 0.4
-            if bandwidth_pct <= 0.05:
-                score = 0.6
-            elif bandwidth_pct >= 0.20:
-                score = 0.4
-            else:
-                # Linear interpolation between control points
-                if bandwidth_pct <= 0.125:
-                    # Between 5% and 12.5%: 0.6 to 0.5
-                    ratio = (bandwidth_pct - 0.05) / (0.125 - 0.05)
-                    score = 0.6 - (ratio * 0.1)
-                else:
-                    # Between 12.5% and 20%: 0.5 to 0.4
-                    ratio = (bandwidth_pct - 0.125) / (0.20 - 0.125)
-                    score = 0.5 - (ratio * 0.1)
+            # Vectorized linear mapping using np.select for multiple conditions
+            conditions = [
+                bandwidth_pct <= 0.05,
+                bandwidth_pct >= 0.20,
+                bandwidth_pct <= 0.125
+            ]
+            
+            choices = [
+                0.6,  # ≤5% → 0.6
+                0.4,  # ≥20% → 0.4
+                0.6 - ((bandwidth_pct - 0.05) / (0.125 - 0.05)) * 0.1  # 5%-12.5%: 0.6 to 0.5
+            ]
+            
+            # Default case for 12.5%-20%: 0.5 to 0.4
+            default = 0.5 - ((bandwidth_pct - 0.125) / (0.20 - 0.125)) * 0.1
+            
+            score = np.select(conditions, choices, default=default)
 
             return IndicatorResult(
-                raw={"bandwidth_pct": bandwidth_pct, "bandwidth": upper_band - lower_band},
-                score=score,
+                raw={"bandwidth_pct": float(bandwidth_pct), "bandwidth": float(upper_band - lower_band)},
+                score=float(score),
                 weight=self.WEIGHTS["bbwidth20"],
-                weighted_score=score * self.WEIGHTS["bbwidth20"],
+                weighted_score=float(score) * self.WEIGHTS["bbwidth20"],
             )
 
         except Exception as e:
@@ -880,8 +1088,9 @@ class TechnicalAnalysisEngine:
                 return None
 
             current_volume = prices[-1].volume
-            recent_volumes = [p.volume for p in prices[-11:-1]]  # Last 10 days excluding today
-            avg_volume = statistics.mean(recent_volumes)
+            # Vectorized volume calculation
+            recent_volumes = np.array([p.volume for p in prices[-11:-1]])  # Last 10 days excluding today
+            avg_volume = np.mean(recent_volumes)
 
             if avg_volume == 0:
                 volume_ratio = 1.0
@@ -892,27 +1101,21 @@ class TechnicalAnalysisEngine:
             current_price = prices[-1]
             price_up = current_price.close > current_price.open
 
-            # Mapping based on direction and volume ratio
+            # Vectorized mapping based on direction and volume ratio using np.select
             if price_up:
-                if volume_ratio >= 1.5:
-                    score = 1.0
-                elif volume_ratio >= 1.0:
-                    score = 0.8
-                else:
-                    score = 0.6
+                conditions = [volume_ratio >= 1.5, volume_ratio >= 1.0]
+                choices = [1.0, 0.8]
+                score = np.select(conditions, choices, default=0.6)
             else:  # price down
-                if volume_ratio >= 1.5:
-                    score = 0.0
-                elif volume_ratio >= 1.0:
-                    score = 0.3
-                else:
-                    score = 0.4
+                conditions = [volume_ratio >= 1.5, volume_ratio >= 1.0]
+                choices = [0.0, 0.3]
+                score = np.select(conditions, choices, default=0.4)
 
             return IndicatorResult(
-                raw={"volume_ratio": volume_ratio, "price_up": price_up},
-                score=score,
+                raw={"volume_ratio": float(volume_ratio), "price_up": bool(price_up)},
+                score=float(score),
                 weight=self.WEIGHTS["volsurge"],
-                weighted_score=score * self.WEIGHTS["volsurge"],
+                weighted_score=float(score) * self.WEIGHTS["volsurge"],
             )
 
         except Exception as e:
@@ -927,40 +1130,42 @@ class TechnicalAnalysisEngine:
             if len(prices) < 21:
                 return None
 
-            # Calculate OBV
-            obv_values = [0]
-            for i in range(1, len(prices)):
-                prev_close = float(prices[i - 1].close)
-                curr_close = float(prices[i].close)
-                volume = prices[i].volume
-
-                if curr_close > prev_close:
-                    obv_values.append(obv_values[-1] + volume)
-                elif curr_close < prev_close:
-                    obv_values.append(obv_values[-1] - volume)
-                else:
-                    obv_values.append(obv_values[-1])
+            # Vectorized OBV calculation using NumPy
+            closes = np.array([float(p.close) for p in prices])
+            volumes = np.array([p.volume for p in prices])
+            
+            # Calculate price changes and volume directions
+            price_changes = np.diff(closes)
+            volume_directions = np.where(price_changes > 0, 1, np.where(price_changes < 0, -1, 0))
+            
+            # Calculate OBV using cumulative sum
+            volume_flow = volumes[1:] * volume_directions
+            obv_values = np.concatenate([[0], np.cumsum(volume_flow)])
 
             # Get current and 20-day ago OBV
             obv_current = obv_values[-1]
             obv_20_ago = obv_values[-21]
 
-            # Volume sum for last 20 days
-            volume_sum = sum(p.volume for p in prices[-20:])
+            # Volume sum for last 20 days using NumPy
+            volume_sum = np.sum(volumes[-20:])
 
             if volume_sum == 0:
                 obv_delta = 0
             else:
                 obv_delta = (obv_current - obv_20_ago) / volume_sum
 
-            score = (obv_delta + 1) / 2
-            score = min(1.0, max(0.0, score))
+            # Vectorized score calculation and clipping
+            score = np.clip((obv_delta + 1) / 2, 0.0, 1.0)
 
             return IndicatorResult(
-                raw={"obv_delta": obv_delta, "obv_current": obv_current, "obv_20_ago": obv_20_ago},
-                score=score,
+                raw={
+                    "obv_delta": float(obv_delta), 
+                    "obv_current": float(obv_current), 
+                    "obv_20_ago": float(obv_20_ago)
+                },
+                score=float(score),
                 weight=self.WEIGHTS["obv20"],
-                weighted_score=score * self.WEIGHTS["obv20"],
+                weighted_score=float(score) * self.WEIGHTS["obv20"],
             )
 
         except Exception as e:
@@ -980,52 +1185,101 @@ class TechnicalAnalysisEngine:
             if len(stock_prices) < 252:  # ~1 year trading days
                 return None
 
-            # Stock 1Y return
-            stock_current = float(stock_prices[-1].adjusted_close or stock_prices[-1].close)
-            stock_1y_ago = float(stock_prices[-252].adjusted_close or stock_prices[-252].close)
+            # Vectorized stock 1Y return calculation
+            stock_prices_array = np.array([float(p.adjusted_close or p.close) for p in stock_prices])
+            stock_current = stock_prices_array[-1]
+            stock_1y_ago = stock_prices_array[-252]
             stock_1y_return = (stock_current / stock_1y_ago - 1) * 100
 
-            # Sector and industry returns
+            # Enhanced benchmark returns calculation including market benchmark (SPY)
             benchmark_returns = []
+            
+            # Add market benchmark (SPY) if available
+            try:
+                from Data.models import Stock
+                spy_stock = Stock.objects.get(symbol='SPY')
+                spy_prices = self.price_reader.get_stock_prices(
+                    symbol='SPY', 
+                    start_date=(datetime.now() - timedelta(days=400)).date(),
+                    end_date=datetime.now().date()
+                )
+                
+                if spy_prices and len(spy_prices) >= 252:
+                    spy_current = float(spy_prices[-1].close)
+                    spy_1y_ago = float(spy_prices[-252].close)
+                    spy_1y_return = (spy_current / spy_1y_ago - 1) * 100
+                    
+                    # Validate SPY return (should be reasonable for a market ETF)
+                    if -50 <= spy_1y_return <= 60:  # Reasonable market range
+                        benchmark_returns.append(spy_1y_return)
+                        logger.debug(f"REL1Y: SPY benchmark added: {spy_1y_return:.2f}%")
+                    else:
+                        logger.warning(f"REL1Y: Extreme SPY return detected ({spy_1y_return:.1f}%), skipping")
+                        
+            except Exception as e:
+                logger.debug(f"REL1Y: Could not get SPY benchmark data: {str(e)}")
 
             if sector_prices and len(sector_prices) >= 252:
-                sector_current = float(sector_prices[-1].close_index)
-                sector_1y_ago = float(sector_prices[-252].close_index)
+                sector_prices_array = np.array([float(p.close_index) for p in sector_prices])
+                sector_current = sector_prices_array[-1]
+                sector_1y_ago = sector_prices_array[-252]
                 sector_1y_return = (sector_current / sector_1y_ago - 1) * 100
-                benchmark_returns.append(sector_1y_return)
+                
+                # Validate sector return for anomalies
+                if abs(sector_1y_return) > 300:  # >300% return is likely erroneous
+                    logger.warning(
+                        f"REL1Y: Extreme sector return detected ({sector_1y_return:.1f}%), "
+                        f"sector prices: current={sector_current:.2f}, 1y_ago={sector_1y_ago:.2f}. Skipping."
+                    )
+                else:
+                    benchmark_returns.append(sector_1y_return)
 
             if industry_prices and len(industry_prices) >= 252:
-                industry_current = float(industry_prices[-1].close_index)
-                industry_1y_ago = float(industry_prices[-252].close_index)
+                industry_prices_array = np.array([float(p.close_index) for p in industry_prices])
+                industry_current = industry_prices_array[-1]
+                industry_1y_ago = industry_prices_array[-252]
                 industry_1y_return = (industry_current / industry_1y_ago - 1) * 100
-                benchmark_returns.append(industry_1y_return)
+                
+                # Validate industry return for anomalies
+                if abs(industry_1y_return) > 300:  # >300% return is likely erroneous
+                    logger.warning(
+                        f"REL1Y: Extreme industry return detected ({industry_1y_return:.1f}%), "
+                        f"industry prices: current={industry_current:.2f}, 1y_ago={industry_1y_ago:.2f}. Skipping."
+                    )
+                else:
+                    benchmark_returns.append(industry_1y_return)
 
             if not benchmark_returns:
-                # Fallback: When no sector/industry data available, use neutral baseline
-                # This prevents indicator failure and allows analysis to continue
-                logger.info("REL1Y: No sector/industry data available, using neutral baseline (0% relative strength)")
+                logger.info("REL1Y: No benchmark data available, using neutral baseline (0% relative strength)")
                 avg_benchmark = stock_1y_return  # This makes relative_strength = 0
             else:
-                avg_benchmark = statistics.mean(benchmark_returns)
+                # Weight SPY more heavily if available (market benchmark is primary)
+                if len(benchmark_returns) > 1 and 'spy_1y_return' in locals():
+                    # Weighted average: 60% SPY, 40% sector/industry average
+                    other_benchmarks = [b for i, b in enumerate(benchmark_returns) if i > 0]  # Skip SPY (first)
+                    if other_benchmarks:
+                        spy_weight = 0.6
+                        other_weight = 0.4
+                        avg_benchmark = spy_weight * spy_1y_return + other_weight * np.mean(other_benchmarks)
+                    else:
+                        avg_benchmark = spy_1y_return
+                else:
+                    avg_benchmark = np.mean(benchmark_returns)
+            
             relative_strength = stock_1y_return - avg_benchmark
 
-            # Map -20pp → 0, 0 → 0.5, +20pp → 1
-            if relative_strength <= -20:
-                score = 0.0
-            elif relative_strength >= 20:
-                score = 1.0
-            else:
-                score = 0.5 + (relative_strength / 40)
+            # Vectorized mapping: -20pp → 0, 0 → 0.5, +20pp → 1
+            score = np.clip(0.5 + (relative_strength / 40), 0.0, 1.0)
 
             return IndicatorResult(
                 raw={
-                    "relative_strength": relative_strength,
-                    "stock_return": stock_1y_return,
-                    "benchmark_return": avg_benchmark,
+                    "relative_strength": float(relative_strength),
+                    "stock_return": float(stock_1y_return),
+                    "benchmark_return": float(avg_benchmark),
                 },
-                score=score,
+                score=float(score),
                 weight=self.WEIGHTS["rel1y"],
-                weighted_score=score * self.WEIGHTS["rel1y"],
+                weighted_score=float(score) * self.WEIGHTS["rel1y"],
             )
 
         except Exception as e:
@@ -1050,56 +1304,112 @@ class TechnicalAnalysisEngine:
             # Use available data length for baseline calculation
             baseline_index = min(504, len(stock_prices)) - 1
 
-            # Stock 2Y return
-            stock_current = float(stock_prices[-1].adjusted_close or stock_prices[-1].close)
-            stock_2y_ago = float(
-                stock_prices[-baseline_index - 1].adjusted_close or stock_prices[-baseline_index - 1].close
-            )
+            # Vectorized stock 2Y return calculation
+            stock_prices_array = np.array([float(p.adjusted_close or p.close) for p in stock_prices])
+            stock_current = stock_prices_array[-1]
+            stock_2y_ago = stock_prices_array[-baseline_index - 1]
             stock_2y_return = (stock_current / stock_2y_ago - 1) * 100
 
-            # Sector and industry returns
+            # Enhanced benchmark returns calculation including market benchmark (SPY)
             benchmark_returns = []
+            
+            # Add market benchmark (SPY) if available
+            try:
+                from Data.models import Stock
+                spy_stock = Stock.objects.get(symbol='SPY')
+                spy_prices = self.price_reader.get_stock_prices(
+                    symbol='SPY', 
+                    start_date=(datetime.now() - timedelta(days=800)).date(),
+                    end_date=datetime.now().date()
+                )
+                
+                if spy_prices and len(spy_prices) >= min_required_days:
+                    spy_baseline_index = min(504, len(spy_prices)) - 1
+                    spy_current = float(spy_prices[-1].close)
+                    spy_2y_ago = float(spy_prices[-spy_baseline_index - 1].close)
+                    spy_2y_return = (spy_current / spy_2y_ago - 1) * 100
+                    
+                    # Validate SPY return (should be reasonable for a market ETF)
+                    if -60 <= spy_2y_return <= 150:  # Reasonable 2-year market range
+                        benchmark_returns.append(spy_2y_return)
+                        logger.debug(f"REL2Y: SPY benchmark added: {spy_2y_return:.2f}%")
+                    else:
+                        logger.warning(f"REL2Y: Extreme SPY return detected ({spy_2y_return:.1f}%), skipping")
+                        
+            except Exception as e:
+                logger.debug(f"REL2Y: Could not get SPY benchmark data: {str(e)}")
 
             if sector_prices and len(sector_prices) >= min_required_days:
                 sector_baseline_index = min(504, len(sector_prices)) - 1
-                sector_current = float(sector_prices[-1].close_index)
-                sector_2y_ago = float(sector_prices[-sector_baseline_index - 1].close_index)
+                sector_prices_array = np.array([float(p.close_index) for p in sector_prices])
+                sector_current = sector_prices_array[-1]
+                sector_2y_ago = sector_prices_array[-sector_baseline_index - 1]
                 sector_2y_return = (sector_current / sector_2y_ago - 1) * 100
-                benchmark_returns.append(sector_2y_return)
+                
+                # Validate sector return for anomalies
+                if abs(sector_2y_return) > 500:  # >500% return is likely erroneous
+                    logger.warning(
+                        f"REL2Y: Extreme sector return detected ({sector_2y_return:.1f}%), "
+                        f"sector prices: current={sector_current:.2f}, 2y_ago={sector_2y_ago:.2f}. Skipping."
+                    )
+                else:
+                    benchmark_returns.append(sector_2y_return)
 
             if industry_prices and len(industry_prices) >= min_required_days:
                 industry_baseline_index = min(504, len(industry_prices)) - 1
-                industry_current = float(industry_prices[-1].close_index)
-                industry_2y_ago = float(industry_prices[-industry_baseline_index - 1].close_index)
+                industry_prices_array = np.array([float(p.close_index) for p in industry_prices])
+                industry_current = industry_prices_array[-1]
+                industry_2y_ago = industry_prices_array[-industry_baseline_index - 1]
                 industry_2y_return = (industry_current / industry_2y_ago - 1) * 100
-                benchmark_returns.append(industry_2y_return)
+                
+                # Validate industry return for anomalies
+                if abs(industry_2y_return) > 500:  # >500% return is likely erroneous
+                    logger.warning(
+                        f"REL2Y: Extreme industry return detected ({industry_2y_return:.1f}%), "
+                        f"industry prices: current={industry_current:.2f}, 2y_ago={industry_2y_ago:.2f}. Skipping."
+                    )
+                else:
+                    benchmark_returns.append(industry_2y_return)
 
             if not benchmark_returns:
-                # Fallback: When no sector/industry data available, use neutral baseline
-                # This prevents indicator failure and allows analysis to continue
-                logger.info("REL2Y: No sector/industry data available, using neutral baseline (0% relative strength)")
+                logger.info("REL2Y: No benchmark data available, using neutral baseline (0% relative strength)")
                 avg_benchmark = stock_2y_return  # This makes relative_strength = 0
             else:
-                avg_benchmark = statistics.mean(benchmark_returns)
+                # Weight SPY more heavily if available (market benchmark is primary)
+                if len(benchmark_returns) > 1 and 'spy_2y_return' in locals():
+                    # Weighted average: 60% SPY, 40% sector/industry average
+                    other_benchmarks = [b for i, b in enumerate(benchmark_returns) if i > 0]  # Skip SPY (first)
+                    if other_benchmarks:
+                        spy_weight = 0.6
+                        other_weight = 0.4
+                        avg_benchmark = spy_weight * spy_2y_return + other_weight * np.mean(other_benchmarks)
+                    else:
+                        avg_benchmark = spy_2y_return
+                else:
+                    avg_benchmark = np.mean(benchmark_returns)
+                
+                # Validate for extreme benchmark returns (likely data errors)
+                if abs(avg_benchmark) > 500:  # >500% return is likely erroneous
+                    logger.warning(
+                        f"REL2Y: Extreme benchmark return detected ({avg_benchmark:.1f}%), "
+                        f"individual returns: {benchmark_returns}. Using neutral baseline."
+                    )
+                    avg_benchmark = stock_2y_return  # Use neutral baseline to avoid skewed results
+            
             relative_strength = stock_2y_return - avg_benchmark
 
-            # Map -100pp → 0, 0 → 0.5, +100pp → 1
-            if relative_strength <= -100:
-                score = 0.0
-            elif relative_strength >= 100:
-                score = 1.0
-            else:
-                score = 0.5 + (relative_strength / 200)
+            # Vectorized mapping: -100pp → 0, 0 → 0.5, +100pp → 1
+            score = np.clip(0.5 + (relative_strength / 200), 0.0, 1.0)
 
             return IndicatorResult(
                 raw={
-                    "relative_strength": relative_strength,
-                    "stock_return": stock_2y_return,
-                    "benchmark_return": avg_benchmark,
+                    "relative_strength": float(relative_strength),
+                    "stock_return": float(stock_2y_return),
+                    "benchmark_return": float(avg_benchmark),
                 },
-                score=score,
+                score=float(score),
                 weight=self.WEIGHTS["rel2y"],
-                weighted_score=score * self.WEIGHTS["rel2y"],
+                weighted_score=float(score) * self.WEIGHTS["rel2y"],
             )
 
         except Exception as e:
@@ -1336,6 +1646,7 @@ class TechnicalAnalysisEngine:
             logger.warning(f"Error detecting three candle patterns: {str(e)}")
             return {"type": "none", "pattern": "error"}
 
+    @cache_indicator(cache_ttl=600)  # 10 minutes cache for support/resistance
     def _calculate_support_resistance(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         Support/Resistance: break above resistance→1; near resistance (≤2%)→0.3; near support (≤2%)→0.7; break below→0; else 0.5. Weight 0.07.
@@ -1409,47 +1720,77 @@ class TechnicalAnalysisEngine:
             return None
 
     def _find_resistance_levels(self, highs: List[float]) -> List[float]:
-        """Find resistance levels from high prices."""
+        """Find resistance levels from high prices using vectorized operations."""
         if len(highs) < 10:
             return []
 
-        # Simple approach: find local maxima
-        levels = []
-        for i in range(2, len(highs) - 2):
-            if (
-                highs[i] > highs[i - 1]
-                and highs[i] > highs[i - 2]
-                and highs[i] > highs[i + 1]
-                and highs[i] > highs[i + 2]
-            ):
-                levels.append(highs[i])
+        # Vectorized approach: find local maxima using NumPy
+        highs_array = np.array(highs)
+        
+        # Create sliding windows for comparison
+        if len(highs_array) < 5:
+            return []
+        
+        # Find local maxima by comparing each point with its neighbors
+        local_maxima_mask = np.zeros(len(highs_array), dtype=bool)
+        
+        for i in range(2, len(highs_array) - 2):
+            if (highs_array[i] > highs_array[i-2:i]).all() and (highs_array[i] > highs_array[i+1:i+3]).all():
+                local_maxima_mask[i] = True
+        
+        levels = highs_array[local_maxima_mask].tolist()
 
-        # Remove levels too close to each other (within 1%)
+        # Vectorized filtering: remove levels too close to each other (within 1%)
+        if not levels:
+            return []
+        
         levels.sort()
-        filtered_levels = []
-        for level in levels:
-            if not filtered_levels or abs(level - filtered_levels[-1]) / filtered_levels[-1] > 0.01:
-                filtered_levels.append(level)
+        levels_array = np.array(levels)
+        
+        # Calculate percentage differences between consecutive levels
+        if len(levels_array) > 1:
+            diffs = np.diff(levels_array) / levels_array[:-1]
+            keep_mask = np.concatenate([[True], diffs > 0.01])
+            filtered_levels = levels_array[keep_mask].tolist()
+        else:
+            filtered_levels = levels
 
         return filtered_levels[-3:]  # Return top 3 levels
 
     def _find_support_levels(self, lows: List[float]) -> List[float]:
-        """Find support levels from low prices."""
+        """Find support levels from low prices using vectorized operations."""
         if len(lows) < 10:
             return []
 
-        # Simple approach: find local minima
-        levels = []
-        for i in range(2, len(lows) - 2):
-            if lows[i] < lows[i - 1] and lows[i] < lows[i - 2] and lows[i] < lows[i + 1] and lows[i] < lows[i + 2]:
-                levels.append(lows[i])
+        # Vectorized approach: find local minima using NumPy
+        lows_array = np.array(lows)
+        
+        if len(lows_array) < 5:
+            return []
+        
+        # Find local minima by comparing each point with its neighbors
+        local_minima_mask = np.zeros(len(lows_array), dtype=bool)
+        
+        for i in range(2, len(lows_array) - 2):
+            if (lows_array[i] < lows_array[i-2:i]).all() and (lows_array[i] < lows_array[i+1:i+3]).all():
+                local_minima_mask[i] = True
+        
+        levels = lows_array[local_minima_mask].tolist()
 
-        # Remove levels too close to each other (within 1%)
+        # Vectorized filtering: remove levels too close to each other (within 1%)
+        if not levels:
+            return []
+        
         levels.sort(reverse=True)
-        filtered_levels = []
-        for level in levels:
-            if not filtered_levels or abs(level - filtered_levels[-1]) / filtered_levels[-1] > 0.01:
-                filtered_levels.append(level)
+        levels_array = np.array(levels)
+        
+        # Calculate percentage differences between consecutive levels
+        if len(levels_array) > 1:
+            diffs = np.abs(np.diff(levels_array)) / levels_array[:-1]
+            keep_mask = np.concatenate([[True], diffs > 0.01])
+            filtered_levels = levels_array[keep_mask].tolist()
+        else:
+            filtered_levels = levels
 
         return filtered_levels[-3:]  # Return bottom 3 levels
 
@@ -1463,6 +1804,13 @@ class TechnicalAnalysisEngine:
             from Analytics.services.sentiment_analyzer import sentiment_metrics
 
             logger.info(f"Calculating sentiment analysis for {symbol}")
+            
+            # Check for cached result (24 hour TTL)
+            sentiment_cache_key = f"sentiment_cache_{symbol}_24h"
+            cached_result = cache.get(sentiment_cache_key)
+            if cached_result:
+                logger.debug(f"Using cached sentiment analysis for {symbol}")
+                return cached_result
 
             # Get sentiment analyzer instance
             sentiment_analyzer = get_sentiment_analyzer()
@@ -1501,7 +1849,7 @@ class TechnicalAnalysisEngine:
                 f"label={aggregated.get('sentimentLabel')}, articles={news_count}"
             )
 
-            return IndicatorResult(
+            result = IndicatorResult(
                 raw={
                     "sentiment": raw_sentiment,
                     "label": aggregated.get("sentimentLabel", "neutral"),
@@ -1514,6 +1862,11 @@ class TechnicalAnalysisEngine:
                 weight=self.WEIGHTS["sentiment"],
                 weighted_score=normalized_score * self.WEIGHTS["sentiment"],
             )
+            
+            # Cache the result for 24 hours
+            cache.set(sentiment_cache_key, result, 24 * 60 * 60)
+            
+            return result
 
         except Exception as e:
             logger.error(f"Error calculating sentiment for {symbol}: {str(e)}")
@@ -1532,6 +1885,13 @@ class TechnicalAnalysisEngine:
         Weight: 0.10 (10% of composite score)
         """
         try:
+            # Check for cached result (6 hour TTL - predictions are more time-sensitive)
+            prediction_cache_key = f"prediction_cache_{symbol}_6h"
+            cached_result = cache.get(prediction_cache_key)
+            if cached_result:
+                logger.debug(f"Using cached prediction for {symbol}")
+                return cached_result
+            
             # Use Universal LSTM service instead of stock-specific predictor
             universal_lstm_service = get_universal_lstm_service()
 
@@ -1573,7 +1933,7 @@ class TechnicalAnalysisEngine:
                 f"confidence={prediction_result['confidence']:.3f}"
             )
 
-            return IndicatorResult(
+            result = IndicatorResult(
                 raw={
                     "predicted_price": prediction_result["predicted_price"],
                     "current_price": prediction_result["current_price"],
@@ -1590,6 +1950,11 @@ class TechnicalAnalysisEngine:
                 weight=self.WEIGHTS["prediction"],
                 weighted_score=normalized_score * self.WEIGHTS["prediction"],
             )
+            
+            # Cache the result for 6 hours
+            cache.set(prediction_cache_key, result, 6 * 60 * 60)
+            
+            return result
 
         except Exception as e:
             logger.error(f"Error calculating LSTM prediction for {symbol}: {str(e)}")
@@ -1600,3 +1965,39 @@ class TechnicalAnalysisEngine:
                 weight=self.WEIGHTS["prediction"],
                 weighted_score=0.5 * self.WEIGHTS["prediction"],
             )
+
+    def _auto_populate_sector_industry(self, symbol: str) -> bool:
+        """
+        Auto-populate missing sector/industry data for a stock.
+        
+        Args:
+            symbol: Stock ticker symbol
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            from Data.services.yahoo_finance import yahoo_finance_service
+            
+            logger.info(f"Fetching sector/industry data for {symbol}")
+            
+            # Fetch sector/industry data from Yahoo Finance
+            profile_data = yahoo_finance_service.fetchSectorIndustrySingle(symbol)
+            
+            if profile_data and "error" not in profile_data:
+                # Upsert the data
+                result = yahoo_finance_service.upsertCompanyProfiles({symbol: profile_data})
+                if result[0] > 0 or result[1] > 0:  # created_count or updated_count
+                    logger.info(f"Successfully populated sector/industry for {symbol}: {profile_data.get('sector', '')}/{profile_data.get('industry', '')}")
+                    return True
+                else:
+                    logger.warning(f"Failed to upsert sector/industry data for {symbol}")
+                    return False
+            else:
+                error_msg = profile_data.get("error", "Unknown error") if profile_data else "No data returned"
+                logger.warning(f"Could not fetch sector/industry data for {symbol}: {error_msg}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error auto-populating sector/industry for {symbol}: {str(e)}")
+            return False

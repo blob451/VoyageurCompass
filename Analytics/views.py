@@ -65,6 +65,13 @@ class AnalysisThrottle(UserRateThrottle):
             required=False,
             description="Explanation detail level: summary, standard, detailed (default: standard)",
         ),
+        OpenApiParameter(
+            name="async",
+            type=OpenApiTypes.BOOL,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Enable async mode - trigger backfill in background if data missing (default: false)",
+        ),
     ],
     responses={
         200: {
@@ -99,14 +106,13 @@ def analyze_stock(request, symbol):
 
     logger = logging.getLogger(__name__)
 
-    # Get parameters
+    # Parameter extraction
     symbol = symbol.upper()
     months = int(request.query_params.get("months", 6))
     sync = request.query_params.get("sync", "false").lower() == "true"
     include_explanation = request.query_params.get("include_explanation", "false").lower() == "true"
     explanation_detail = request.query_params.get("explanation_detail", "standard")
 
-    # DEBUG: Log all received parameters
     # Parameters validated
 
     logger.info(
@@ -116,11 +122,11 @@ def analyze_stock(request, symbol):
         f"Parameters - months: {months}, sync: {sync}, explanation: {include_explanation}, detail: {explanation_detail}"
     )
 
-    # Validate parameters
+    # Parameter validation
     if months < 1 or months > 24:
         return Response({"error": "Months parameter must be between 1 and 24"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Validate explanation detail level
+    # Explanation detail validation
     if explanation_detail not in ["summary", "standard", "detailed"]:
         return Response(
             {"error": "explanation_detail must be one of: summary, standard, detailed"},
@@ -137,11 +143,47 @@ def analyze_stock(request, symbol):
                 {"error": f'Failed to sync data: {sync_result["error"]}'}, status=status.HTTP_400_BAD_REQUEST
             )
 
-    # Run analysis
+    # Data coverage verification and backfill trigger
+    async_mode = request.query_params.get("async", "false").lower() == "true"
+    if async_mode:
+        from Data.repo.price_reader import PriceReader
+        from Data.services.tasks import async_stock_backfill
+
+        # Data adequacy assessment
+        required_years = 2  # Standard requirement
+        price_reader = PriceReader()
+        coverage = price_reader.check_data_coverage(symbol, required_years)
+        
+        # Determine if backfill is needed
+        needs_backfill = (
+            not coverage["stock"]["has_data"] or
+            coverage["stock"]["gap_count"] > 50
+        )
+        
+        if needs_backfill:
+            logger.info(f"Data insufficient for {symbol}, triggering async backfill")
+            
+            # Trigger async backfill + analysis
+            backfill_task = async_stock_backfill.delay(
+                symbol=symbol,
+                required_years=required_years, 
+                user_id=request.user.id
+            )
+            
+            return Response({
+                "status": "async_processing",
+                "symbol": symbol,
+                "message": f"Data backfill initiated for {symbol}. Analysis will start automatically when complete.",
+                "task_id": backfill_task.id,
+                "check_status_url": f"/api/v1/analytics/status/{symbol}/",
+                "estimated_completion": "2-3 minutes"
+            }, status=status.HTTP_202_ACCEPTED)
+
+    # Analysis execution
     try:
         logger.info(f"Starting analysis process for {symbol}")
 
-        # Create analysis logger for web-based requests
+        # Analysis logger initialisation
         analysis_logger = None
         if request.user and hasattr(request.user, "username"):
             try:
@@ -219,7 +261,7 @@ def analyze_stock(request, symbol):
                         explanation_service = get_explanation_service()
 
                         if explanation_service.enabled:  # Only check if feature is enabled
-                            # Check existing explanations
+                            # Explanation existence verification
                             existing = saved_analysis.explanations_json or {}
                             levels = existing.get("levels", {})
 
@@ -274,7 +316,7 @@ def analyze_stock(request, symbol):
                                     # Generation attempt completed
                                     # Creating fallback content
 
-                                    # Create fallback content
+                                    # Fallback content generation
                                     score = saved_analysis.score_0_10 if hasattr(saved_analysis, "score_0_10") else 5.0
                                     recommendation = "BUY" if score >= 7 else "HOLD" if score >= 4 else "SELL"
                                     fallback_content = f"{symbol} receives a technical analysis score of {score:.1f}/10, suggesting a {recommendation} position based on current technical indicators."
@@ -364,7 +406,7 @@ def analyze_stock(request, symbol):
                 explanation_service = get_explanation_service()
 
                 if explanation_service.enabled:  # Use enabled instead of is_enabled() for consistency
-                    # Get the saved analysis result for explanation
+                    # Saved analysis retrieval for explanation
                     saved_analysis = AnalyticsResults.objects.filter(
                         id=analytics_result_id, user=request.user, stock__symbol=symbol
                     ).first()
@@ -443,13 +485,13 @@ def analyze_stock(request, symbol):
             "analytics_result_id": analytics_result_id,
         }
 
-        # Add explanation to response if generated
+        # Conditional explanation inclusion
         if explanation_data:
             response_data["explanation"] = explanation_data
 
         # Response formatted and verified
 
-        # Invalidate analysis history cache for this user since we just created a new analysis
+        # Analysis history cache invalidation
         user_cache_pattern = f"analysis_history:{request.user.id}:*"
         # Django cache doesn't support wildcard deletion, so we'll use a simple approach
         # In production, consider using Redis directly for pattern-based cache invalidation
@@ -507,7 +549,7 @@ def analyze_portfolio(request, portfolio_id):
     Returns:
         Analysis results for all holdings
     """
-    # Check portfolio ownership
+    # Portfolio ownership verification
     try:
         portfolio = Portfolio.objects.get(id=portfolio_id)
 
@@ -518,7 +560,7 @@ def analyze_portfolio(request, portfolio_id):
     except Portfolio.DoesNotExist:
         return Response({"error": "Portfolio not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    # Run portfolio analysis (simplified implementation)
+    # Portfolio analysis execution
     try:
         # For now, disable portfolio analysis - could be implemented later
         # by running individual stock analyses for each holding
@@ -568,7 +610,7 @@ def batch_analysis(request):
     symbols = request.data.get("symbols", [])
     months = int(request.data.get("months", 6))
 
-    # Validate input
+    # Input validation
     if not symbols:
         return Response({"error": "Symbols list is required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -578,14 +620,14 @@ def batch_analysis(request):
     if months < 1 or months > 24:
         return Response({"error": "Months parameter must be between 1 and 24"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Run analysis for each symbol with new TA engine
-    results = {}
+    # Multi-symbol analysis execution
     engine = TechnicalAnalysisEngine()
-
-    for symbol in symbols:
+    
+    def analyze_single_symbol(symbol):
+        """Analyze a single symbol."""
         symbol = symbol.upper()
         try:
-            # Create analysis logger for each symbol in batch
+            # Batch analysis logger initialisation
             analysis_logger = None
             if request.user and hasattr(request.user, "username"):
                 try:
@@ -599,13 +641,22 @@ def batch_analysis(request):
 
             analysis = engine.analyze_stock(symbol, user=request.user, logger_instance=analysis_logger)
 
-            results[symbol] = {
+            return symbol, {
                 "success": True,
                 "composite_score": analysis["score_0_10"],
                 "composite_raw": analysis["composite_raw"],
                 "analysis_date": analysis["analysis_date"].isoformat(),
                 "horizon": analysis["horizon"],
             }
+        except Exception as e:
+            return symbol, {"success": False, "error": str(e)}
+
+    # Sequential analysis execution
+    results = {}
+    for symbol in symbols:
+        try:
+            symbol, analysis_result = analyze_single_symbol(symbol)
+            results[symbol] = analysis_result
         except Exception as e:
             results[symbol] = {"success": False, "error": str(e)}
 
@@ -639,24 +690,36 @@ def market_overview(request):
         "QQQ": "NASDAQ ETF",
     }
 
-    results = {}
     engine = TechnicalAnalysisEngine()
 
-    for symbol, name in indices.items():
+    def analyze_index(symbol, name):
+        """Analyze a single index."""
         try:
             analysis = engine.analyze_stock(symbol, horizon="short")
 
-            results[symbol] = {
+            return symbol, {
                 "name": name,
                 "composite_score": analysis["score_0_10"],
                 "analysis_date": analysis["analysis_date"].isoformat(),
                 "horizon": analysis["horizon"],
             }
         except Exception:
-            results[symbol] = {"name": name, "error": "Data unavailable"}
+            return symbol, {"name": name, "error": "Data unavailable"}
 
-    # Get market status
-    market_status = yahoo_finance_service.get_market_status()
+    # Analyze indices and get market status
+    results = {}
+    for symbol, name in indices.items():
+        try:
+            symbol, analysis_result = analyze_index(symbol, name)
+            results[symbol] = analysis_result
+        except Exception as e:
+            results[symbol] = {"name": name, "error": str(e)}
+    
+    # Market status retrieval
+    try:
+        market_status = yahoo_finance_service.get_market_status()
+    except Exception as e:
+        market_status = {"error": str(e)}
 
     return Response({"market_status": market_status, "indices": results, "timestamp": datetime.now().isoformat()})
 
@@ -723,7 +786,7 @@ def get_user_analysis_history(request):
     # Parse requested fields
     if fields_param:
         requested_fields = set(fields_param.split(","))
-        # Validate fields
+        # Field validation
         valid_fields = {
             "id",
             "symbol",
@@ -759,22 +822,24 @@ def get_user_analysis_history(request):
     if cached_result is not None:
         return Response(cached_result)
 
-    # Build queryset with optimisations
+    # Optimised queryset construction
     queryset = AnalyticsResults.objects.filter(user=request.user).select_related("stock").order_by("-as_of")
 
     # Apply symbol filter
     if symbol_filter:
         queryset = queryset.filter(stock__symbol__iexact=symbol_filter)
 
-    # Get total count before pagination
+    # Pre-pagination count determination
     total_count = queryset.count()
 
     # Apply pagination
     paginated_queryset = queryset[offset : offset + limit]
 
     # Serialize the results with field selection
+    paginated_results = list(paginated_queryset)
     analyses = []
-    for result in paginated_queryset:
+    
+    for result in paginated_results:
         analysis_data = {}
 
         if "id" in requested_fields:
@@ -856,7 +921,7 @@ def get_analysis_by_id(request, analysis_id):
         Analysis result details
     """
     try:
-        # Get the analysis result and ensure it belongs to the user
+        # User-owned analysis retrieval
         result = AnalyticsResults.objects.filter(id=analysis_id, user=request.user).select_related("stock").first()
 
         if not result:
@@ -998,13 +1063,11 @@ def get_user_latest_analysis(request, symbol):
     symbol = symbol.upper()
 
     try:
-        # Get the user's latest analysis for this stock
-        result = (
-            AnalyticsResults.objects.filter(user=request.user, stock__symbol=symbol)
-            .select_related("stock")
-            .order_by("-as_of")
+        # Latest user analysis retrieval
+        result = AnalyticsResults.objects.filter(user=request.user, stock__symbol=symbol)\
+            .select_related("stock")\
+            .order_by("-as_of")\
             .first()
-        )
 
         if not result:
             return Response({"error": f"No analysis found for {symbol}"}, status=status.HTTP_404_NOT_FOUND)

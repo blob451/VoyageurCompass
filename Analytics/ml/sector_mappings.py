@@ -116,7 +116,6 @@ TRAINING_STOCK_UNIVERSE = {
         "AAPL",
         "MSFT",
         "GOOGL",
-        "AMZN",
         "META",
         # Cloud/Software
         "CRM",

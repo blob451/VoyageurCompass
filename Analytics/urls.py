@@ -41,6 +41,7 @@ from Analytics.quality_views import (
     quality_service_status,
 )
 from Analytics.sentiment_views import stock_sentiment
+from Analytics.status_views import check_analysis_status
 from Analytics.views import (
     analyze_portfolio,
     analyze_stock,
@@ -50,6 +51,12 @@ from Analytics.views import (
     get_user_analysis_history,
     get_user_latest_analysis,
 )
+from Analytics.views_batch import (
+    analyze_portfolio_batch,
+    batch_analyze_stocks,
+    get_batch_performance_stats,
+    warm_analysis_cache,
+)
 
 app_name = "analytics"
 
@@ -58,10 +65,17 @@ urlpatterns = [
     path("stock-analysis/<str:symbol>/", analyze_stock, name="stock-analysis"),  # Alternative name for API consistency
     path("analyze-portfolio/<int:portfolio_id>/", analyze_portfolio, name="analyze_portfolio"),
     path("batch-analysis/", batch_analysis, name="batch_analysis"),
+    # High-performance batch endpoints
+    path("batch/analyze/", batch_analyze_stocks, name="batch_analyze_stocks"),
+    path("batch/portfolio/", analyze_portfolio_batch, name="analyze_portfolio_batch"),
+    path("batch/portfolio/<int:portfolio_id>/", analyze_portfolio_batch, name="analyze_portfolio_batch_id"),
+    path("batch/stats/", get_batch_performance_stats, name="batch_performance_stats"),
+    path("batch/warm-cache/", warm_analysis_cache, name="warm_analysis_cache"),
     path("user/history/", get_user_analysis_history, name="user_analysis_history"),
     path("user/<str:symbol>/latest/", get_user_latest_analysis, name="user_latest_analysis"),
     path("analysis/<int:analysis_id>/", get_analysis_by_id, name="get_analysis_by_id"),
     path("sentiment/<str:symbol>/", stock_sentiment, name="stock_sentiment"),
+    path("status/<str:symbol>/", check_analysis_status, name="check_analysis_status"),
     path("model/finbert-status/", finbert_model_status, name="finbert_model_status"),
     # Explanation endpoints
     path("explain/<int:analysis_id>/", generate_explanation, name="generate_explanation"),
