@@ -575,6 +575,12 @@ class LocalLLMService:
         self.connection_retry_attempts = getattr(settings, "OLLAMA_RETRY_ATTEMPTS", 3)
         self.connection_retry_delay = getattr(settings, "OLLAMA_RETRY_DELAY", 1)
 
+        # Security and resource management integration
+        self._security_validator = None
+        self._resource_manager = None
+        self.security_enabled = getattr(settings, "LLM_SECURITY_ENABLED", True)
+        self.resource_management_enabled = getattr(settings, "LLM_RESOURCE_MANAGEMENT_ENABLED", True)
+
         # Circuit breaker, monitoring and health service initialisation
         self.circuit_breaker = LLMCircuitBreaker()
         self.performance_monitor = LLMPerformanceMonitor()
@@ -2404,6 +2410,78 @@ Broader market context and sector trends support the overall investment outlook 
             "results": warm_up_results,
             "timestamp": time.time()
         }
+
+    def is_model_loaded(self, model_name: str) -> bool:
+        """Check if a specific model is currently loaded and available."""
+        try:
+            if not OLLAMA_AVAILABLE or not self.client:
+                return False
+
+            # Check if model is in the list of available models
+            models_response = self.client.list()
+            available_models = [m["name"] for m in models_response.get("models", [])]
+
+            return model_name in available_models
+
+        except Exception as e:
+            logger.error(f"Failed to check if model {model_name} is loaded: {str(e)}")
+            return False
+
+    def load_model(self, model_name: str) -> bool:
+        """Load a specific model if not already loaded."""
+        try:
+            if not OLLAMA_AVAILABLE or not self.client:
+                logger.warning("Ollama not available for model loading")
+                return False
+
+            # Check if model is already loaded
+            if self.is_model_loaded(model_name):
+                logger.debug(f"Model {model_name} already loaded")
+                return True
+
+            # Attempt to pull/load the model
+            logger.info(f"Loading model: {model_name}")
+            self.client.pull(model_name)
+
+            # Verify the model was loaded
+            return self.is_model_loaded(model_name)
+
+        except Exception as e:
+            logger.error(f"Failed to load model {model_name}: {str(e)}")
+            return False
+
+    def set_model(self, model_name: str) -> bool:
+        """Set the current active model."""
+        try:
+            # Validate model availability
+            if not self.is_model_loaded(model_name):
+                logger.warning(f"Model {model_name} not available, attempting to load")
+                if not self.load_model(model_name):
+                    logger.error(f"Failed to load model {model_name}")
+                    return False
+
+            # Set as current model
+            old_model = self.current_model
+            self.current_model = model_name
+            logger.info(f"Switched from {old_model} to {model_name}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to set model {model_name}: {str(e)}")
+            return False
+
+    def get_available_models(self) -> List[str]:
+        """Get list of all available models."""
+        try:
+            if not OLLAMA_AVAILABLE or not self.client:
+                return []
+
+            models_response = self.client.list()
+            return [m["name"] for m in models_response.get("models", [])]
+
+        except Exception as e:
+            logger.error(f"Failed to get available models: {str(e)}")
+            return []
 
 
 # Singleton instance

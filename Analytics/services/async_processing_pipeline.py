@@ -158,9 +158,16 @@ class AsyncProcessingPipeline:
                 self.average_batch_time * (self.successful_batch_requests - 1) + batch_time
             ) / self.successful_batch_requests
 
+        # Convert results to symbol-keyed dictionary for BatchAnalysisService compatibility
+        results_dict = {}
+        for i, result in enumerate(results):
+            if result:
+                symbol = result.get('symbol') or analysis_requests[i].get('symbol', f'UNKNOWN_{i}')
+                results_dict[symbol] = result
+
         batch_result = {
             "batch_id": batch_id,
-            "results": results,
+            "results": results_dict,  # Now returns dict keyed by symbol
             "task_ids": task_ids,
             "processing_time": batch_time,
             "total_requests": len(analysis_requests),
@@ -168,6 +175,8 @@ class AsyncProcessingPipeline:
             "failed_requests": failure_count,
             "success_rate": success_count / len(analysis_requests) if analysis_requests else 0,
             "failed_task_ids": failed_tasks,
+            "errors": [{"symbol": analysis_requests[i].get('symbol', f'UNKNOWN_{i}'),
+                       "error": f"Task failed: {task_id}"} for i, task_id in enumerate(failed_tasks)],
             "average_time_per_request": batch_time / len(analysis_requests) if analysis_requests else 0,
             "completed_at": datetime.now().isoformat(),
         }

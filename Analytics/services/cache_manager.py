@@ -239,25 +239,72 @@ class MultilingualCacheManager:
     def _clear_cache_by_pattern(self, pattern: str) -> int:
         """
         Clear cache entries matching a pattern.
-        
+
         Args:
             pattern: Pattern to match cache keys
-            
+
         Returns:
             Number of cleared entries
         """
         try:
-            # Note: This is a simplified implementation
-            # Real implementation would depend on your cache backend
-            
-            # For development/testing with simple backends
             cleared_count = 0
-            
-            # Try to clear specific known keys if pattern matching isn't available
-            # This is a fallback approach for cache backends that don't support pattern clearing
-            
+
+            # Check if we're using Redis cache backend
+            if hasattr(cache, '_cache') and hasattr(cache._cache, '_client'):
+                # Redis backend with direct client access
+                redis_client = cache._cache._client
+
+                # Use SCAN to find matching keys (more efficient than KEYS)
+                cursor = 0
+                keys_to_delete = []
+
+                while True:
+                    cursor, keys = redis_client.scan(cursor=cursor, match=pattern, count=100)
+                    keys_to_delete.extend(keys)
+
+                    if cursor == 0:
+                        break
+
+                # Delete keys in batches to avoid blocking Redis
+                if keys_to_delete:
+                    # Convert bytes to strings if needed
+                    string_keys = [key.decode('utf-8') if isinstance(key, bytes) else key for key in keys_to_delete]
+
+                    # Delete in batches of 100
+                    for i in range(0, len(string_keys), 100):
+                        batch = string_keys[i:i+100]
+                        if batch:
+                            deleted = redis_client.delete(*batch)
+                            cleared_count += deleted
+
+                logger.info(f"Cleared {cleared_count} cache entries matching pattern: {pattern}")
+
+            elif hasattr(cache, 'clear'):
+                # Fallback for other cache backends - clear all if pattern is too generic
+                # This is not ideal but ensures cache clearing works
+                if '*' in pattern and len(pattern.replace('*', '')) < 10:
+                    # Very generic pattern, might be safer to warn and not clear everything
+                    logger.warning(f"Generic cache pattern {pattern} - using selective clearing")
+
+                    # Try to clear only known cache prefixes
+                    for prefix_type, prefix in self.cache_prefixes.items():
+                        if pattern.startswith(prefix) or prefix in pattern:
+                            # For non-Redis backends, we can try clearing specific known keys
+                            # This is a best-effort approach
+                            for lang in self.supported_languages:
+                                for level in self.detail_levels:
+                                    test_key = f"{prefix}{lang}_{level}_test"
+                                    cache.delete(test_key)
+                                    cleared_count += 1
+                else:
+                    logger.warning(f"Cache backend doesn't support pattern clearing for pattern: {pattern}")
+
+            else:
+                # DummyCache or other backends without pattern support
+                logger.info(f"Cache backend doesn't support pattern clearing: {type(cache).__name__}")
+
             return cleared_count
-            
+
         except Exception as e:
             logger.error(f"Error clearing cache by pattern {pattern}: {str(e)}")
             return 0

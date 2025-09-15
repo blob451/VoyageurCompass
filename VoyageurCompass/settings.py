@@ -204,33 +204,59 @@ REDIS_HOST = env("REDIS_HOST", default="redis")
 REDIS_PORT = env("REDIS_PORT", default="6379")
 REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
-# Temporarily use local memory cache for development (Redis connection issue)
+# Production Redis cache configuration with connection pooling and optimization
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "unique-snowflake",
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
         "TIMEOUT": 300,
         "OPTIONS": {
-            "MAX_ENTRIES": 10000,
+            "CONNECTION_POOL_KWARGS": {
+                "max_connections": 50,
+                "retry_on_timeout": True,
+                "socket_keepalive": True,
+                "socket_keepalive_options": {},
+                "health_check_interval": 30,
+            },
+            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+            "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
+        "KEY_PREFIX": "voyageur",
+        "VERSION": 1,
     },
-    # L2 cache for longer-term storage (temporarily using local memory)
+    # L2 cache for longer-term storage (explanations, translations)
     "l2_cache": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "l2-cache",
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
         "TIMEOUT": 3600,
         "OPTIONS": {
-            "MAX_ENTRIES": 5000,
+            "CONNECTION_POOL_KWARGS": {
+                "max_connections": 30,
+                "retry_on_timeout": True,
+                "socket_keepalive": True,
+            },
+            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+            "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
         },
+        "KEY_PREFIX": "voyageur_l2",
+        "VERSION": 1,
     },
-    # Session cache (temporarily using local memory)
+    # Session cache optimized for user sessions
     "sessions": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "session-cache",
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2",
         "TIMEOUT": 86400,
         "OPTIONS": {
-            "MAX_ENTRIES": 1000,
+            "CONNECTION_POOL_KWARGS": {
+                "max_connections": 20,
+                "retry_on_timeout": True,
+                "socket_keepalive": True,
+            },
+            "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
         },
+        "KEY_PREFIX": "voyageur_session",
+        "VERSION": 1,
     },
 }
 

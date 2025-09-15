@@ -26,6 +26,7 @@ env/
 
 # Development cache and temporary files
 .pytest_cache/
+config/.pytest_cache/
 .coverage
 htmlcov/
 .tox/

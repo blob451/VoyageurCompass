@@ -13,6 +13,8 @@ from django.conf import settings
 from django.core.cache import cache
 
 from Analytics.services.local_llm_service import get_local_llm_service
+from Analytics.services.security_validator import get_security_validator, sanitize_financial_input
+from Analytics.services.enhanced_translation_quality import get_enhanced_quality_scorer
 
 logger = logging.getLogger(__name__)
 
@@ -253,6 +255,8 @@ class TranslationService:
         # Initialise components
         self.terminology_mapper = FinancialTerminologyMapper()
         self.quality_scorer = TranslationQualityScorer()
+        self.enhanced_quality_scorer = get_enhanced_quality_scorer()
+        self.security_validator = get_security_validator()
         
         # Caching configuration
         self.cache_prefix = "translation:"
@@ -315,8 +319,13 @@ class TranslationService:
                 logger.error("LLM service not available for translation")
                 return self._create_fallback_translation(english_text, target_language)
             
+            # Security validation for input
+            sanitized_text = sanitize_financial_input(english_text)
+            if sanitized_text != english_text:
+                logger.warning(f"Input sanitized for translation: {len(english_text) - len(sanitized_text)} chars removed")
+
             # Build translation prompt
-            translation_prompt = self._build_translation_prompt(english_text, target_language, context)
+            translation_prompt = self._build_translation_prompt(sanitized_text, target_language, context)
             
             # Generate translation
             start_time = time.time()
@@ -337,24 +346,37 @@ class TranslationService:
             
             translated_text = response["response"].strip()
             
-            # Calculate quality score
-            quality_score = self.quality_scorer.calculate_translation_quality(
-                english_text, translated_text, target_language
+            # Calculate enhanced quality score
+            enhanced_quality_result = self.enhanced_quality_scorer.calculate_enhanced_quality_score(
+                sanitized_text, translated_text, "en", target_language
             )
+            quality_score = enhanced_quality_result.get("overall_score", 0.5)
+            quality_level = enhanced_quality_result.get("quality_level", "unknown")
+
+            # Fallback to basic quality score if enhanced scorer fails
+            if quality_score == 0.5 and enhanced_quality_result.get("error"):
+                quality_score = self.quality_scorer.calculate_translation_quality(
+                    sanitized_text, translated_text, target_language
+                )
+                quality_level = "basic_scoring"
             
-            # Create result
+            # Create result with enhanced quality data
             result = {
                 "original_text": english_text,
+                "sanitized_text": sanitized_text,
                 "translated_text": translated_text,
                 "target_language": target_language,
                 "language_name": self.language_names[target_language],
                 "translation_model": self.translation_model,
                 "quality_score": quality_score,
+                "quality_level": quality_level,
+                "enhanced_quality_analysis": enhanced_quality_result,
                 "generation_time": generation_time,
                 "timestamp": time.time(),
                 "word_count_original": len(english_text.split()),
                 "word_count_translated": len(translated_text.split()),
                 "cached": False,
+                "input_sanitized": sanitized_text != english_text,
             }
             
             # Cache successful translation

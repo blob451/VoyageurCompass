@@ -12,6 +12,7 @@ from django.conf import settings
 from django.core.cache import cache
 
 from Analytics.services.local_llm_service import get_local_llm_service
+from Analytics.services.security_validator import get_security_validator, sanitize_financial_input, validate_financial_output
 from Data.models import AnalyticsResults
 
 logger = logging.getLogger(__name__)
@@ -22,8 +23,10 @@ class ExplanationService:
 
     def __init__(self):
         self._llm_service = None
+        self._security_validator = None
         self.enabled = getattr(settings, "EXPLAINABILITY_ENABLED", True)
         self.cache_ttl = getattr(settings, "EXPLANATION_CACHE_TTL", 300)
+        self.security_enabled = getattr(settings, "EXPLANATION_SECURITY_ENABLED", True)
 
         # Template explanations for LLM fallback scenarios
         self.indicator_templates = {
@@ -48,6 +51,13 @@ class ExplanationService:
             logger.info("Initializing LLM service for explanation generation")
             self._llm_service = get_local_llm_service()
         return self._llm_service
+
+    @property
+    def security_validator(self):
+        """Lazy-loaded security validator."""
+        if self._security_validator is None and self.security_enabled:
+            self._security_validator = get_security_validator()
+        return self._security_validator
 
     def is_enabled(self) -> bool:
         """Verify explanation service availability status."""
@@ -91,6 +101,23 @@ class ExplanationService:
                     f"LLM unavailable, using template for {analysis_data.get('symbol', 'unknown')} ({detail_level})"
                 )
                 explanation = self._generate_template_explanation(analysis_data, detail_level)
+
+            # Security validation for generated content
+            if explanation and self.security_enabled and self.security_validator:
+                content_validation = self.security_validator.validate_output(
+                    explanation.get('content', ''), 'explanation'
+                )
+
+                if not content_validation['is_valid']:
+                    logger.warning(
+                        f"Security validation failed for {analysis_data.get('symbol', 'unknown')}: "
+                        f"{content_validation['issues']}"
+                    )
+                    explanation['content'] = content_validation['filtered_content']
+                    explanation['security_filtered'] = True
+                    explanation['security_issues'] = content_validation['issues']
+                else:
+                    explanation['security_validated'] = True
 
             if explanation:
                 # Add format validation for detailed explanations
