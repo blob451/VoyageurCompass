@@ -14,10 +14,67 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 
-from Analytics.engine.ta_engine import TechnicalAnalysisEngine
+from Analytics.engine.enhanced_ta_engine import EnhancedTechnicalAnalysisEngine
 from Analytics.utils.analysis_logger import AnalysisLogger
 from Data.models import AnalyticsResults, Portfolio
 from Data.services.yahoo_finance import yahoo_finance_service
+
+
+def get_stock_sector_industry(stock):
+    """
+    Get sector and industry for a stock with robust handling and auto-population.
+    
+    Args:
+        stock: Stock model instance
+        
+    Returns:
+        tuple: (sector, industry) with proper fallbacks
+    """
+    # Get current values, handling None and whitespace-only strings
+    sector = (stock.sector or "").strip()
+    industry = (stock.industry or "").strip()
+    
+    # If either is empty, try to auto-populate from Yahoo Finance
+    if not sector or not industry:
+        try:
+            # Import here to avoid circular imports
+            from Data.services.yahoo_finance import yahoo_finance_service
+            import logging
+            
+            logger = logging.getLogger(__name__)
+            logger.info(f"Auto-populating missing sector/industry data for {stock.symbol}")
+            
+            # Fetch stock info from Yahoo Finance
+            stock_info = yahoo_finance_service.get_stock_info(stock.symbol)
+            
+            if stock_info and not stock_info.get("error"):
+                # Stock record update with valid data
+                updated = False
+                if not sector and stock_info.get("sector"):
+                    stock.sector = stock_info["sector"].strip()
+                    sector = stock.sector
+                    updated = True
+                    
+                if not industry and stock_info.get("industry"):
+                    stock.industry = stock_info["industry"].strip()
+                    industry = stock.industry
+                    updated = True
+                    
+                if updated:
+                    stock.save(update_fields=["sector", "industry"])
+                    logger.info(f"Updated {stock.symbol} - Sector: {sector}, Industry: {industry}")
+                    
+        except Exception as e:
+            # Auto-population failure handling to maintain API stability
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to auto-populate sector/industry for {stock.symbol}: {e}")
+    
+    # Return with fallbacks
+    return (
+        sector if sector else "Unknown",
+        industry if industry else "Unknown"
+    )
 
 
 class AnalysisThrottle(UserRateThrottle):
@@ -192,7 +249,7 @@ def analyze_stock(request, symbol):
             except Exception as logger_error:
                 logger.warning(f"Failed to create analysis logger for {symbol}: {str(logger_error)}")
 
-        engine = TechnicalAnalysisEngine()
+        engine = EnhancedTechnicalAnalysisEngine()
         analysis = engine.analyze_stock(symbol, user=request.user, logger_instance=analysis_logger)
         logger.info(f"Engine analysis completed for {symbol}")
 
@@ -473,9 +530,24 @@ def analyze_stock(request, symbol):
                     "method": "error",
                 }
 
+        # Get sector and industry for response
+        if analytics_result_id:
+            saved_analysis = AnalyticsResults.objects.filter(
+                id=analytics_result_id, user=request.user, stock__symbol=symbol
+            ).first()
+            if saved_analysis:
+                sector, industry = get_stock_sector_industry(saved_analysis.stock)
+            else:
+                sector, industry = "Unknown", "Unknown"
+        else:
+            sector, industry = "Unknown", "Unknown"
+
         response_data = {
             "success": True,
             "symbol": analysis.get("symbol", symbol),
+            "name": analysis.get("name", f"{symbol} Corporation"),
+            "sector": sector,
+            "industry": industry,
             "analysis_date": analysis_date_str,
             "horizon": analysis.get("horizon", "unknown"),
             "composite_score": analysis.get("score_0_10", 0.0),
@@ -493,7 +565,7 @@ def analyze_stock(request, symbol):
 
         # Analysis history cache invalidation
         user_cache_pattern = f"analysis_history:{request.user.id}:*"
-        # Django cache doesn't support wildcard deletion, so we'll use a simple approach
+        # Django cache wildcard deletion limitation requires simple invalidation approach
         # In production, consider using Redis directly for pattern-based cache invalidation
         cache.delete_many(
             [
@@ -621,7 +693,7 @@ def batch_analysis(request):
         return Response({"error": "Months parameter must be between 1 and 24"}, status=status.HTTP_400_BAD_REQUEST)
 
     # Multi-symbol analysis execution
-    engine = TechnicalAnalysisEngine()
+    engine = EnhancedTechnicalAnalysisEngine()
     
     def analyze_single_symbol(symbol):
         """Analyze a single symbol."""
@@ -664,7 +736,7 @@ def batch_analysis(request):
         {
             "success": True,
             "results": results,
-            "total_analyzed": len(results),
+            "total_analysed": len(results),
             "successful": sum(1 for r in results.values() if r.get("success")),
         }
     )
@@ -690,7 +762,7 @@ def market_overview(request):
         "QQQ": "NASDAQ ETF",
     }
 
-    engine = TechnicalAnalysisEngine()
+    engine = EnhancedTechnicalAnalysisEngine()
 
     def analyze_index(symbol, name):
         """Analyze a single index."""
@@ -853,9 +925,12 @@ def get_user_analysis_history(request):
         if "analysis_date" in requested_fields:
             analysis_data["analysis_date"] = result.as_of.isoformat()
         if "sector" in requested_fields:
-            analysis_data["sector"] = result.stock.sector or "Unknown"
+            sector, industry = get_stock_sector_industry(result.stock)
+            analysis_data["sector"] = sector
         if "industry" in requested_fields:
-            analysis_data["industry"] = result.stock.industry or "Unknown"
+            if "sector" not in requested_fields:  # Avoid calling twice
+                sector, industry = get_stock_sector_industry(result.stock)
+            analysis_data["industry"] = industry
         if "horizon" in requested_fields:
             analysis_data["horizon"] = result.horizon
         if "composite_raw" in requested_fields:
@@ -928,12 +1003,15 @@ def get_analysis_by_id(request, analysis_id):
             return Response({"error": "Analysis not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Format the response - same structure as get_user_latest_analysis
+        # Get sector and industry with auto-population
+        sector, industry = get_stock_sector_industry(result.stock)
+        
         analysis_data = {
             "id": result.id,
             "symbol": result.stock.symbol,
             "name": result.stock.short_name or result.stock.long_name or f"{result.stock.symbol} Corporation",
-            "sector": result.stock.sector or "Unknown",
-            "industry": result.stock.industry or "Unknown",
+            "sector": sector,
+            "industry": industry,
             "score": result.score_0_10,
             "analysis_date": result.as_of.isoformat(),
             "horizon": result.horizon,
@@ -1072,13 +1150,16 @@ def get_user_latest_analysis(request, symbol):
         if not result:
             return Response({"error": f"No analysis found for {symbol}"}, status=status.HTTP_404_NOT_FOUND)
 
+        # Get sector and industry with auto-population
+        sector, industry = get_stock_sector_industry(result.stock)
+        
         # Format the response
         analysis_data = {
             "id": result.id,
             "symbol": result.stock.symbol,
             "name": result.stock.short_name or result.stock.long_name or f"{symbol} Corporation",
-            "sector": result.stock.sector or "Unknown",
-            "industry": result.stock.industry or "Unknown",
+            "sector": sector,
+            "industry": industry,
             "score": result.score_0_10,
             "analysis_date": result.as_of.isoformat(),
             "horizon": result.horizon,

@@ -127,7 +127,8 @@ const SentimentExplanation = ({
     try {
       await generateExplanation({
         analysisId,
-        detailLevel
+        detailLevel,
+        forceRegenerate: true  // Always force regeneration when user clicks Generate
       }).unwrap();
       
       const duration = performance.now() - startTime;
@@ -158,18 +159,16 @@ const SentimentExplanation = ({
     // Update detail level first
     setCurrentDetailLevel(detailLevel);
     
-    // Force refetch to see if explanation exists for this detail level
-    const result = await refetchExplanation();
+    // Only refetch to check if explanation exists for this detail level
+    // Don't automatically generate - let the user click Generate if needed
+    explanationLogger.workflow(analysisId, 'Detail level changed, checking for existing explanation', {
+      sentimentLabel: label,
+      detailLevel,
+      newsCount
+    });
     
-    // If no explanation exists for this detail level, generate it
-    if (!result?.data?.explanation?.content) {
-      explanationLogger.workflow(analysisId, 'No explanation found for detail level, generating new one', {
-        sentimentLabel: label,
-        detailLevel,
-        newsCount
-      });
-      await handleGenerateExplanation(detailLevel);
-    }
+    // Just refetch - this will either return existing explanation or empty state
+    refetchExplanation();
   };
 
   const sentimentExplanation = explanation?.explanation;
@@ -187,6 +186,7 @@ const SentimentExplanation = ({
       defaultExpanded={defaultExpanded}
       confidence={sentimentExplanation?.confidence}
       method={sentimentExplanation?.method}
+      modelName={sentimentExplanation?.model_used}
       timestamp={sentimentExplanation?.explained_at}
     >
       {/* Sentiment Overview */}

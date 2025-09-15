@@ -383,7 +383,7 @@ const StockSearchPage = () => {
                   AI-Powered Explanations
                 </Typography>
                 <Chip 
-                  label="LLaMA 3.1 70B" 
+                  label="Phi3 & LLaMA 3.1" 
                   size="small" 
                   color="primary" 
                   variant="outlined" 

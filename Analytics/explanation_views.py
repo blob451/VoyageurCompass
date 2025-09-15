@@ -18,6 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from Analytics.services.explanation_service import get_explanation_service
+from Analytics.services.translation_service import get_translation_service
 from Analytics.views import AnalysisThrottle
 from Data.models import AnalyticsResults
 
@@ -92,7 +93,14 @@ def retry_database_operation(operation, max_retries=3, base_delay=0.1):
             type=OpenApiTypes.STR,
             location=OpenApiParameter.QUERY,
             required=False,
-            description="Explanation detail level: summary, standard, detailed (default: standard)",
+            description="Explanation detail level: summary (Standard), standard (Enhanced), detailed (Premium) - default: standard",
+        ),
+        OpenApiParameter(
+            name="language",
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Target language for explanation: en, fr, es (default: en)",
         ),
     ],
     responses={
@@ -100,11 +108,28 @@ def retry_database_operation(operation, max_retries=3, base_delay=0.1):
             "description": "Explanation generated successfully",
             "example": {
                 "success": True,
+                "analysis_id": 123,
+                "symbol": "AAPL",
                 "explanation": {
                     "content": "AAPL receives a 7.5/10 analysis score...",
                     "confidence_score": 0.85,
                     "detail_level": "standard",
                     "method": "llm",
+                    "language": "en",
+                    "model_used": "phi3:3.8b",
+                    "generation_time": 3.2,
+                    "word_count": 245,
+                    "translated_content": "AAPL reçoit un score d'analyse de 7.5/10...",
+                    "translation_quality": 0.91,
+                    "translation_model": "qwen2:3b",
+                    "translation_time": 1.8,
+                    "target_language": "fr",
+                    "total_generation_time": 5.0,
+                },
+                "multilingual": {
+                    "requested_language": "fr",
+                    "translation_available": True,
+                    "supported_languages": ["en", "fr", "es"],
                 },
             },
         },
@@ -125,16 +150,26 @@ def generate_explanation(request, analysis_id):
 
     Query Parameters:
         detail_level: Explanation detail level (summary/standard/detailed, default: standard)
+                      Note: summary=Standard, standard=Enhanced, detailed=Premium
+        language: Target language (en/fr/es, default: en)
 
     Returns:
-        Generated explanation with metadata
+        Generated explanation with multilingual metadata
     """
     detail_level = request.query_params.get("detail_level", "standard")
+    language = request.query_params.get("language", "en")
+    force_regenerate = request.query_params.get("force_regenerate", "false").lower() == "true"
 
     # Validate detail level
     if detail_level not in ["summary", "standard", "detailed"]:
         return Response(
             {"error": "detail_level must be one of: summary, standard, detailed"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validate language
+    if language not in ["en", "fr", "es"]:
+        return Response(
+            {"error": "language must be one of: en, fr, es"}, status=status.HTTP_400_BAD_REQUEST
         )
 
     try:
@@ -173,14 +208,14 @@ def generate_explanation(request, analysis_id):
         existing_explanations = analysis_result.explanations_json or {}
         existing_levels = existing_explanations.get("levels", {})
 
-        if detail_level in existing_levels:
+        if detail_level in existing_levels and not force_regenerate:
             # Return existing explanation for this detail level
             logger.info(f"[EXPLAIN] Returning existing {detail_level} explanation for analysis {analysis_id}")
             existing_explanation = existing_levels[detail_level]
             explanation_result = {
                 "content": existing_explanation.get("content", ""),
                 "confidence_score": existing_explanation.get("confidence", 0.0),
-                "method": analysis_result.explanation_method or "llm",
+                "method": analysis_result.explanation_method or "llama",
                 "word_count": existing_explanation.get(
                     "word_count", len(existing_explanation.get("content", "").split())
                 ),
@@ -191,10 +226,11 @@ def generate_explanation(request, analysis_id):
             }
         else:
             # Generate new explanation for this detail level
-            logger.info(f"[EXPLAIN] Starting {detail_level} explanation generation for {analysis_result.stock.symbol}")
+            regeneration_reason = "force regeneration requested" if force_regenerate else "no existing explanation"
+            logger.info(f"[EXPLAIN] Starting {detail_level} explanation generation for {analysis_result.stock.symbol} ({regeneration_reason})")
             try:
                 explanation_result = explanation_service.explain_prediction_single(
-                    analysis_result, detail_level=detail_level, user=request.user
+                    analysis_result, detail_level=detail_level, user=request.user, force_regenerate=force_regenerate
                 )
 
                 if explanation_result:
@@ -278,20 +314,77 @@ def generate_explanation(request, analysis_id):
             logger.error(f"Failed to save explanation after retries: {str(e)}")
             # Continue execution - explanation generation was successful, only save failed
 
+        # Handle translation if requested language is not English
+        translation_result = None
+        if language != "en":
+            logger.info(f"[TRANSLATION] Translating explanation to {language}")
+            try:
+                translation_service = get_translation_service()
+                
+                # Prepare translation context
+                translation_context = {
+                    "symbol": analysis_result.stock.symbol,
+                    "score": analysis_result.score_0_10,
+                    "analysis_id": analysis_id
+                }
+                
+                translation_result = translation_service.translate_explanation(
+                    english_text=explanation_result.get("content", ""),
+                    target_language=language,
+                    context=translation_context
+                )
+                
+                if translation_result:
+                    logger.info(
+                        f"[TRANSLATION] Translation successful - quality: {translation_result.get('quality_score', 0):.2f}, "
+                        f"time: {translation_result.get('generation_time', 0):.2f}s"
+                    )
+                else:
+                    logger.warning(f"[TRANSLATION] Translation failed, will return English version")
+                    
+            except Exception as translation_error:
+                logger.error(f"[TRANSLATION] Translation error: {str(translation_error)}")
+                translation_result = None
+
+        # Prepare response data with multilingual support
+        explanation_data = {
+            "content": explanation_result.get("content", ""),
+            "confidence_score": explanation_result.get("confidence_score", 0.0),
+            "detail_level": detail_level,
+            "method": explanation_result.get("method", "unknown"),
+            "generation_time": explanation_result.get("generation_time", 0.0),
+            "word_count": explanation_result.get("word_count", 0),
+            "indicators_explained": explanation_result.get("indicators_explained", []),
+            "risk_factors": explanation_result.get("risk_factors", []),
+            "recommendation": explanation_result.get("recommendation", "HOLD"),
+            "language": "en",  # Original language
+            "model_used": explanation_result.get("model_used", "unknown"),
+        }
+        
+        # Add translation data if available
+        if translation_result:
+            explanation_data.update({
+                "translated_content": translation_result.get("translated_text", ""),
+                "translation_quality": translation_result.get("quality_score", 0.0),
+                "translation_model": translation_result.get("translation_model", "unknown"),
+                "translation_time": translation_result.get("generation_time", 0.0),
+                "target_language": language,
+                "total_generation_time": explanation_result.get("generation_time", 0.0) + translation_result.get("generation_time", 0.0),
+            })
+            # Use translated content as primary content for non-English requests
+            explanation_data["content"] = translation_result.get("translated_text", explanation_data["content"])
+            explanation_data["language"] = language
+            explanation_data["word_count"] = translation_result.get("word_count_translated", explanation_data["word_count"])
+        
         response_data = {
             "success": True,
             "analysis_id": analysis_id,
             "symbol": analysis_result.stock.symbol,
-            "explanation": {
-                "content": explanation_result.get("content", ""),
-                "confidence_score": explanation_result.get("confidence_score", 0.0),
-                "detail_level": detail_level,
-                "method": explanation_result.get("method", "unknown"),
-                "generation_time": explanation_result.get("generation_time", 0.0),
-                "word_count": explanation_result.get("word_count", 0),
-                "indicators_explained": explanation_result.get("indicators_explained", []),
-                "risk_factors": explanation_result.get("risk_factors", []),
-                "recommendation": explanation_result.get("recommendation", "HOLD"),
+            "explanation": explanation_data,
+            "multilingual": {
+                "requested_language": language,
+                "translation_available": translation_result is not None,
+                "supported_languages": ["en", "fr", "es"],
             },
         }
 
@@ -312,7 +405,33 @@ def generate_explanation(request, analysis_id):
     responses={
         200: {
             "description": "Service status retrieved",
-            "example": {"enabled": True, "llm_available": True, "model_name": "llama3.1:70b", "cache_ttl": 300},
+            "example": {
+                "success": True,
+                "status": {
+                    "enabled": True,
+                    "llm_available": True,
+                    "models": {
+                        "summary": {"name": "phi3:3.8b", "healthy": True, "last_check": "2025-01-17T10:30:00Z"},
+                        "standard": {"name": "phi3:3.8b", "healthy": True, "last_check": "2025-01-17T10:30:00Z"},
+                        "detailed": {"name": "llama3.1:8b", "healthy": True, "last_check": "2025-01-17T10:30:00Z"},
+                        "translation": {"name": "qwen2:3b", "healthy": True, "last_check": "2025-01-17T10:30:00Z"}
+                    },
+                    "performance": {
+                        "total_requests": 1250,
+                        "cache_hits": 340,
+                        "cache_misses": 910,
+                        "avg_generation_time": 4.2,
+                        "error_count": 12
+                    },
+                    "circuit_breaker": {
+                        "state": "CLOSED",
+                        "failure_count": 0,
+                        "last_failure": None
+                    },
+                    "cache_ttl": 300,
+                    "supported_languages": ["en", "fr", "es"]
+                }
+            }
         }
     },
 )

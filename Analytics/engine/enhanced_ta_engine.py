@@ -105,6 +105,29 @@ class EnhancedTechnicalAnalysisEngine:
             
             price_data = self.price_reader.get_stock_prices(symbol, start_date, end_date)
             
+            # Auto-sync fallback if no data found - same as original ta_engine
+            if not price_data:
+                logger.info(f"No existing data for {symbol}, attempting auto-sync")
+                if self._auto_sync_stock_data(symbol):
+                    # Retry after sync with multiple attempts
+                    for attempt in range(3):
+                        try:
+                            if attempt > 0:
+                                import time
+                                time.sleep(2)  # Wait 2 seconds between retries
+                            
+                            price_data = self.price_reader.get_stock_prices(symbol, start_date, end_date)
+                            if price_data:
+                                logger.info(f"Successfully retrieved data for {symbol} after auto-sync (attempt {attempt + 1})")
+                                break
+                        except Exception as retry_e:
+                            logger.warning(f"Retry attempt {attempt + 1} failed for {symbol}: {str(retry_e)}")
+                    
+                    if not price_data:
+                        logger.error(f"Auto-sync completed but no data retrieved for {symbol}")
+                else:
+                    logger.warning(f"Auto-sync failed for {symbol}")
+            
             # Get sector and industry data if available
             sector_data = None
             industry_data = None
@@ -132,7 +155,13 @@ class EnhancedTechnicalAnalysisEngine:
             return self._create_error_result(symbol, f"Data retrieval failed: {str(e)}")
         
         if not price_data:
-            return self._create_error_result(symbol, "No price data available")
+            # Check if this was due to a delisted stock detected during auto-sync
+            is_delisted = hasattr(self.original_engine, "_delisted_stock") and self.original_engine._delisted_stock
+            if is_delisted:
+                error_msg = f"Stock {symbol} appears to be delisted and is no longer available for trading"
+            else:
+                error_msg = "No price data available"
+            return self._create_error_result(symbol, error_msg)
         
         # Convert to DataFrame for analysis
         df = self._convert_to_dataframe(price_data)
@@ -467,6 +496,13 @@ class EnhancedTechnicalAnalysisEngine:
         except Exception as e:
             logger.error(f"Failed to store enhanced results: {str(e)}")
             
+    def _auto_sync_stock_data(self, symbol: str) -> bool:
+        """
+        Automatically sync stock data when it's missing from the database.
+        Delegates to the original engine's auto-sync method.
+        """
+        return self.original_engine._auto_sync_stock_data(symbol)
+            
     def _create_error_result(self, symbol: str, error_message: str) -> Dict[str, Any]:
         """Create standardized error result."""
         return {
@@ -478,6 +514,17 @@ class EnhancedTechnicalAnalysisEngine:
             'enhancement_applied': False,
             'success': False
         }
+    
+    def analyze_stock(self, symbol: str, user=None, logger_instance=None):
+        """
+        Backward compatibility method that delegates to the original engine.
+        This ensures views that call analyze_stock() continue to work.
+        """
+        return self.original_engine.analyze_stock(
+            symbol=symbol,
+            user=user,
+            logger_instance=logger_instance
+        )
 
 
 # Global service instance

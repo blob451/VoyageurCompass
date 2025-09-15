@@ -30,7 +30,7 @@ from Analytics.views import AnalysisThrottle
                 "symbols": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "List of stock symbols to analyze",
+                    "description": "List of stock symbols to analyse",
                 },
                 "detail_level": {
                     "type": "string",

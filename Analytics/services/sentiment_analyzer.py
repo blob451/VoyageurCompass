@@ -405,7 +405,7 @@ class SentimentAnalyzer:
         "finbert_tone": {
             "name": "yiyanghkust/finbert-tone",
             "version": "1.1.0",
-            "description": "FinBERT specialized for tone analysis",
+            "description": "FinBERT specialised for tone analysis",
             "specialization": "tone",
             "confidence_threshold": 0.55,
             "active": False,
@@ -413,7 +413,7 @@ class SentimentAnalyzer:
         "finbert_sentiment": {
             "name": "abhilash1910/finbert-sentiment",
             "version": "1.2.0",
-            "description": "FinBERT specialized for sentiment analysis",
+            "description": "FinBERT specialised for sentiment analysis",
             "specialization": "sentiment",
             "confidence_threshold": 0.6,
             "active": False,
@@ -466,7 +466,7 @@ class SentimentAnalyzer:
             self._tfidf_vectorizer = TfidfVectorizer(max_features=1000, stop_words="english")
         else:
             self._tfidf_vectorizer = None
-        self._cache_warm_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA"]  # Frequently analyzed stocks
+        self._cache_warm_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA"]  # Frequently analysed stocks
         self._similarity_threshold = 0.95  # Cosine similarity threshold for cache hits
 
         # Advanced error recovery
@@ -836,13 +836,13 @@ class SentimentAnalyzer:
             return
 
         # Check without lock first (double-checked locking pattern)
-        if self._initialized:
+        if self._initialised:
             return
 
         with self._model_lock:
             # Check again inside the lock to prevent race conditions
-            if self._initialized:
-                logger.debug("Model already initialized by another thread")
+            if self._initialised:
+                logger.debug("Model already initialised by another thread")
                 return
 
             try:
@@ -871,7 +871,7 @@ class SentimentAnalyzer:
                 if self.USE_GPU:
                     torch.cuda.empty_cache()
 
-                self._initialized = True
+                self._initialised = True
                 self._last_used = time.time()
                 self._usage_count = 0
                 load_time = time.time() - start_time
@@ -1597,7 +1597,7 @@ class SentimentAnalyzer:
 
     def warm_cache(self, symbols: Optional[List[str]] = None):
         """
-        Pre-warm cache for frequently analyzed stocks.
+        Pre-warm cache for frequently analysed stocks.
 
         Args:
             symbols: List of stock symbols to pre-warm cache for
@@ -1665,7 +1665,7 @@ class SentimentAnalyzer:
         model_info = self.MODEL_REGISTRY.get(self._current_model_key, {}).copy()
         model_info["current"] = True
         model_info["key"] = self._current_model_key
-        model_info["initialized"] = self._initialized
+        model_info["initialised"] = self._initialised
 
         # Add performance stats if available
         if self._current_model_key in self._model_performance:
@@ -1694,7 +1694,7 @@ class SentimentAnalyzer:
 
         try:
             # Unload current model
-            if self._initialized:
+            if self._initialised:
                 self._unload_model()
 
             # Update configuration
@@ -1933,7 +1933,7 @@ class SentimentAnalyzer:
                 -0.0002,  # Std length (negative - variability adds overhead)
                 -0.00005,  # Length range (negative - range adds complexity)
                 -0.01,  # Complex characters (negative - complex chars slower)
-                0.002,  # Financial terms (slightly positive - model optimized for these)
+                0.002,  # Financial terms (slightly positive - model optimised for these)
             ]
         )
 

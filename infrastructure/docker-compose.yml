@@ -304,9 +304,14 @@ services:
       - OLLAMA_HOST=0.0.0.0
       - OLLAMA_MODELS=/root/.ollama/models
       - OLLAMA_NUM_PARALLEL=2
-      - OLLAMA_MAX_LOADED_MODELS=2
+      - OLLAMA_MAX_LOADED_MODELS=3
       - OLLAMA_GPU_MEMORY_FRACTION=0.8
       - CUDA_VISIBLE_DEVICES=0
+      # Multi-model configuration
+      - OLLAMA_SUMMARY_MODEL=${OLLAMA_SUMMARY_MODEL:-phi3:3.8b}
+      - OLLAMA_STANDARD_MODEL=${OLLAMA_STANDARD_MODEL:-phi3:3.8b}  
+      - OLLAMA_DETAILED_MODEL=${OLLAMA_DETAILED_MODEL:-llama3.1:8b}
+      - OLLAMA_TRANSLATION_MODEL=${OLLAMA_TRANSLATION_MODEL:-qwen2:3b}
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s

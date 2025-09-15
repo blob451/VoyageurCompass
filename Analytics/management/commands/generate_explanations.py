@@ -179,18 +179,18 @@ class Command(BaseCommand):
                         successful += 1
                         self.stdout.write(
                             self.style.SUCCESS(
-                                f"    ✓ Generated ({explanation_result.get('word_count', 0)} words, "
+                                f"    [SUCCESS] Generated ({explanation_result.get('word_count', 0)} words, "
                                 f"{explanation_result.get('generation_time', 0):.2f}s, "
                                 f"method: {explanation_result.get('method', 'unknown')})"
                             )
                         )
                     else:
                         failed += 1
-                        self.stdout.write(self.style.ERROR(f"    ✗ Failed to generate explanation"))
+                        self.stdout.write(self.style.ERROR(f"    [FAILED] Failed to generate explanation"))
 
                 except Exception as e:
                     failed += 1
-                    self.stdout.write(self.style.ERROR(f"    ✗ Error: {str(e)}"))
+                    self.stdout.write(self.style.ERROR(f"    [ERROR] Error: {str(e)}"))
 
                 processed += 1
 

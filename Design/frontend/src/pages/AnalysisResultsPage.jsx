@@ -32,7 +32,6 @@ import {
   Psychology
 } from '@mui/icons-material';
 import { useGetAnalysisByIdQuery, useGetExplanationStatusQuery } from '../features/api/apiSlice';
-import SentimentExplanation from '../components/SentimentExplanation';
 import TechnicalExplanation from '../components/TechnicalExplanation';
 
 const AnalysisResultsPage = () => {
@@ -529,7 +528,7 @@ const AnalysisResultsPage = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {explanationStatus?.status?.llm_available ? (
               <Chip 
-                label="LLaMA 3.1 70B Online" 
+                label="Multi-Model AI Active" 
                 color="success" 
                 size="small"
                 variant="outlined"
@@ -553,13 +552,68 @@ const AnalysisResultsPage = () => {
         </Box>
         
         <Typography variant="body2" color="text.secondary" paragraph>
-          Get natural language explanations powered by LLaMA 3.1 70B to better understand your analysis results.
+          Get natural language explanations powered by our multi-model AI system optimized for financial analysis.
           {!explanationStatus?.status?.llm_available && (
             <Typography component="span" color="warning.main" sx={{ ml: 1 }}>
               LLM service unavailable - using template explanations.
             </Typography>
           )}
         </Typography>
+
+        {/* Model Information Cards */}
+        {explanationStatus?.status?.llm_available && (
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+            <Paper 
+              sx={{ 
+                p: 2, 
+                flex: '1 1 300px', 
+                minWidth: 300,
+                background: 'linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%)',
+                border: '1px solid rgba(33, 150, 243, 0.2)'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Chip 
+                  label="Phi3 (3.8B)" 
+                  color="primary" 
+                  size="small" 
+                  variant="filled"
+                />
+                <Typography variant="subtitle2" color="primary">
+                  Quick Analysis
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Fast summaries and standard explanations with optimized performance for real-time analysis.
+              </Typography>
+            </Paper>
+
+            <Paper 
+              sx={{ 
+                p: 2, 
+                flex: '1 1 300px', 
+                minWidth: 300,
+                background: 'linear-gradient(135deg, #fff3e0 0%, #fce4ec 100%)',
+                border: '1px solid rgba(255, 152, 0, 0.2)'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Chip 
+                  label="LLaMA 3.1 (8B)" 
+                  color="warning" 
+                  size="small" 
+                  variant="filled"
+                />
+                <Typography variant="subtitle2" color="warning.dark">
+                  Detailed Analysis
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                In-depth explanations with comprehensive market context and technical reasoning.
+              </Typography>
+            </Paper>
+          </Box>
+        )}
 
         {/* Technical Analysis Explanation */}
         <TechnicalExplanation
@@ -568,14 +622,6 @@ const AnalysisResultsPage = () => {
           defaultExpanded={true}
         />
 
-        {/* Sentiment Analysis Explanation (only if sentiment data exists) */}
-        {analysisData.indicators?.sentiment && (
-          <SentimentExplanation
-            analysisId={analysisId}
-            sentimentData={analysisData.indicators.sentiment}
-            defaultExpanded={false}
-          />
-        )}
       </Box>
     </Container>
   );

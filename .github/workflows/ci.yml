@@ -446,7 +446,7 @@ jobs:
     needs: quality-gates
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     
-    environment: staging
+    # environment: staging  # Commented out - environment not configured in repository
     
     steps:
     - name: Checkout code
@@ -471,7 +471,7 @@ jobs:
     needs: quality-gates
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
-    environment: production
+    # environment: production  # Commented out - environment not configured in repository
     
     steps:
     - name: Checkout code

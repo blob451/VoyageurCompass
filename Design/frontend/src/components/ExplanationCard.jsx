@@ -40,9 +40,10 @@ const ExplanationCard = ({
   onRefresh,
   defaultExpanded = false,
   showControls = true,
-  variant = 'standard', // 'summary', 'standard', 'detailed'
+  variant = 'standard', // 'summary' (Standard), 'standard' (Enhanced), 'detailed' (Premium)
   confidence = null,
   method = null,
+  modelName = null,
   timestamp = null,
   children
 }) => {
@@ -153,6 +154,19 @@ const ExplanationCard = ({
     return <Psychology />;
   };
 
+  const formatModelName = (modelName) => {
+    if (!modelName) return 'LLM';
+    
+    // Convert common model names to user-friendly formats
+    if (modelName.includes('phi3') || modelName.includes('Phi3')) return 'Phi3 3.8B';
+    if (modelName.includes('llama3.1:8b') || modelName.includes('LLaMA-3.1-8B')) return 'LLaMA 3.1 8B';
+    if (modelName.includes('llama3.1:70b') || modelName.includes('LLaMA-3.1-70B')) return 'LLaMA 3.1 70B';
+    if (modelName.includes('llama') || modelName.includes('LLaMA')) return 'LLaMA';
+    
+    // Default to a cleaned up version of the model name
+    return modelName.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return '';
     try {
@@ -208,11 +222,36 @@ const ExplanationCard = ({
           {majorSections.map((section, index) => {
             const trimmed = section.trim();
             // Pattern 1: **Title:** content (primary sections)  
-            // Handle malformed LLM output: **Title:****content
-            const primaryMatch = trimmed.match(/^\*\*(.*?):\*\*+\s*(.*)/s);
-            if (primaryMatch) {
-              const title = primaryMatch[1].trim();
-              let content = primaryMatch[2].trim();
+            // Handle various malformed LLM outputs with enhanced regex patterns
+            let primaryMatch = trimmed.match(/^\*\*(.*?):\*\*+\s*(.*)/s);
+            
+            // If no match, try standard format
+            if (!primaryMatch) {
+              primaryMatch = trimmed.match(/^\*\*(.*?):\*\*\s*(.*)/s);
+            }
+            
+            // Try with missing space after colon
+            if (!primaryMatch) {
+              primaryMatch = trimmed.match(/^\*\*(.*?):\*\*([^*].*)/s);
+            }
+            
+            // Try with wrong asterisk count (***Title:*** content)
+            if (!primaryMatch) {
+              primaryMatch = trimmed.match(/^\*{3,}(.*?):\*{3,}\s*(.*)/s);
+            }
+            
+            // Try with extra asterisks in content (**Title:** ***content***)
+            if (!primaryMatch) {
+              primaryMatch = trimmed.match(/^\*\*(.*?):\*\*\s*\*+([^*].*?)\**/s);
+            }
+            
+            // Pattern 2: **TITLE** content (fallback for missing colon)
+            const fallbackMatch = !primaryMatch ? trimmed.match(/^\*\*([^*]+)\*\*\s*(.*)/s) : null;
+            
+            if (primaryMatch || fallbackMatch) {
+              const match = primaryMatch || fallbackMatch;
+              const title = match[1].trim();
+              let content = match[2].trim();
               
               // If content is empty, check if it's in the next major section
               if (!content && index + 1 < majorSections.length) {
@@ -250,7 +289,10 @@ const ExplanationCard = ({
                       backgroundColor: sectionType.bgColor,
                       p: 1.5,
                       borderRadius: 1,
-                      fontSize: '0.9rem'
+                      fontSize: '0.9rem',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                      whiteSpace: 'pre-wrap'
                     }}
                   >
                     {content}
@@ -283,7 +325,50 @@ const ExplanationCard = ({
               );
             }
             
-            // Pattern 3: Regular paragraph
+            // Pattern 3: Regular paragraph - enhanced fallback styling for Premium mode
+            if (selectedDetail === 'detailed' && trimmed.length > 50) {
+              // For Premium mode, style longer paragraphs as premium section-like content
+              // Try to auto-detect if this might be a section content
+              const isPossibleSectionContent = trimmed.length > 100 || 
+                                               /\b(analysis|assessment|strategy|outlook|recommendation)\b/i.test(trimmed);
+              
+              const sectionStyle = isPossibleSectionContent ? {
+                color: 'success.main',
+                borderColor: 'success.light', 
+                bgColor: 'rgba(76, 175, 80, 0.08)',
+                icon: '📈'
+              } : {
+                color: 'primary.main',
+                borderColor: 'primary.light',
+                bgColor: 'rgba(25, 118, 210, 0.08)', 
+                icon: '📋'
+              };
+              
+              return (
+                <Box key={index} sx={{ mb: 2.5 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      pl: 2, 
+                      borderLeft: 3, 
+                      borderColor: sectionStyle.borderColor,
+                      backgroundColor: sectionStyle.bgColor,
+                      p: 1.5,
+                      borderRadius: 1,
+                      fontSize: '0.9rem',
+                      lineHeight: 1.7,
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                      whiteSpace: 'pre-wrap'
+                    }}
+                  >
+                    {trimmed}
+                  </Typography>
+                </Box>
+              );
+            }
+            
+            // Regular paragraph for other modes
             return (
               <Typography key={index} variant="body1" paragraph sx={{ mb: 2, lineHeight: 1.7 }}>
                 {trimmed}
@@ -386,13 +471,24 @@ const ExplanationCard = ({
             <Typography variant="h6">
               {title}
             </Typography>
-            {method && (
-              <Tooltip title={method === 'llama' ? 'LLaMA 3.1 70B Generated' : 'Template Generated'}>
+            {method === 'llama' && modelName && (
+              <Tooltip title={`Generated by ${formatModelName(modelName)} model`}>
                 <Chip 
                   icon={getMethodIcon(method)}
-                  label={method === 'llama' ? 'AI' : 'Template'}
+                  label={formatModelName(modelName)}
                   size="small"
-                  color={method === 'llama' ? 'primary' : 'default'}
+                  color="primary"
+                  variant="outlined"
+                />
+              </Tooltip>
+            )}
+            {method && method !== 'llama' && (
+              <Tooltip title="Template Generated - LLM Unavailable">
+                <Chip 
+                  icon={getMethodIcon(method)}
+                  label="Template"
+                  size="small"
+                  color="default"
                   variant="outlined"
                 />
               </Tooltip>
@@ -421,9 +517,9 @@ const ExplanationCard = ({
                     onChange={(e) => handleDetailLevelChange(e.target.value)}
                     disabled={isLoading}
                   >
-                    <MenuItem value="summary">Summary</MenuItem>
-                    <MenuItem value="standard">Standard</MenuItem>
-                    <MenuItem value="detailed">Detailed</MenuItem>
+                    <MenuItem value="summary">Standard</MenuItem>
+                    <MenuItem value="standard">Enhanced</MenuItem>
+                    <MenuItem value="detailed">Premium</MenuItem>
                   </Select>
                 </FormControl>
                 
@@ -500,7 +596,7 @@ const ExplanationCard = ({
                   Generating AI explanation...
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  This may take a few seconds using LLaMA 3.1 70B
+                  This may take a few seconds using AI model
                 </Typography>
               </Box>
             </Box>

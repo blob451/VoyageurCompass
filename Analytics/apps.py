@@ -49,7 +49,7 @@ def warm_application_cache():
         CACHE_WARMING_STATUS['warming'] = True
         logger.info("Starting application cache warming in background...")
 
-        # Run cache warming command with optimized settings for startup
+        # Run cache warming command with optimised settings for startup
         call_command('warm_cache', 
                     stocks=['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL'], 
                     skip_indicators=False,
@@ -93,7 +93,7 @@ class AnalyticsConfig(AppConfig):
             
             def delayed_cache_warming():
                 import time
-                time.sleep(5)  # Wait 5 seconds for Django to fully initialize
+                time.sleep(5)  # Wait 5 seconds for Django to fully initialise
                 warm_application_cache()
             
             warming_thread = threading.Thread(target=delayed_cache_warming, daemon=True)

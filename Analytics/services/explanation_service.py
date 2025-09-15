@@ -58,7 +58,7 @@ class ExplanationService:
         return self.enabled  # Always true if feature enabled, regardless of LLM availability
 
     def explain_prediction_single(
-        self, analysis_result: Union[Dict[str, Any], AnalyticsResults], detail_level: str = "standard", user=None
+        self, analysis_result: Union[Dict[str, Any], AnalyticsResults], detail_level: str = "standard", user=None, force_regenerate: bool = False
     ) -> Optional[Dict[str, Any]]:
         """Generate detailed explanation for individual stock analysis result."""
         if not self.enabled:
@@ -68,10 +68,17 @@ class ExplanationService:
         try:
             analysis_data = self._prepare_analysis_data(analysis_result)
             cache_key = self._create_cache_key(analysis_data, detail_level, user)
-            cached_explanation = cache.get(cache_key)
-            if cached_explanation:
-                logger.info(f"Retrieved cached explanation for {analysis_data.get('symbol', 'unknown')}")
-                return cached_explanation
+            
+            # Skip cache check if force regeneration is requested
+            if not force_regenerate:
+                cached_explanation = cache.get(cache_key)
+                if cached_explanation:
+                    logger.info(f"Retrieved cached explanation for {analysis_data.get('symbol', 'unknown')}")
+                    return cached_explanation
+            else:
+                logger.info(f"Force regeneration requested, skipping cache for {analysis_data.get('symbol', 'unknown')}")
+                # Clear existing cache entry for this key
+                cache.delete(cache_key)
 
             start_time = time.time()
 
@@ -86,8 +93,21 @@ class ExplanationService:
                 explanation = self._generate_template_explanation(analysis_data, detail_level)
 
             if explanation:
+                # Add format validation for detailed explanations
+                if detail_level == "detailed" and explanation.get("content"):
+                    validation_result = self._validate_detailed_explanation_format(explanation["content"])
+                    explanation["format_validation"] = validation_result
+                    
+                    if not validation_result["is_valid"]:
+                        logger.warning(f"Format validation failed for {analysis_data.get('symbol', 'unknown')}: {validation_result['issues']}")
+                        
+                        # Apply corrective formatting if possible
+                        if validation_result.get("suggested_fix"):
+                            explanation["content"] = validation_result["suggested_fix"]
+                            explanation["format_corrected"] = True
+                
                 explanation["generation_time"] = time.time() - start_time
-                explanation["method"] = "llm" if self.llm_service.is_available() else "template"
+                explanation["method"] = "llama" if self.llm_service.is_available() else "template"
                 explanation["detail_level"] = detail_level
                 explanation["generated_at"] = datetime.now().isoformat()
 
@@ -110,6 +130,7 @@ class ExplanationService:
         analysis_results: List[Union[Dict[str, Any], AnalyticsResults]],
         detail_level: str = "standard",
         user=None,
+        force_regenerate: bool = False,
     ) -> List[Optional[Dict[str, Any]]]:
         """
         Generate explanations for multiple analysis results.
@@ -125,7 +146,7 @@ class ExplanationService:
         explanations = []
 
         for analysis_result in analysis_results:
-            explanation = self.explain_prediction_single(analysis_result, detail_level, user)
+            explanation = self.explain_prediction_single(analysis_result, detail_level, user, force_regenerate)
             explanations.append(explanation)
 
         return explanations
@@ -388,6 +409,64 @@ class ExplanationService:
             risk_factors.append("Uncertain trend direction")
 
         return risk_factors[:3]  # Limit to top 3 risk factors
+
+    def _validate_detailed_explanation_format(self, content: str) -> Dict[str, Any]:
+        """Validate detailed explanation format and suggest fixes."""
+        validation_result = {
+            "is_valid": True,
+            "issues": [],
+            "word_count": len(content.split()),
+            "section_count": 0,
+            "has_proper_headers": False,
+            "suggested_fix": None
+        }
+        
+        try:
+            import re
+            
+            # Check word count (should be 600+)
+            word_count = len(content.split())
+            validation_result["word_count"] = word_count
+            
+            if word_count < 600:
+                validation_result["is_valid"] = False
+                validation_result["issues"].append(f"Insufficient word count: {word_count} (minimum 600)")
+            
+            # Check for section headers
+            section_patterns = [
+                r'\*\*\s*Investment\s+Summary\s*:\s*\*\*',
+                r'\*\*\s*Technical\s+Analysis\s*:\s*\*\*',
+                r'\*\*\s*Risk\s+Assessment\s*:\s*\*\*',
+                r'\*\*\s*Entry\s+Strategy\s*:\s*\*\*',
+                r'\*\*\s*Market\s+Outlook\s*:\s*\*\*'
+            ]
+            
+            sections_found = 0
+            for pattern in section_patterns:
+                if re.search(pattern, content, re.IGNORECASE):
+                    sections_found += 1
+            
+            validation_result["section_count"] = sections_found
+            validation_result["has_proper_headers"] = sections_found >= 3
+            
+            if sections_found < 3:
+                validation_result["is_valid"] = False
+                validation_result["issues"].append(f"Missing section headers: found {sections_found}/5 expected sections")
+            
+            # Check for malformed headers and suggest fix
+            malformed_headers = re.findall(r'\*\*([^*]+?):\*\*+\s*([^*])', content)
+            if malformed_headers:
+                validation_result["issues"].append("Found malformed headers (extra asterisks)")
+                # Apply basic correction
+                fixed_content = re.sub(r'\*\*([^*]+?):\*\*+\s*([^*])', r'**\1:** \2', content)
+                validation_result["suggested_fix"] = fixed_content
+            
+        except Exception as e:
+            logger.error(f"Error validating explanation format: {str(e)}")
+            validation_result["is_valid"] = False
+            validation_result["issues"].append("Validation error occurred")
+        
+        return validation_result
 
     def _create_cache_key(self, analysis_data: Dict[str, Any], detail_level: str, user=None) -> str:
         """Create cache key for explanation."""

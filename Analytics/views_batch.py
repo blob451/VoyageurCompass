@@ -185,7 +185,7 @@ def batch_analyze_stocks(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @throttle_classes([BatchAnalysisThrottle])
-async def analyze_portfolio_batch(request, portfolio_id=None):
+def analyze_portfolio_batch(request, portfolio_id=None):
     """
     Analyze user's portfolio using async batch processing.
     
@@ -246,10 +246,12 @@ async def analyze_portfolio_batch(request, portfolio_id=None):
         # Get batch analysis service
         batch_service = get_batch_analysis_service()
         
-        # Execute async portfolio analysis
-        result = await batch_service.analyze_portfolio_async(
-            portfolio_symbols=symbols,
-            user=request.user
+        # Execute portfolio analysis
+        result = batch_service.analyze_stock_batch(
+            symbols=symbols,
+            user=request.user,
+            use_cache=True,
+            cache_ttl=1800
         )
         
         # Enhance result with portfolio information
@@ -337,7 +339,7 @@ def get_batch_performance_stats(request):
 
 @extend_schema(
     summary="Warm cache for popular stocks",
-    description="Pre-warm cache for frequently analyzed stocks to improve performance",
+    description="Pre-warm cache for frequently analysed stocks to improve performance",
     parameters=[
         OpenApiParameter(
             name="symbol_list",

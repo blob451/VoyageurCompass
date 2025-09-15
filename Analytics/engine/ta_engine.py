@@ -71,6 +71,52 @@ def cache_indicator(cache_ttl: int = 300):
     return decorator
 
 
+def smart_cache_indicator(base_ttl: int = 300, indicator_type: str = "standard"):
+    """
+    Intelligent caching decorator that adjusts TTL based on market volatility and indicator characteristics.
+    
+    Args:
+        base_ttl: Base cache time-to-live in seconds
+        indicator_type: Type of indicator ("stable", "standard", "volatile", "external")
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            symbol = getattr(self, '_current_symbol', 'unknown')
+            
+            # Generate cache key
+            price_data_str = ""
+            if args and hasattr(args[0], '__iter__'):
+                try:
+                    price_data_str = str([(p.date, float(p.close), int(p.volume)) for p in args[0][-50:]])
+                except (AttributeError, IndexError, TypeError):
+                    price_data_str = str(args)[:200]
+            
+            cache_key = f"ta_smart:{func.__name__}:{symbol}:{hashlib.md5(price_data_str.encode()).hexdigest()[:12]}"
+            
+            # Check cache first
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                logger.debug(f"Smart cache hit for {func.__name__} on {symbol}")
+                return cached_result
+            
+            # Calculate result
+            result = func(self, *args, **kwargs)
+            
+            if result:
+                # Calculate intelligent TTL based on indicator type and market conditions
+                intelligent_ttl = self._calculate_intelligent_ttl(
+                    base_ttl, indicator_type, args[0] if args else None
+                )
+                
+                cache.set(cache_key, result, intelligent_ttl)
+                logger.debug(f"Smart cached {func.__name__} for {symbol} with TTL {intelligent_ttl}s")
+            
+            return result
+        return wrapper
+    return decorator
+
+
 class IndicatorResult(NamedTuple):
     """Structured container for individual indicator analysis results."""
 
@@ -124,6 +170,77 @@ class TechnicalAnalysisEngine:
         self.price_reader = PriceReader()
         self.analytics_writer = AnalyticsWriter()
         self._current_symbol = None  # Track current symbol for caching
+        
+    def _calculate_intelligent_ttl(self, base_ttl: int, indicator_type: str, price_data=None):
+        """
+        Calculate intelligent TTL based on market volatility and indicator characteristics.
+        
+        Args:
+            base_ttl: Base cache time-to-live in seconds
+            indicator_type: Type of indicator ("stable", "standard", "volatile", "external")
+            price_data: Recent price data for volatility calculation
+            
+        Returns:
+            Adjusted TTL in seconds
+        """
+        try:
+            # Base multipliers by indicator type
+            type_multipliers = {
+                "stable": 2.0,      # Support/resistance, moving averages
+                "standard": 1.0,    # RSI, MACD, Bollinger Bands
+                "volatile": 0.5,    # Volume, candlestick patterns
+                "external": 3.0     # Sentiment, predictions (slower changing)
+            }
+            
+            multiplier = type_multipliers.get(indicator_type, 1.0)
+            
+            # Calculate volatility adjustment if price data available
+            if price_data and hasattr(price_data, '__iter__'):
+                try:
+                    # Get recent close prices for volatility calculation
+                    recent_closes = [float(p.close) for p in price_data[-20:]]  # Last 20 days
+                    if len(recent_closes) >= 10:
+                        # Calculate coefficient of variation (volatility measure)
+                        mean_price = sum(recent_closes) / len(recent_closes)
+                        variance = sum((x - mean_price) ** 2 for x in recent_closes) / len(recent_closes)
+                        std_dev = variance ** 0.5
+                        cv = std_dev / mean_price if mean_price > 0 else 0
+                        
+                        # High volatility = shorter cache (more frequent updates needed)
+                        # Low volatility = longer cache (stable conditions)
+                        if cv > 0.05:  # High volatility (>5% daily variation)
+                            multiplier *= 0.6
+                        elif cv < 0.02:  # Low volatility (<2% daily variation)
+                            multiplier *= 1.5
+                            
+                except (AttributeError, ValueError, TypeError):
+                    # Fallback to base multiplier if volatility calc fails
+                    pass
+            
+            # Apply time-of-day adjustment (shorter cache during market hours)
+            try:
+                from datetime import datetime, time
+                now = datetime.now().time()
+                market_open = time(9, 30)  # 9:30 AM
+                market_close = time(16, 0)  # 4:00 PM
+                
+                if market_open <= now <= market_close:
+                    multiplier *= 0.7  # Shorter cache during market hours
+                    
+            except ImportError:
+                pass
+            
+            # Calculate final TTL with bounds
+            intelligent_ttl = int(base_ttl * multiplier)
+            
+            # Apply reasonable bounds (30 seconds to 2 hours)
+            intelligent_ttl = max(30, min(intelligent_ttl, 7200))
+            
+            return intelligent_ttl
+            
+        except Exception as e:
+            logger.warning(f"Failed to calculate intelligent TTL: {e}")
+            return base_ttl
 
     def get_indicator_display_name(self, indicator_code: str, indicator_result=None) -> str:
         """Retrieve human-readable display name for indicator code.
@@ -193,14 +310,19 @@ class TechnicalAnalysisEngine:
             if not stock_prices:
                 # Auto-sync failure verification
                 auto_sync_attempted = hasattr(self, "_last_auto_sync") and self._last_auto_sync
-                if auto_sync_attempted:
-                    error_msg = (f"No price data available for {symbol}. Auto-sync failed due to data provider issues. "
-                                f"Please try again later or use the sync button to manually refresh data.")
+                is_delisted = hasattr(self, "_delisted_stock") and self._delisted_stock
+                
+                if is_delisted:
+                    error_msg = (f"Stock {symbol} appears to be delisted and is no longer available for trading. "
+                                f"Delisted stocks cannot be analysed as they have no current market data.")
+                elif auto_sync_attempted:
+                    error_msg = (f"Unable to fetch current market data for {symbol} after automatic sync attempt. "
+                                f"This may be due to data provider issues. Please try again later.")
                 else:
                     error_msg = (f"No price data available for {symbol}. Stock may not exist or data provider is unavailable. "
                                 f"Please verify the symbol and try again.")
                 
-                logger.error(f"Data unavailable for {symbol} - auto-sync attempted: {auto_sync_attempted}")
+                logger.error(f"Data unavailable for {symbol} - auto-sync attempted: {auto_sync_attempted}, delisted: {is_delisted}")
                 if logger_instance:
                     logger_instance.log_analysis_error(error_msg)
                 raise ValueError(error_msg)
@@ -357,8 +479,11 @@ class TechnicalAnalysisEngine:
         # If no data found, attempt to auto-sync
         if not stock_prices:
             logger.info(f"No existing data for {symbol}, attempting auto-sync")
-            if self._auto_sync_stock_data(symbol):
-                self._last_auto_sync = True  # Track that auto-sync was used
+            # Always track that auto-sync was attempted, regardless of success
+            self._last_auto_sync = True
+            auto_sync_successful = self._auto_sync_stock_data(symbol)
+            
+            if auto_sync_successful:
 
                 # Retry after sync with multiple attempts
                 for attempt in range(3):
@@ -389,7 +514,7 @@ class TechnicalAnalysisEngine:
     def _get_sector_industry_data(
         self, symbol: str, analysis_date: datetime
     ) -> Tuple[List[SectorPriceData], List[IndustryPriceData]]:
-        """Get sector and industry composite data with optimized availability checks."""
+        """Get sector and industry composite data with optimised availability checks."""
         try:
             # Step 1: Get sector/industry keys with early validation
             sector_key, industry_key = self.price_reader.get_stock_sector_industry_keys(symbol)
@@ -463,6 +588,9 @@ class TechnicalAnalysisEngine:
 
         Returns:
             True if sync was successful, False otherwise
+            
+        Side effects:
+            Sets self._delisted_stock = True if stock appears to be delisted
         """
         import platform
         import threading
@@ -509,6 +637,9 @@ class TechnicalAnalysisEngine:
 
         try:
             logger.info(f"Auto-syncing data for {symbol}")
+            
+            # Initialize delisted detection flag
+            self._delisted_stock = False
 
             # Import here to avoid circular imports
             from Data.models import Stock
@@ -574,6 +705,10 @@ class TechnicalAnalysisEngine:
                     
                     if hist.empty:
                         logger.error(f"No historical data available for {symbol}")
+                        # Check if this might be a delisted stock by examining recent logging output
+                        # yfinance logs "$SYMBOL: possibly delisted; no price data found" when a stock is delisted
+                        self._delisted_stock = True
+                        logger.info(f"Detected likely delisted stock: {symbol} (empty historical data)")
                         return False
 
                     # Stock and price record creation
@@ -715,17 +850,30 @@ class TechnicalAnalysisEngine:
             ("rel2y", self._calculate_relative_strength_2y, (stock_prices, sector_prices, industry_prices)),
         ]
         
-        # Execute Group 1: Technical indicators (max parallelism)
-        with ThreadPoolExecutor(max_workers=4, thread_name_prefix="TechInd") as executor:
-            future_to_indicator = {
-                executor.submit(self._safe_indicator_calculation, name, func, args): name 
-                for name, func, args in technical_indicators
-            }
+        # Execute all indicator groups concurrently for maximum parallelism
+        with ThreadPoolExecutor(max_workers=10, thread_name_prefix="AllInd") as executor:
+            all_futures = {}
             
-            for future in as_completed(future_to_indicator):
-                indicator_name = future_to_indicator[future]
+            # Submit all technical indicators
+            for name, func, args in technical_indicators:
+                future = executor.submit(self._safe_indicator_calculation, name, func, args)
+                all_futures[future] = (name, "technical", 30)  # (name, type, timeout)
+                
+            # Submit all relative strength indicators
+            for name, func, args in relative_indicators:
+                future = executor.submit(self._safe_indicator_calculation, name, func, args)
+                all_futures[future] = (name, "relative", 15)
+                
+            # Submit all external data indicators
+            for name, func, args in external_indicators:
+                future = executor.submit(self._safe_indicator_calculation, name, func, args)
+                all_futures[future] = (name, "external", 45)
+            
+            # Collect results as they complete
+            for future in as_completed(all_futures):
+                indicator_name, indicator_type, timeout = all_futures[future]
                 try:
-                    result = future.result(timeout=30)  # 30 second timeout per indicator
+                    result = future.result(timeout=timeout)
                     indicators[indicator_name] = result
                     
                     # Log to web interface if available
@@ -733,56 +881,10 @@ class TechnicalAnalysisEngine:
                         display_name = self.get_indicator_display_name(indicator_name, result)
                         logger_instance.log_indicator_calculation(display_name, result)
                         
-                    logger.debug(f"Completed technical indicator: {indicator_name}")
+                    logger.debug(f"Completed {indicator_type} indicator: {indicator_name}")
                     
                 except Exception as e:
-                    logger.warning(f"Technical indicator {indicator_name} failed: {str(e)}")
-                    indicators[indicator_name] = None
-        
-        # Execute Group 2: Relative strength indicators  
-        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="RelStr") as executor:
-            future_to_indicator = {
-                executor.submit(self._safe_indicator_calculation, name, func, args): name 
-                for name, func, args in relative_indicators
-            }
-            
-            for future in as_completed(future_to_indicator):
-                indicator_name = future_to_indicator[future]
-                try:
-                    result = future.result(timeout=15)  # 15 second timeout
-                    indicators[indicator_name] = result
-                    
-                    if logger_instance and result is not None:
-                        display_name = self.get_indicator_display_name(indicator_name, result)
-                        logger_instance.log_indicator_calculation(display_name, result)
-                        
-                    logger.debug(f"Completed relative strength indicator: {indicator_name}")
-                    
-                except Exception as e:
-                    logger.warning(f"Relative strength indicator {indicator_name} failed: {str(e)}")
-                    indicators[indicator_name] = None
-        
-        # Execute Group 3: External data indicators
-        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="ExtData") as executor:
-            future_to_indicator = {
-                executor.submit(self._safe_indicator_calculation, name, func, args): name 
-                for name, func, args in external_indicators
-            }
-            
-            for future in as_completed(future_to_indicator):
-                indicator_name = future_to_indicator[future]
-                try:
-                    result = future.result(timeout=45)  # 45 second timeout for external data
-                    indicators[indicator_name] = result
-                    
-                    if logger_instance and result is not None:
-                        display_name = self.get_indicator_display_name(indicator_name, result)
-                        logger_instance.log_indicator_calculation(display_name, result)
-                        
-                    logger.debug(f"Completed external data indicator: {indicator_name}")
-                    
-                except Exception as e:
-                    logger.warning(f"External data indicator {indicator_name} failed: {str(e)}")
+                    logger.warning(f"{indicator_type.title()} indicator {indicator_name} failed: {str(e)}")
                     indicators[indicator_name] = None
         
         duration = time.time() - start_time
@@ -817,7 +919,7 @@ class TechnicalAnalysisEngine:
             logger.warning(f"Safe indicator calculation failed for {name}: {str(e)}")
             return None
 
-    @cache_indicator(cache_ttl=600)  # 10 minutes cache for moving averages
+    @smart_cache_indicator(base_ttl=600, indicator_type="stable")  # Moving averages are stable
     def _calculate_sma_crossover(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         SMA 50/200 Crossover: Score=1 if 50>200; 0 if 50<200. Weight 0.15.
@@ -874,7 +976,7 @@ class TechnicalAnalysisEngine:
             logger.warning(f"Error calculating price vs 50d: {str(e)}")
             return None
 
-    @cache_indicator(cache_ttl=300)  # 5 minutes cache for RSI
+    @smart_cache_indicator(base_ttl=300, indicator_type="standard")  # RSI is standard volatility
     def _calculate_rsi14(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         RSI(14): standard formula over adjusted close; Score=RSI/100 (cap 0..1). Weight 0.10.
@@ -918,7 +1020,7 @@ class TechnicalAnalysisEngine:
             logger.warning(f"Error calculating RSI14: {str(e)}")
             return None
 
-    @cache_indicator(cache_ttl=300)  # 5 minutes cache for MACD
+    @smart_cache_indicator(base_ttl=300, indicator_type="standard")  # MACD is standard volatility
     def _calculate_macd_histogram(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         MACD(12,26,9) histogram: Score=0.5+0.5*(hist/(1% of price)); clamp 0..1. Weight 0.10.
@@ -985,7 +1087,7 @@ class TechnicalAnalysisEngine:
             logger.warning(f"Error calculating MACD histogram: {str(e)}")
             return None
 
-    @cache_indicator(cache_ttl=300)  # 5 minutes cache for Bollinger Bands
+    @smart_cache_indicator(base_ttl=300, indicator_type="standard")  # Bollinger Bands are standard
     def _calculate_bollinger_position(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         Bollinger %B (20,2): %B=(close−lower)/(upper−lower); Score=1−%B; clamp 0..1. Weight 0.10.
@@ -1079,6 +1181,7 @@ class TechnicalAnalysisEngine:
             logger.warning(f"Error calculating Bollinger Bandwidth: {str(e)}")
             return None
 
+    @smart_cache_indicator(base_ttl=180, indicator_type="volatile")  # Volume is highly volatile
     def _calculate_volume_surge(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         Volume Surge: compare today volume to 10-day mean; complex mapping based on price direction. Weight 0.10.
@@ -1416,6 +1519,7 @@ class TechnicalAnalysisEngine:
             logger.warning(f"Error calculating 2Y relative strength: {str(e)}")
             return None
 
+    @smart_cache_indicator(base_ttl=120, indicator_type="volatile")  # Candlestick patterns change quickly
     def _calculate_candlestick_reversal(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         Candlestick Reversal: detect patterns in last 3-5 days; bullish→1, bearish→0, none→0.5. Weight 0.08.
@@ -1646,7 +1750,7 @@ class TechnicalAnalysisEngine:
             logger.warning(f"Error detecting three candle patterns: {str(e)}")
             return {"type": "none", "pattern": "error"}
 
-    @cache_indicator(cache_ttl=600)  # 10 minutes cache for support/resistance
+    @smart_cache_indicator(base_ttl=600, indicator_type="stable")  # Support/resistance levels are stable
     def _calculate_support_resistance(self, prices: List[PriceData]) -> Optional[IndicatorResult]:
         """
         Support/Resistance: break above resistance→1; near resistance (≤2%)→0.3; near support (≤2%)→0.7; break below→0; else 0.5. Weight 0.07.
@@ -1794,6 +1898,7 @@ class TechnicalAnalysisEngine:
 
         return filtered_levels[-3:]  # Return bottom 3 levels
 
+    @smart_cache_indicator(base_ttl=1800, indicator_type="external")  # Sentiment changes slowly (30 min)
     def _calculate_sentiment_analysis(self, symbol: str) -> Optional[IndicatorResult]:
         """
         Calculate sentiment score from news analysis.
@@ -1878,6 +1983,7 @@ class TechnicalAnalysisEngine:
                 weighted_score=0.5 * self.WEIGHTS["sentiment"],
             )
 
+    @smart_cache_indicator(base_ttl=900, indicator_type="external")  # Predictions update less frequently (15 min)
     def _calculate_prediction_score(self, symbol: str) -> Optional[IndicatorResult]:
         """
         Calculate LSTM price prediction score.

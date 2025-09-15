@@ -1,5 +1,5 @@
 """
-Management command to analyze database performance and provide optimization recommendations.
+Management command to analyse database performance and provide optimisation recommendations.
 """
 
 import logging

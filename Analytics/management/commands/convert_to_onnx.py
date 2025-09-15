@@ -58,9 +58,9 @@ class Command(BaseCommand):
         )
         
         parser.add_argument(
-            '--optimize',
+            '--optimise',
             action='store_true',
-            help='Apply ONNX graph optimizations'
+            help='Apply ONNX graph optimisations'
         )
         
         parser.add_argument(
@@ -95,7 +95,7 @@ class Command(BaseCommand):
         
         model_type = options['model_type']
         quantize = options['quantize']
-        optimize = options['optimize']
+        optimise = options['optimise']
         benchmark = options['benchmark']
         
         conversion_results = {}
@@ -103,12 +103,12 @@ class Command(BaseCommand):
         try:
             if model_type in ['finbert', 'all']:
                 self.stdout.write('Converting FinBERT model...')
-                result = self._convert_finbert(output_dir, quantize, optimize)
+                result = self._convert_finbert(output_dir, quantize, optimise)
                 conversion_results['finbert'] = result
             
             if model_type in ['lstm', 'all']:
                 self.stdout.write('Converting Universal LSTM model...')
-                result = self._convert_lstm(output_dir, quantize, optimize)
+                result = self._convert_lstm(output_dir, quantize, optimise)
                 conversion_results['lstm'] = result
             
             # Run benchmarks if requested
@@ -130,7 +130,7 @@ class Command(BaseCommand):
         except Exception as e:
             raise CommandError(f'Model conversion failed: {str(e)}')
 
-    def _convert_finbert(self, output_dir: Path, quantize: bool, optimize: bool) -> dict:
+    def _convert_finbert(self, output_dir: Path, quantize: bool, optimise: bool) -> dict:
         """Convert FinBERT model to ONNX format."""
         try:
             # Load the FinBERT model
@@ -178,7 +178,7 @@ class Command(BaseCommand):
             tokenizer.save_pretrained(str(finbert_dir))
             
             # Apply optimizations
-            if optimize:
+            if optimise:
                 self._optimize_onnx_model(onnx_path)
             
             # Apply quantization
@@ -202,7 +202,7 @@ class Command(BaseCommand):
             logger.error(f"FinBERT conversion failed: {str(e)}")
             return {'success': False, 'error': str(e)}
 
-    def _convert_lstm(self, output_dir: Path, quantize: bool, optimize: bool) -> dict:
+    def _convert_lstm(self, output_dir: Path, quantize: bool, optimise: bool) -> dict:
         """Convert Universal LSTM model to ONNX format."""
         try:
             # Try to load the Universal LSTM model
@@ -269,7 +269,7 @@ class Command(BaseCommand):
                 }, f)
             
             # Apply optimizations
-            if optimize:
+            if optimise:
                 self._optimize_onnx_model(onnx_path)
             
             # Apply quantization

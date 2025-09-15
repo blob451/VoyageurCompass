@@ -40,7 +40,7 @@ const TechnicalExplanation = ({
   analysisData,
   defaultExpanded = true 
 }) => {
-  const [currentDetailLevel, setCurrentDetailLevel] = React.useState('summary');
+  const [currentDetailLevel, setCurrentDetailLevel] = React.useState('summary'); // 'summary' = Standard level
   const [generateExplanation, { isLoading: isGenerating }] = useGenerateExplanationMutation();
   const { 
     data: explanation, 
@@ -126,7 +126,8 @@ const TechnicalExplanation = ({
     try {
       await generateExplanation({
         analysisId,
-        detailLevel
+        detailLevel,
+        forceRegenerate: true  // Always force regeneration when user clicks Generate
       }).unwrap();
       
       const duration = performance.now() - startTime;
@@ -157,18 +158,16 @@ const TechnicalExplanation = ({
     // Update detail level first
     setCurrentDetailLevel(detailLevel);
     
-    // Force refetch to see if explanation exists for this detail level
-    const result = await refetchExplanation();
+    // Only refetch to check if explanation exists for this detail level
+    // Don't automatically generate - let the user click Generate if needed
+    explanationLogger.workflow(analysisId, 'Detail level changed, checking for existing explanation', {
+      symbol,
+      detailLevel,
+      score
+    });
     
-    // If no explanation exists for this detail level, generate it
-    if (!result?.data?.explanation?.content) {
-      explanationLogger.workflow(analysisId, 'No explanation found for detail level, generating new one', {
-        symbol,
-        detailLevel,
-        score
-      });
-      await handleGenerateExplanation(detailLevel);
-    }
+    // Just refetch - this will either return existing explanation or empty state
+    refetchExplanation();
   };
 
   const technicalExplanation = explanation?.explanation;
@@ -177,7 +176,7 @@ const TechnicalExplanation = ({
 
   return (
     <ExplanationCard
-      title="Technical Analysis Summary Explanation"
+      title="Analysis Explanation"
       analysisId={analysisId}
       explanation={technicalExplanation}
       isLoading={isGenerating || isLoadingExplanation}
@@ -188,6 +187,7 @@ const TechnicalExplanation = ({
       variant={currentDetailLevel}
       confidence={technicalExplanation?.confidence}
       method={technicalExplanation?.method}
+      modelName={technicalExplanation?.model_used}
       timestamp={technicalExplanation?.explained_at}
     >
       {/* Analysis Overview */}

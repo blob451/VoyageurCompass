@@ -85,6 +85,8 @@ urlpatterns = [
     # Enhanced LLM endpoints
     path("llm/explain/", generate_explanation, name="llm_explain"),
     path("llm/status/", explanation_service_status, name="llm_status"),
+    # Multi-model status endpoint
+    path("models/status/", explanation_service_status, name="models_status"),
     # Async Processing endpoints
     path("async/batch-analyze/", batch_analyze, name="batch_analyze"),
     path("async/batch-explain/", batch_explain, name="batch_explain"),

@@ -11,6 +11,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from Analytics.engine.ta_engine import TechnicalAnalysisEngine
+from Analytics.services.local_llm_service import get_local_llm_service
 from Analytics.services.sentiment_analyzer import get_sentiment_analyzer
 from Analytics.services.universal_predictor import get_universal_lstm_service
 from Data.models import Stock, StockPrice, DataSectorPrice, DataIndustryPrice
@@ -49,6 +50,18 @@ class Command(BaseCommand):
             action='store_true',
             help='Skip price data warming'
         )
+        
+        parser.add_argument(
+            '--skip-llm',
+            action='store_true',
+            help='Skip LLM model warming'
+        )
+        
+        parser.add_argument(
+            '--llm-only',
+            action='store_true',
+            help='Only warm LLM models (skip other warming)'
+        )
 
     def handle(self, *args, **options):
         """Execute cache warming process."""
@@ -57,27 +70,46 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Starting cache warming process...'))
         
         stocks = options['stocks']
-        total_tasks = len(stocks) * 3 + 4  # Price data + indicators + sentiment per stock + 4 global tasks
+        llm_only = options.get('llm_only', False)
+        
+        # Calculate total tasks based on options
+        if llm_only:
+            total_tasks = 1  # Only LLM warming
+        else:
+            total_tasks = len(stocks) * 3 + 5  # Price data + indicators + sentiment per stock + 5 global tasks (including LLM)
         current_task = 0
         
         try:
-            # 1. Warm up ML models
+            # LLM-only mode
+            if llm_only:
+                current_task += 1
+                self.stdout.write(f'[{current_task}/{total_tasks}] Warming LLM models...')
+                self._warm_llm_models()
+                return
+            
+            # 1. Warm up LLM models first (if not skipped)
+            if not options['skip_llm']:
+                current_task += 1
+                self.stdout.write(f'[{current_task}/{total_tasks}] Warming LLM models...')
+                self._warm_llm_models()
+            
+            # 2. Warm up ML models
             if not options['skip_models']:
                 current_task += 1
                 self.stdout.write(f'[{current_task}/{total_tasks}] Warming ML models...')
                 self._warm_ml_models()
             
-            # 2. Warm up sector/industry data
+            # 3. Warm up sector/industry data
             current_task += 1
             self.stdout.write(f'[{current_task}/{total_tasks}] Warming sector/industry data...')
             self._warm_sector_industry_data()
             
-            # 3. Warm up market status
+            # 4. Warm up market status
             current_task += 1
             self.stdout.write(f'[{current_task}/{total_tasks}] Warming market status...')
             self._warm_market_status()
             
-            # 4. Warm up frequently accessed stocks
+            # 5. Warm up frequently accessed stocks
             for symbol in stocks:
                 if not options['skip_prices']:
                     current_task += 1
@@ -137,6 +169,40 @@ class Command(BaseCommand):
                 
         except Exception as e:
             logger.warning(f"ML model warming failed: {str(e)}")
+
+    def _warm_llm_models(self):
+        """Warm up LLM models using the built-in warm-up method."""
+        try:
+            llm_service = get_local_llm_service()
+            if not llm_service:
+                logger.warning("LLM service not available for warming")
+                return
+                
+            # Use the LocalLLMService warm-up method
+            warm_up_result = llm_service.warm_up_models()
+            
+            if warm_up_result.get('success'):
+                logger.info(f"LLM warm-up successful: {warm_up_result['models_successful']}/{warm_up_result['models_tested']} models in {warm_up_result['total_time']}s")
+                
+                # Log individual model results
+                for result in warm_up_result.get('results', []):
+                    if result['success']:
+                        logger.info(f"  [OK] {result['model']}: {result['response_time']}s")
+                    else:
+                        logger.warning(f"  [FAIL] {result['model']}: {result.get('error', 'Unknown error')}")
+            else:
+                logger.error(f"LLM warm-up failed: {warm_up_result.get('error', 'Unknown error')}")
+            
+            # Cache warm-up results for monitoring
+            cache_key = "llm_warmup_results"
+            cache_data = {
+                'timestamp': datetime.now().isoformat(),
+                **warm_up_result
+            }
+            cache.set(cache_key, cache_data, 3600)  # Cache for 1 hour
+                
+        except Exception as e:
+            logger.error(f"LLM model warming failed: {str(e)}")
 
     def _warm_sector_industry_data(self):
         """Warm up sector and industry composite data."""

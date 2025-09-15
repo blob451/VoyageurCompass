@@ -324,10 +324,48 @@ Load Balancer -> Django App Servers ->
 - **Discussions**: GitHub Discussions
 - **Email**: support@voyageurcompass.com
 
+## Documentation
+
+### Complete Documentation Suite
+- **[Testing Guide](TESTING_GUIDE.md)** - Comprehensive testing framework covering unit, integration, API, frontend, and performance testing
+- **[API Documentation](API_DOCUMENTATION.md)** - Complete API reference with examples and authentication details
+
+### LLM System Documentation
+- **[System Guide](llm/system_guide.md)** - Complete LLM system overview, installation, and operation guide
+- **[Troubleshooting Guide](llm/troubleshooting.md)** - Detailed diagnostic procedures and common issue solutions
+- **[Operations Runbook](llm/operations_runbook.md)** - Daily, weekly, and monthly operational procedures with incident response
+
+### Testing Commands
+```bash
+# Run comprehensive test suite (see TESTING_GUIDE.md for details)
+pytest --cov=Data --cov=Analytics --cov=Core -n auto --dist worksteal
+
+# Run LLM system tests
+pytest Analytics/tests/test_phase_3_multi_model_integration.py -v
+
+# Run integration tests
+pytest -m integration -v --tb=short
+
+# Frontend tests
+cd Design/frontend && npm run test:coverage
+```
+
+### LLM System Commands
+```bash
+# Monitor LLM system status
+python manage.py llm_monitor_dashboard --format summary
+
+# Run performance benchmarks
+python manage.py benchmark_llm --iterations 5 --percentiles
+
+# LLM model warm-up
+python manage.py warm_cache --llm-only
+```
+
 ## Contributing
 
 We welcome contributions! Please read our contributing guidelines and submit pull requests for:
-- Model improvements and optimizations
+- Model improvements and optimisations
 - New technical indicators
 - Performance enhancements
 - Bug fixes and documentation updates

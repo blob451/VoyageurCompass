@@ -355,6 +355,8 @@ if DEBUG:
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
+        "http://localhost:3002",  # Additional Vite port
+        "http://127.0.0.1:3002",
         "http://localhost:5173",  # Vite default
         "http://127.0.0.1:5173",
     ]
@@ -717,9 +719,21 @@ OLLAMA_HOST = env("OLLAMA_HOST", default="localhost")
 OLLAMA_PORT = int(env("OLLAMA_PORT", default=11434))
 OLLAMA_MODEL = env("OLLAMA_MODEL", default="llama3.1:70b")
 
-# LLM Performance Optimization
+# Multi-Model LLM Configuration
+# Model assignments for different detail levels and use cases
+OLLAMA_SUMMARY_MODEL = env("OLLAMA_SUMMARY_MODEL", default="phi3:3.8b")
+OLLAMA_STANDARD_MODEL = env("OLLAMA_STANDARD_MODEL", default="phi3:3.8b") 
+OLLAMA_DETAILED_MODEL = env("OLLAMA_DETAILED_MODEL", default="llama3.1:8b")
+OLLAMA_TRANSLATION_MODEL = env("OLLAMA_TRANSLATION_MODEL", default="qwen2:3b")
+
+# Legacy model configuration for backward compatibility
 OLLAMA_PRIMARY_MODEL = env("OLLAMA_PRIMARY_MODEL", default="llama3.1:8b")
-OLLAMA_DETAILED_MODEL = env("OLLAMA_DETAILED_MODEL", default="llama3.1:70b")
+
+# Model health monitoring and circuit breaker configuration
+OLLAMA_HEALTH_CHECK_INTERVAL = int(env("OLLAMA_HEALTH_CHECK_INTERVAL", default=30))
+OLLAMA_CIRCUIT_BREAKER_THRESHOLD = int(env("OLLAMA_CIRCUIT_BREAKER_THRESHOLD", default=3))
+
+# LLM Performance Configuration
 OLLAMA_PERFORMANCE_MODE = env.bool("OLLAMA_PERFORMANCE_MODE", default=True)
 OLLAMA_GENERATION_TIMEOUT = int(env("OLLAMA_GENERATION_TIMEOUT", default=60))  # Increased from 45
 OLLAMA_GPU_LAYERS = int(env("OLLAMA_GPU_LAYERS", default=-1))  # -1 = use all available
