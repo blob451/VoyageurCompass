@@ -16,19 +16,21 @@ import {
   FormControlLabel,
   Checkbox
 } from '@mui/material';
-import { 
-  AccountCircle, 
-  Email, 
-  Lock, 
+import {
+  AccountCircle,
+  Email,
+  Lock,
   Star,
   CardGiftcard,
   Security
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 // import { useDispatch, useSelector } from 'react-redux'; // Not used currently
 
 const RegisterPage = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   // const dispatch = useDispatch(); // Not used currently
   // const { loading, error } = useSelector((state) => state.auth); // Not used currently
   
@@ -67,37 +69,37 @@ const RegisterPage = () => {
     const errors = {};
 
     if (!formData.username.trim()) {
-      errors.username = 'Username is required';
+      errors.username = t('register.validation.usernameRequired');
     } else if (formData.username.length < 3) {
-      errors.username = 'Username must be at least 3 characters';
+      errors.username = t('register.validation.usernameMinLength');
     }
 
     if (!formData.email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = t('register.validation.emailRequired');
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = 'Please enter a valid email address';
+      errors.email = t('register.validation.emailInvalid');
     }
 
     if (!formData.password) {
-      errors.password = 'Password is required';
+      errors.password = t('register.validation.passwordRequired');
     } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
+      errors.password = t('register.validation.passwordMinLength');
     }
 
     if (formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
+      errors.confirmPassword = t('register.validation.passwordsNoMatch');
     }
 
     if (!formData.firstName.trim()) {
-      errors.firstName = 'First name is required';
+      errors.firstName = t('register.validation.firstNameRequired');
     }
 
     if (!formData.lastName.trim()) {
-      errors.lastName = 'Last name is required';
+      errors.lastName = t('register.validation.lastNameRequired');
     }
 
     if (!formData.agreeTerms) {
-      errors.agreeTerms = 'You must agree to the terms and conditions';
+      errors.agreeTerms = t('register.validation.agreeTermsRequired');
     }
 
     setValidationErrors(errors);
@@ -112,43 +114,35 @@ const RegisterPage = () => {
     }
 
     try {
-      // TODO: Implement actual registration API call
-      console.log('Registration data:', {
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
-        first_name: formData.firstName,
-        last_name: formData.lastName
-      });
       
       // Simulate registration success
       setTimeout(() => {
-        navigate('/login', { 
-          state: { 
-            message: 'Registration successful! Please log in to continue.' 
+        navigate('/login', {
+          state: {
+            message: t('register.registrationSuccess')
           }
         });
       }, 1000);
-    } catch (err) {
-      console.error('Registration failed:', err);
+    } catch {
+      setValidationErrors({ general: 'Registration failed. Please try again.' });
     }
   };
 
   const benefits = [
     {
       icon: <CardGiftcard sx={{ color: 'success.main' }} />,
-      title: 'Welcome Bonus',
-      description: '5 free credits to get started'
+      title: t('register.benefits.welcomeBonus'),
+      description: t('register.benefits.welcomeBonusDesc')
     },
     {
       icon: <Star sx={{ color: 'warning.main' }} />,
-      title: 'Professional Analysis',
-      description: '12 technical indicators per stock'
+      title: t('register.benefits.professionalAnalysis'),
+      description: t('register.benefits.professionalAnalysisDesc')
     },
     {
       icon: <Security sx={{ color: 'info.main' }} />,
-      title: 'Secure Platform',
-      description: 'Your data is protected with enterprise security'
+      title: t('register.benefits.securePlatform'),
+      description: t('register.benefits.securePlatformDesc')
     }
   ];
 
@@ -173,16 +167,16 @@ const RegisterPage = () => {
               }}
             >
               <Box sx={{ textAlign: 'center', mb: 3 }}>
-                <Typography 
-                  variant="h4" 
-                  component="h1" 
+                <Typography
+                  variant="h4"
+                  component="h1"
                   gutterBottom
                   sx={{ fontWeight: 600, color: 'primary.main' }}
                 >
-                  Create Account
+                  {t('register.title')}
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
-                  Join VoyageurCompass and start analyzing stocks today
+                  {t('register.subtitle')}
                 </Typography>
               </Box>
 
@@ -197,7 +191,7 @@ const RegisterPage = () => {
                   <Grid item xs={6}>
                     <TextField
                       fullWidth
-                      label="First Name"
+                      label={t('register.firstName')}
                       name="firstName"
                       value={formData.firstName}
                       onChange={handleInputChange}
@@ -211,7 +205,7 @@ const RegisterPage = () => {
                   <Grid item xs={6}>
                     <TextField
                       fullWidth
-                      label="Last Name"
+                      label={t('register.lastName')}
                       name="lastName"
                       value={formData.lastName}
                       onChange={handleInputChange}
@@ -224,7 +218,7 @@ const RegisterPage = () => {
                 <TextField
                   fullWidth
                   margin="normal"
-                  label="Username"
+                  label={t('register.username')}
                   name="username"
                   value={formData.username}
                   onChange={handleInputChange}
@@ -238,7 +232,7 @@ const RegisterPage = () => {
                 <TextField
                   fullWidth
                   margin="normal"
-                  label="Email Address"
+                  label={t('register.email')}
                   name="email"
                   type="email"
                   value={formData.email}
@@ -253,7 +247,7 @@ const RegisterPage = () => {
                 <TextField
                   fullWidth
                   margin="normal"
-                  label="Password"
+                  label={t('register.password')}
                   name="password"
                   type="password"
                   value={formData.password}
@@ -268,7 +262,7 @@ const RegisterPage = () => {
                 <TextField
                   fullWidth
                   margin="normal"
-                  label="Confirm Password"
+                  label={t('register.confirmPassword')}
                   name="confirmPassword"
                   type="password"
                   value={formData.confirmPassword}
@@ -291,14 +285,10 @@ const RegisterPage = () => {
                   }
                   label={
                     <Typography variant="body2">
-                      I agree to the{' '}
-                      <Link href="#" color="primary">
-                        Terms of Service
-                      </Link>{' '}
-                      and{' '}
-                      <Link href="#" color="primary">
-                        Privacy Policy
-                      </Link>
+                      {t('register.agreeTerms', {
+                        termsLink: <Link href="#" color="primary">{t('register.termsOfService')}</Link>,
+                        privacyLink: <Link href="#" color="primary">{t('register.privacyPolicy')}</Link>
+                      })}
                     </Typography>
                   }
                   sx={{ mt: 2, mb: 1 }}
@@ -320,21 +310,21 @@ const RegisterPage = () => {
                   {loading ? (
                     <CircularProgress size={24} color="inherit" />
                   ) : (
-                    'Create Account'
+                    t('register.createAccount')
                   )}
                 </Button>
 
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="body2" color="text.secondary">
-                    Already have an account?{' '}
-                    <Link 
+                    {t('register.alreadyHaveAccount')}{' '}
+                    <Link
                       component="button"
                       type="button"
                       onClick={() => navigate('/login')}
                       color="primary"
                       sx={{ textDecoration: 'none' }}
                     >
-                      Sign In
+                      {t('register.signIn')}
                     </Link>
                   </Typography>
                 </Box>
@@ -345,13 +335,13 @@ const RegisterPage = () => {
           {/* Benefits Section */}
           <Grid item xs={12} md={6}>
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Typography 
-                variant="h5" 
-                component="h2" 
+              <Typography
+                variant="h5"
+                component="h2"
                 gutterBottom
                 sx={{ fontWeight: 600, mb: 3, textAlign: 'center' }}
               >
-                Why Join VoyageurCompass?
+                {t('register.whyJoin')}
               </Typography>
 
               <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -379,20 +369,20 @@ const RegisterPage = () => {
               <Card sx={{ backgroundColor: 'primary.main', color: 'white', mt: 'auto' }}>
                 <CardContent sx={{ textAlign: 'center', p: 3 }}>
                   <Typography variant="h6" gutterBottom>
-                    Student-Friendly Pricing
+                    {t('register.studentPricing')}
                   </Typography>
                   <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mb: 2 }}>
-                    <Chip 
-                      label="1 Credit = $1" 
+                    <Chip
+                      label={t('register.pricing.creditLabel')}
                       sx={{ backgroundColor: 'white', color: 'primary.main' }}
                     />
-                    <Chip 
-                      label="1 Analysis" 
+                    <Chip
+                      label={t('register.pricing.analysisLabel')}
                       sx={{ backgroundColor: 'white', color: 'primary.main' }}
                     />
                   </Box>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Only pay for the analysis you need. Perfect for students and professionals.
+                    {t('register.pricingDescription')}
                   </Typography>
                 </CardContent>
               </Card>

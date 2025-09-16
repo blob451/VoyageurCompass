@@ -601,6 +601,28 @@ class LocalLLMService:
         self.sentiment_integration_enabled = True
         self.sentiment_cache_prefix = "sentiment_enhanced:"
 
+        # Multilingual support configuration
+        self.multilingual_enabled = getattr(settings, "MULTILINGUAL_LLM_ENABLED", True)
+        self.language_models = getattr(settings, "LLM_MODELS_BY_LANGUAGE", {
+            'en': 'llama3.1:8b',
+            'fr': 'qwen2:3b',
+            'es': 'qwen2:3b',
+        })
+        self.supported_languages = list(self.language_models.keys())
+        self.default_language = getattr(settings, "DEFAULT_USER_LANGUAGE", "en")
+
+        # Translation service configuration
+        self.translation_enabled = getattr(settings, "TRANSLATION_SERVICE_ENABLED", True)
+        self.translation_cache_ttl = getattr(settings, "TRANSLATION_CACHE_TTL", 86400)
+        self.translation_timeout = getattr(settings, "TRANSLATION_TIMEOUT", 30)
+
+        # Financial terminology mapping
+        self.financial_terminology = getattr(settings, "FINANCIAL_TERMINOLOGY_MAPPING", {})
+
+        # Cultural formatting configuration
+        self.cultural_formatting_enabled = getattr(settings, "CULTURAL_FORMATTING_ENABLED", True)
+        self.financial_formatting = getattr(settings, "FINANCIAL_FORMATTING", {})
+
         # Client initialisation deferred to lazy property
 
     @property
@@ -2482,6 +2504,312 @@ Broader market context and sector trends support the overall investment outlook 
         except Exception as e:
             logger.error(f"Failed to get available models: {str(e)}")
             return []
+
+    # Multilingual Support Methods
+
+    def generate_multilingual_explanation(
+        self,
+        analysis_data: Dict[str, Any],
+        target_language: str = "en",
+        detail_level: str = "standard",
+        explanation_type: str = "technical_analysis",
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate explanations in the specified language.
+
+        Args:
+            analysis_data: Dictionary containing analysis results
+            target_language: Target language code (en, fr, es)
+            detail_level: 'summary', 'standard', or 'detailed'
+            explanation_type: Type of explanation to generate
+
+        Returns:
+            Dictionary with multilingual explanation content or None if failed
+        """
+        if not self.multilingual_enabled:
+            logger.warning("Multilingual support is disabled")
+            return self.generate_explanation(analysis_data, detail_level, explanation_type)
+
+        if target_language not in self.supported_languages:
+            logger.warning(f"Unsupported language '{target_language}', falling back to {self.default_language}")
+            target_language = self.default_language
+
+        # Create multilingual cache key
+        cache_key = self._create_multilingual_cache_key(
+            analysis_data, target_language, detail_level, explanation_type
+        )
+
+        # Check cache first
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            logger.info(f"Retrieved multilingual explanation from cache for language: {target_language}")
+            return cached_result
+
+        try:
+            # Get language-specific model
+            model_name = self.language_models.get(target_language, self.language_models[self.default_language])
+
+            # Generate native language explanation
+            if target_language == "en":
+                result = self._generate_native_explanation(
+                    analysis_data, detail_level, explanation_type, model_name, target_language
+                )
+            else:
+                result = self._generate_translated_explanation(
+                    analysis_data, detail_level, explanation_type, model_name, target_language
+                )
+
+            if result:
+                # Apply cultural formatting
+                if self.cultural_formatting_enabled:
+                    result = self._apply_cultural_formatting(result, target_language)
+
+                # Cache the result
+                cache.set(cache_key, result, self.translation_cache_ttl)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error generating multilingual explanation for {target_language}: {str(e)}")
+            return None
+
+    def _generate_native_explanation(
+        self,
+        analysis_data: Dict[str, Any],
+        detail_level: str,
+        explanation_type: str,
+        model_name: str,
+        language: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Generate explanation directly in the target language."""
+        try:
+            # Build language-specific prompt
+            prompt = self._build_multilingual_prompt(
+                analysis_data, detail_level, explanation_type, language
+            )
+
+            # Generate with language-specific model
+            generation_options = self._get_language_specific_options(language, detail_level)
+
+            result = self._generate_with_timeout(
+                model=model_name,
+                prompt=prompt,
+                options=generation_options,
+                timeout=self._get_timeout_for_detail_level(detail_level),
+            )
+
+            if result and result.get("response"):
+                return {
+                    "explanation": result["response"],
+                    "language": language,
+                    "model_used": model_name,
+                    "detail_level": detail_level,
+                    "explanation_type": explanation_type,
+                    "generation_method": "native",
+                    "timestamp": datetime.now().isoformat(),
+                }
+
+        except Exception as e:
+            logger.error(f"Error in native explanation generation for {language}: {str(e)}")
+
+        return None
+
+    def _generate_translated_explanation(
+        self,
+        analysis_data: Dict[str, Any],
+        detail_level: str,
+        explanation_type: str,
+        model_name: str,
+        target_language: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Generate explanation and translate to target language."""
+        try:
+            # First generate in English
+            english_result = self.generate_explanation(analysis_data, detail_level, explanation_type)
+
+            if not english_result or not english_result.get("explanation"):
+                return None
+
+            # Translate to target language
+            translated_explanation = self._translate_text(
+                english_result["explanation"], target_language, model_name
+            )
+
+            if translated_explanation:
+                return {
+                    "explanation": translated_explanation,
+                    "language": target_language,
+                    "model_used": model_name,
+                    "detail_level": detail_level,
+                    "explanation_type": explanation_type,
+                    "generation_method": "translated",
+                    "original_language": "en",
+                    "timestamp": datetime.now().isoformat(),
+                }
+
+        except Exception as e:
+            logger.error(f"Error in translated explanation generation for {target_language}: {str(e)}")
+
+        return None
+
+    def _translate_text(self, text: str, target_language: str, model_name: str) -> Optional[str]:
+        """Translate text to target language using financial terminology mapping."""
+        if not self.translation_enabled:
+            return text
+
+        try:
+            # Build translation prompt with financial terminology context
+            financial_terms = self.financial_terminology.get(target_language, {})
+
+            prompt = f"""Translate the following financial analysis text to {target_language}.
+            Use appropriate financial terminology and maintain professional tone.
+
+            Financial term mappings for {target_language}:
+            {chr(10).join([f"- {en}: {foreign}" for en, foreign in financial_terms.items()])}
+
+            Text to translate:
+            {text}
+
+            Translation:"""
+
+            result = self._generate_with_timeout(
+                model=model_name,
+                prompt=prompt,
+                options={
+                    "temperature": 0.3,
+                    "max_tokens": len(text) * 2,  # Allow for expansion
+                    "top_p": 0.9,
+                },
+                timeout=self.translation_timeout,
+            )
+
+            if result and result.get("response"):
+                return result["response"].strip()
+
+        except Exception as e:
+            logger.error(f"Error translating text to {target_language}: {str(e)}")
+
+        return None
+
+    def _build_multilingual_prompt(
+        self,
+        analysis_data: Dict[str, Any],
+        detail_level: str,
+        explanation_type: str,
+        language: str,
+    ) -> str:
+        """Build language-specific prompt for native generation."""
+
+        # Base analysis information
+        symbol = analysis_data.get("symbol", "N/A")
+        price = analysis_data.get("currentPrice", 0)
+
+        # Language-specific prompt templates
+        if language == "fr":
+            return f"""Analysez les données financières suivantes pour {symbol} et fournissez une explication détaillée en français:
+
+Prix actuel: {price}
+Données d'analyse: {analysis_data}
+
+Niveau de détail requis: {detail_level}
+Type d'explication: {explanation_type}
+
+Fournissez une analyse professionnelle en français utilisant la terminologie financière appropriée."""
+
+        elif language == "es":
+            return f"""Analice los siguientes datos financieros para {symbol} y proporcione una explicación detallada en español:
+
+Precio actual: {price}
+Datos de análisis: {analysis_data}
+
+Nivel de detalle requerido: {detail_level}
+Tipo de explicación: {explanation_type}
+
+Proporcione un análisis profesional en español utilizando la terminología financiera apropiada."""
+
+        else:  # Default to English
+            return self._build_optimized_prompt(analysis_data, detail_level, explanation_type)
+
+    def _get_language_specific_options(self, language: str, detail_level: str) -> Dict[str, Any]:
+        """Get generation options optimized for specific language."""
+        base_options = {
+            "temperature": 0.4,
+            "top_p": 0.9,
+            "max_tokens": self._get_max_tokens_for_detail(detail_level),
+        }
+
+        # Language-specific adjustments
+        if language in ["fr", "es"]:
+            # Romance languages may need slightly more tokens for equivalent meaning
+            base_options["max_tokens"] = int(base_options["max_tokens"] * 1.2)
+            # Slightly lower temperature for more consistent terminology
+            base_options["temperature"] = 0.3
+
+        return base_options
+
+    def _apply_cultural_formatting(self, result: Dict[str, Any], language: str) -> Dict[str, Any]:
+        """Apply cultural formatting preferences to the result."""
+        if not self.cultural_formatting_enabled or language not in self.financial_formatting:
+            return result
+
+        try:
+            formatting_config = self.financial_formatting[language]
+            explanation = result.get("explanation", "")
+
+            # Apply number formatting (basic pattern replacement)
+            # This is a simple implementation - production would use more sophisticated formatting
+            if language == "fr":
+                # Replace comma thousands separators with spaces and dots with commas for decimals
+                import re
+                explanation = re.sub(r'\$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+                                   lambda m: f"{m.group(1).replace(',', ' ').replace('.', ',')} €",
+                                   explanation)
+            elif language == "es":
+                # Similar for Spanish formatting
+                import re
+                explanation = re.sub(r'\$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+                                   lambda m: f"{m.group(1).replace(',', '.')},00 €",
+                                   explanation)
+
+            result["explanation"] = explanation
+            result["cultural_formatting_applied"] = True
+
+        except Exception as e:
+            logger.error(f"Error applying cultural formatting for {language}: {str(e)}")
+
+        return result
+
+    def _create_multilingual_cache_key(
+        self,
+        analysis_data: Dict[str, Any],
+        language: str,
+        detail_level: str,
+        explanation_type: str,
+    ) -> str:
+        """Create cache key for multilingual explanations."""
+        base_key = self._create_cache_key(analysis_data, detail_level, explanation_type)
+        return f"multilingual_{language}_{base_key}"
+
+    def get_supported_languages(self) -> List[str]:
+        """Get list of supported languages."""
+        return self.supported_languages
+
+    def is_language_supported(self, language: str) -> bool:
+        """Check if a language is supported."""
+        return language in self.supported_languages
+
+    def get_language_model(self, language: str) -> str:
+        """Get the model assigned to a specific language."""
+        return self.language_models.get(language, self.language_models[self.default_language])
+
+    def _get_max_tokens_for_detail(self, detail_level: str) -> int:
+        """Get maximum tokens based on detail level."""
+        token_limits = {
+            "summary": 150,
+            "standard": 300,
+            "detailed": 600,
+        }
+        return token_limits.get(detail_level, 300)
 
 
 # Singleton instance

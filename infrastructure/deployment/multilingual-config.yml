@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  voyageur-app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    environment:
+      # Core multilingual settings
+      - ENABLE_TRANSLATIONS=true
+      - TRANSLATION_MODEL=qwen2:3b
+      - SUPPORTED_LANGUAGES=en,fr,es
+      - DEFAULT_LANGUAGE=en
+      - BROWSER_LANGUAGE_DETECTION=true
+
+      # Performance settings
+      - TRANSLATION_CACHE_TTL_HIGH=7200
+      - TRANSLATION_CACHE_TTL_STANDARD=1800
+      - TRANSLATION_CACHE_TTL_LOW=300
+      - TRANSLATION_QUALITY_THRESHOLD=0.7
+
+      # Ollama connection for translations
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - TRANSLATION_TIMEOUT=30
+
+      # Cache optimization
+      - REDIS_URL=redis://redis:6379/2
+      - CACHE_TRANSLATION_ENABLED=true
+      - CACHE_MAX_TRANSLATION_SIZE=10000
+
+      # Monitoring
+      - TRANSLATION_METRICS_ENABLED=true
+      - LOG_TRANSLATION_PERFORMANCE=true
+
+    volumes:
+      - translation_cache:/app/cache/translations
+      - logs:/app/logs
+    depends_on:
+      - ollama
+      - redis
+    networks:
+      - voyageur_network
+
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_MODELS=/root/.ollama/models
+    volumes:
+      - ollama_models:/root/.ollama/models
+      - ./models/qwen2-3b:/models/qwen2-3b
+    ports:
+      - "11434:11434"
+    networks:
+      - voyageur_network
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 2gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+      - ./redis-multilingual.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - voyageur_network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/multilingual.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - static_files:/var/www/static
+    depends_on:
+      - voyageur-app
+    networks:
+      - voyageur_network
+
+volumes:
+  ollama_models:
+    driver: local
+  redis_data:
+    driver: local
+  translation_cache:
+    driver: local
+  static_files:
+    driver: local
+  logs:
+    driver: local
+
+networks:
+  voyageur_network:
+    driver: bridge

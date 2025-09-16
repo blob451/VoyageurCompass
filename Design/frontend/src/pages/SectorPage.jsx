@@ -43,14 +43,15 @@ import {
   FlightTakeoff,
   Phone,
   ElectricBolt,
-  Sentiment,
   SentimentSatisfied,
   SentimentDissatisfied,
   SentimentNeutral
 } from '@mui/icons-material';
 import { useGetUserAnalysisHistoryQuery } from '../features/api/apiSlice';
+import { useTranslation } from 'react-i18next';
 
 const SectorPage = () => {
+  const { t } = useTranslation();
   const [selectedSectors, setSelectedSectors] = useState(['technology', 'healthcare']);
   const [timeframe, setTimeframe] = useState('1M');
   const [loading, setLoading] = useState(false);
@@ -78,16 +79,16 @@ const SectorPage = () => {
   };
 
   const availableSectors = [
-    { id: 'technology', name: 'Technology', description: 'Software, hardware, semiconductors' },
-    { id: 'healthcare', name: 'Healthcare', description: 'Pharmaceuticals, medical devices, biotech' },
-    { id: 'financials', name: 'Financials', description: 'Banks, insurance, investment services' }, // cSpell:ignore financials Financials
-    { id: 'consumer_discretionary', name: 'Consumer Discretionary', description: 'Retail, automotive, entertainment' },
-    { id: 'industrials', name: 'Industrials', description: 'Manufacturing, aerospace, transportation' },
-    { id: 'real_estate', name: 'Real Estate', description: 'REITs, property development' },
-    { id: 'utilities', name: 'Utilities', description: 'Electric, gas, water utilities' },
-    { id: 'telecommunications', name: 'Telecommunications', description: 'Telecom services, media' },
-    { id: 'energy', name: 'Energy', description: 'Oil, gas, renewable energy' },
-    { id: 'materials', name: 'Materials', description: 'Mining, chemicals, metals' }
+    { id: 'technology', name: t('sectors.technology.name'), description: t('sectors.technology.description') },
+    { id: 'healthcare', name: t('sectors.healthcare.name'), description: t('sectors.healthcare.description') },
+    { id: 'financials', name: t('sectors.financials.name'), description: t('sectors.financials.description') }, // cSpell:ignore financials Financials
+    { id: 'consumer_discretionary', name: t('sectors.consumer_discretionary.name'), description: t('sectors.consumer_discretionary.description') },
+    { id: 'industrials', name: t('sectors.industrials.name'), description: t('sectors.industrials.description') },
+    { id: 'real_estate', name: t('sectors.real_estate.name'), description: t('sectors.real_estate.description') },
+    { id: 'utilities', name: t('sectors.utilities.name'), description: t('sectors.utilities.description') },
+    { id: 'telecommunications', name: t('sectors.telecommunications.name'), description: t('sectors.telecommunications.description') },
+    { id: 'energy', name: t('sectors.energy.name'), description: t('sectors.energy.description') },
+    { id: 'materials', name: t('sectors.materials.name'), description: t('sectors.materials.description') }
   ];
 
   const timeframes = ['1D', '1W', '1M', '3M', '6M', '1Y'];
@@ -232,10 +233,10 @@ const SectorPage = () => {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
-          Sector Analysis
+          {t('sectorAnalysis.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Compare sector performance and identify market trends across industries
+          {t('sectorAnalysis.subtitle')}
         </Typography>
       </Box>
 
@@ -243,12 +244,12 @@ const SectorPage = () => {
       <Card sx={{ mb: 4, backgroundColor: 'primary.main', color: 'white' }}>
         <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="h6">Available Credits</Typography>
+            <Typography variant="h6">{t('sectorAnalysis.availableCredits')}</Typography>
             <Typography variant="h4">{userCredits}</Typography>
           </Box>
           <Box sx={{ textAlign: 'right' }}>
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
-              Cost: {Math.ceil(selectedSectors.length / 2)} Credits ({selectedSectors.length} sectors)
+              {t('sectorAnalysis.cost', { credits: Math.ceil(selectedSectors.length / 2), sectors: selectedSectors.length })}
             </Typography>
             <Typography variant="body2" sx={{ opacity: 0.7, fontSize: '0.8rem' }}>
               2 sectors = 1 credit
@@ -262,7 +263,7 @@ const SectorPage = () => {
         <Grid container spacing={3} alignItems="center">
           <Grid item xs={12} md={6}>
             <FormControl fullWidth>
-              <InputLabel>Select Sectors</InputLabel>
+              <InputLabel>{t('sectorAnalysis.selectSectors')}</InputLabel>
               <Select
                 multiple
                 value={selectedSectors}
@@ -302,11 +303,11 @@ const SectorPage = () => {
           
           <Grid item xs={12} md={3}>
             <FormControl fullWidth>
-              <InputLabel>Timeframe</InputLabel>
+              <InputLabel>{t('sectorAnalysis.timeframe')}</InputLabel>
               <Select
                 value={timeframe}
                 onChange={(e) => setTimeframe(e.target.value)}
-                label="Timeframe"
+                label={t('sectorAnalysis.timeframe')}
               >
                 {timeframes.map((tf) => (
                   <MenuItem key={tf} value={tf}>{tf}</MenuItem>
@@ -324,7 +325,7 @@ const SectorPage = () => {
               startIcon={loading ? <CircularProgress size={20} /> : <Analytics />}
               fullWidth
             >
-              {loading ? 'Analyzing...' : 'Analyze Sectors'}
+              {loading ? t('sectorAnalysis.analyzing') : t('sectorAnalysis.analyzeSectors')}
             </Button>
           </Grid>
         </Grid>
@@ -342,10 +343,10 @@ const SectorPage = () => {
           <Box sx={{ textAlign: 'center' }}>
             <CircularProgress size={60} sx={{ mb: 2 }} />
             <Typography variant="h6" gutterBottom>
-              Analyzing {selectedSectors.length} sectors...
+              {t('sectorAnalysis.analyzingCount', { count: selectedSectors.length })}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Processing market data and performance metrics
+              {t('sectorAnalysis.processing')}
             </Typography>
             <LinearProgress sx={{ mt: 2 }} />
           </Box>

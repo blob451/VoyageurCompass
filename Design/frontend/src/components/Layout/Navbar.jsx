@@ -28,6 +28,8 @@ import {
   LightMode
 } from '@mui/icons-material';
 import { useThemeMode } from '../../theme/ThemeModeContext.jsx';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from '../LanguageSwitcher';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -37,6 +39,7 @@ const Navbar = () => {
   const [toolsMenuAnchor, setToolsMenuAnchor] = useState(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
   const { mode, toggleMode } = useThemeMode();
+  const { t } = useTranslation();
 
   // User credits display (temporary mock data)
   const userCredits = 25;
@@ -125,15 +128,15 @@ const Navbar = () => {
           {user ? (
             <>
               <Button color="inherit" onClick={() => navigate('/dashboard')}>
-                Dashboard
+                {t('navbar.dashboard')}
               </Button>
               
-              <Button 
-                color="inherit" 
+              <Button
+                color="inherit"
                 onClick={handleToolsMenuOpen}
                 endIcon={<ExpandMore />}
               >
-                Tools
+                {t('navbar.tools')}
               </Button>
               
               <Menu
@@ -143,42 +146,44 @@ const Navbar = () => {
               >
                 <MenuItem onClick={() => handleNavigation('/stocks')}>
                   <Analytics sx={{ mr: 1 }} />
-                  Stock Analysis
+                  {t('navbar.stockAnalysis')}
                 </MenuItem>
                 <MenuItem onClick={() => handleNavigation('/reports')}>
                   <Assessment sx={{ mr: 1 }} />
-                  Analysis Reports
+                  {t('navbar.analysisReports')}
                 </MenuItem>
                 <MenuItem onClick={() => handleNavigation('/compare')}>
                   <Compare sx={{ mr: 1 }} />
-                  Compare Stocks
+                  {t('navbar.compareStocks')}
                 </MenuItem>
                 <MenuItem onClick={() => handleNavigation('/sectors')}>
                   <AccountBalance sx={{ mr: 1 }} />
-                  Sector Analysis
+                  {t('navbar.sectorAnalysis')}
                 </MenuItem>
                 <MenuItem onClick={() => handleNavigation('/store')}>
                   <ShoppingCart sx={{ mr: 1 }} />
-                  Credit Store
+                  {t('navbar.creditStore')}
                 </MenuItem>
               </Menu>
 
               <Button color="inherit" onClick={() => navigate('/help')}>
                 <Help sx={{ mr: 0.5 }} />
-                Help
+                {t('navbar.help')}
               </Button>
+
+              <LanguageSwitcher sx={{ mr: 1 }} />
 
               <IconButton
                 color="inherit"
-                aria-label={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}
+                aria-label={t(`navbar.switchTo${mode === 'light' ? 'Dark' : 'Light'}Mode`)}
                 onClick={toggleMode}
-                title={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}
+                title={t(`navbar.switchTo${mode === 'light' ? 'Dark' : 'Light'}Mode`)}
               >
                 {mode === 'light' ? <DarkMode /> : <LightMode />}
               </IconButton>
 
-              <Chip 
-                label={`${userCredits} Credits`}
+              <Chip
+                label={`${userCredits} ${t('navbar.credits')}`}
                 size="small"
                 sx={{ 
                   backgroundColor: 'rgba(255,255,255,0.2)', 
@@ -202,39 +207,42 @@ const Navbar = () => {
               >
                 <MenuItem onClick={() => handleNavigation('/settings')}>
                   <Settings sx={{ mr: 1 }} />
-                  Settings
+                  {t('navbar.settings')}
                 </MenuItem>
                 <MenuItem onClick={handleLogout}>
-                  Logout
+                  {t('navbar.signOut')}
                 </MenuItem>
               </Menu>
             </>
           ) : (
             <>
               <Button color="inherit" onClick={() => navigate('/help')}>
-                Help
+                {t('navbar.help')}
               </Button>
+
+              <LanguageSwitcher sx={{ mr: 1 }} />
+
               <IconButton
                 color="inherit"
-                aria-label={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}
+                aria-label={t(`navbar.switchTo${mode === 'light' ? 'Dark' : 'Light'}Mode`)}
                 onClick={toggleMode}
-                title={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}
+                title={t(`navbar.switchTo${mode === 'light' ? 'Dark' : 'Light'}Mode`)}
               >
                 {mode === 'light' ? <DarkMode /> : <LightMode />}
               </IconButton>
               <Button color="inherit" onClick={() => navigate('/login')}>
-                Login
+                {t('auth.login')}
               </Button>
-              <Button 
-                color="inherit" 
+              <Button
+                color="inherit"
                 onClick={() => navigate('/register')}
                 variant="outlined"
-                sx={{ 
+                sx={{
                   borderColor: 'white',
                   '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
                 }}
               >
-                Register
+                {t('auth.register')}
               </Button>
             </>
           )}

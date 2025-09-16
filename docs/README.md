@@ -29,9 +29,10 @@ A state-of-the-art financial analytics platform powered by AI-driven explanation
 
 ### Core Platform
 - **Backend**: Django 4.2+ with REST API
-- **Frontend**: React 18+ with modern UI components
+- **Frontend**: React 18+ with modern UI components and multilingual support
 - **Database**: PostgreSQL with optimized queries
 - **Containerization**: Docker with multi-service architecture
+- **Internationalization**: Full multilingual support (English, French, Spanish)
 
 ### AI/ML Infrastructure
 - **Language Models**: LLaMA 3.1 (8B/70B) via Ollama
@@ -45,6 +46,8 @@ A state-of-the-art financial analytics platform powered by AI-driven explanation
 - **News Processing**: Automated sentiment analysis from financial news
 - **Caching**: Redis-based intelligent caching system
 - **Quality Assurance**: Automated explanation quality assessment
+- **Translation Service**: AI-powered multilingual content generation with quality scoring
+- **Locale Support**: Comprehensive locale-aware formatting for numbers, dates, and currencies
 
 ## Quick Start
 
@@ -86,7 +89,9 @@ ollama pull llama3.1:70b
    OLLAMA_BASE_URL=http://localhost:11434
    ENABLE_LLM_EXPLANATIONS=true
    ENABLE_SENTIMENT_ANALYSIS=true
+   ENABLE_TRANSLATIONS=true
    CACHE_TTL_BASE=180
+   TRANSLATION_MODEL=qwen2:3b
    ```
 
 2. **Model Configuration**:
@@ -158,16 +163,19 @@ POST /api/analytics/explain/
   "symbol": "AAPL",
   "analysis_data": {...},
   "detail_level": "standard",
-  "include_sentiment": true
+  "include_sentiment": true,
+  "language": "fr"
 }
 
 # Response:
 {
-  "content": "**BUY** - AAPL shows strong technical momentum...",
+  "content": "**ACHETER** - AAPL montre une forte dynamique technique...",
   "recommendation": "BUY",
   "confidence_score": 0.85,
   "generation_time": 1.23,
   "model_used": "llama3.1:8b",
+  "language": "fr",
+  "translation_quality": 0.92,
   "quality_metrics": {
     "recommendation_clarity": 0.95,
     "technical_coverage": 0.78,

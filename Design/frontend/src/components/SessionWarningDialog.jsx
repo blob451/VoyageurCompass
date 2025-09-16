@@ -11,13 +11,15 @@ import {
   Alert,
 } from '@mui/material';
 import { Warning, AccessTime } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 
-const SessionWarningDialog = ({ 
-  open, 
-  onExtendSession, 
+const SessionWarningDialog = ({
+  open,
+  onExtendSession,
   onLogout,
   warningDuration = 3 * 60 * 1000 // 3 minutes in milliseconds
 }) => {
+  const { t } = useTranslation();
   const [timeRemaining, setTimeRemaining] = useState(warningDuration);
 
   useEffect(() => {
@@ -66,7 +68,7 @@ const SessionWarningDialog = ({
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
           <Warning sx={{ color: 'warning.main', fontSize: 32 }} />
           <Typography variant="h5" component="span" color="warning.main">
-            Session Expiring Soon
+            {t('session.expiring.title')}
           </Typography>
         </Box>
       </DialogTitle>
@@ -74,7 +76,7 @@ const SessionWarningDialog = ({
       <DialogContent sx={{ textAlign: 'center', pb: 2 }}>
         <Alert severity="warning" sx={{ mb: 3 }}>
           <Typography variant="body1">
-            Your session will expire in <strong>{formatTime(timeRemaining)}</strong> due to inactivity.
+            {t('session.expiring.message', { time: formatTime(timeRemaining) })}
           </Typography>
         </Alert>
 
@@ -82,7 +84,7 @@ const SessionWarningDialog = ({
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
             <AccessTime sx={{ color: 'text.secondary' }} />
             <Typography variant="body2" color="text.secondary">
-              Time remaining: {formatTime(timeRemaining)}
+              {t('session.expiring.timeRemaining', { time: formatTime(timeRemaining) })}
             </Typography>
           </Box>
           
@@ -102,19 +104,18 @@ const SessionWarningDialog = ({
         </Box>
 
         <Typography variant="body2" color="text.secondary" paragraph>
-          For your security, we automatically log you out after 15 minutes of inactivity.
-          Click "Stay Logged In" to continue your session, or "Logout" to end it now.
+          {t('session.expiring.securityNotice')}
         </Typography>
 
-        <Box sx={{ 
-          p: 2, 
-          bgcolor: 'grey.50', 
+        <Box sx={{
+          p: 2,
+          bgcolor: 'grey.50',
           borderRadius: 1,
           border: '1px solid',
           borderColor: 'grey.200'
         }}>
           <Typography variant="caption" color="text.secondary">
-            💡 <strong>Tip:</strong> Any activity (clicking, typing, scrolling) will automatically extend your session.
+            {t('session.expiring.tip')}
           </Typography>
         </Box>
       </DialogContent>
@@ -126,7 +127,7 @@ const SessionWarningDialog = ({
           color="inherit"
           sx={{ minWidth: 120 }}
         >
-          Logout Now
+          {t('session.expiring.logoutNow')}
         </Button>
         <Button
           onClick={onExtendSession}
@@ -135,7 +136,7 @@ const SessionWarningDialog = ({
           sx={{ minWidth: 120 }}
           autoFocus
         >
-          Stay Logged In
+          {t('session.expiring.stayLoggedIn')}
         </Button>
       </DialogActions>
     </Dialog>

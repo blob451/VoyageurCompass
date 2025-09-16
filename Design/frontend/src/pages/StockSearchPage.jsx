@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Container,
@@ -56,6 +57,7 @@ import { analysisLogger } from '../utils/logger';
 const StockSearchPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
   const [searchTicker, setSearchTicker] = useState('');
   const [analysisData, setAnalysisData] = useState(null);
   const [error, setError] = useState('');
@@ -107,15 +109,13 @@ const StockSearchPage = () => {
     analysisLogger.stage(targetSymbol, 'Analysis Started', { mode, phase: 'analyzing' });
     
     if (!targetSymbol?.trim()) {
-      console.log(`[ANALYSIS] Error: No ticker symbol provided`);
-      setError('Please enter a stock ticker symbol');
+      setError(t('stockSearch.enterTickerError'));
       setAnalysisPhase('failed');
       return;
     }
     
     if (userCredits < 1) {
-      console.log(`[ANALYSIS] Error: Insufficient credits (${userCredits})`);
-      setError('Insufficient credits. Please purchase more credits to continue.');
+      setError(t('stockSearch.insufficientCreditsError'));
       setAnalysisPhase('failed');
       return;
     }
@@ -134,27 +134,23 @@ const StockSearchPage = () => {
       });
       
       if (result.error) {
-        console.log(`[ANALYSIS] API error received:`, result.error);
-        const errorMessage = result.error.data?.error || 'Analysis failed. Please try again.';
-        console.log(`[ANALYSIS] Error message: ${errorMessage}`);
+        const errorMessage = result.error.data?.error || t('stockSearch.analysisFailedError');
         setError(errorMessage);
         setAnalysisPhase('failed');
         
         // Check if it's a "No price data" error that might need auto-sync
         if (errorMessage.includes('No price data available')) {
-          console.log(`[ANALYSIS] Switching to syncing phase`);
           setAnalysisPhase('syncing');
           // The backend should handle auto-sync, but we show appropriate UI
           setTimeout(() => {
-            console.log(`[ANALYSIS] Updating sync status message`);
-            setError('Stock data is being synchronized. This may take a few moments...');
+            setError(t('stockSearch.syncingData'));
           }, 1000);
           
           // Set a longer timeout for sync completion
           setTimeout(() => {
             if (analysisPhase === 'syncing') {
               console.log(`[ANALYSIS] Sync timeout reached`);
-              setError('Data synchronization is taking longer than expected. Please try again.');
+              setError(t('stockSearch.syncTimeout'));
               setAnalysisPhase('failed');
             }
           }, 30000); // 30 seconds timeout
@@ -202,11 +198,11 @@ const StockSearchPage = () => {
 
     } catch (err) {
       console.log(`[ANALYSIS] Analysis failed with exception:`, err);
-      setError('Analysis failed. Please try again.');
+      setError(t('stockSearch.analysisFailedError'));
       setAnalysisPhase('failed');
       console.error('Analysis error:', err);
     }
-  }, [searchTicker, userCredits, analyzeStock, refetchHistory, analysisHistoryData, analysisPhase, includeExplanation]);
+  }, [searchTicker, userCredits, analyzeStock, refetchHistory, analysisHistoryData, analysisPhase, includeExplanation, t]);
 
   // Handle navigation from dashboard
   useEffect(() => {
@@ -254,12 +250,12 @@ const StockSearchPage = () => {
 
   const handleSearch = (ticker = searchTicker) => {
     if (!ticker.trim()) {
-      setError('Please enter a stock ticker symbol');
+      setError(t('stockSearch.enterTickerError'));
       return;
     }
-    
+
     if (userCredits < 1) {
-      setError('Insufficient credits. Please purchase more credits to continue.');
+      setError(t('stockSearch.insufficientCreditsError'));
       return;
     }
 
@@ -299,10 +295,10 @@ const StockSearchPage = () => {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
-          Stock Analysis
+          {t('search.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Get comprehensive technical analysis for any stock with 12 professional indicators
+          {t('stockSearch.comprehensiveAnalysis')}
         </Typography>
       </Box>
 
@@ -310,12 +306,12 @@ const StockSearchPage = () => {
       <Card sx={{ mb: 4, backgroundColor: 'primary.main', color: 'white' }}>
         <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="h6">Available Credits</Typography>
+            <Typography variant="h6">{t('stockSearch.availableCredits')}</Typography>
             <Typography variant="h4">{userCredits}</Typography>
           </Box>
           <Box sx={{ textAlign: 'right' }}>
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
-              1 Credit = 1 Analysis
+              {t('stockSearch.creditEquation')}
             </Typography>
             <Button 
               variant="outlined" 
@@ -327,7 +323,7 @@ const StockSearchPage = () => {
                 '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
               }}
             >
-              Buy More Credits
+              {t('stockSearch.buyMoreCredits')}
             </Button>
           </Box>
         </CardContent>
@@ -338,13 +334,13 @@ const StockSearchPage = () => {
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Create New Report
+              {t('stockSearch.createNewReport')}
             </Typography>
             <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
               <TextField
                 fullWidth
-                label="Stock Ticker Symbol"
-                placeholder="e.g., AAPL, MSFT, GOOGL"
+                label={t('stockSearch.stockTickerSymbol')}
+                placeholder={t('search.placeholder')}
                 value={searchTicker}
                 onChange={(e) => setSearchTicker(e.target.value.toUpperCase())}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -370,7 +366,7 @@ const StockSearchPage = () => {
                 {analysisPhase === 'analyzing' || analysisPhase === 'syncing' ? (
                   <CircularProgress size={24} />
                 ) : (
-                  'Analyze'
+                  t('search.button')
                 )}
               </Button>
             </Box>
@@ -380,7 +376,7 @@ const StockSearchPage = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <Psychology color="primary" />
                 <Typography variant="subtitle2">
-                  AI-Powered Explanations
+                  {t('stockSearch.aiExplanations')}
                 </Typography>
                 <Chip 
                   label="Phi3 & LLaMA 3.1" 
@@ -391,14 +387,14 @@ const StockSearchPage = () => {
               </Box>
               
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                🤖 Summary AI explanations will be automatically generated to help you understand your analysis results
+                {t('stockSearch.autoExplanation')}
               </Typography>
             </Box>
             
             {/* Recent Searches */}
             <Box>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                Recent searches:
+                {t('stockSearch.recentSearches')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 {recentSearches.map((symbol) => (
@@ -423,20 +419,20 @@ const StockSearchPage = () => {
                 <CircularProgress size={60} sx={{ mb: 2 }} />
                 <Typography variant="h6" gutterBottom>
                   {analysisPhase === 'syncing' ? (
-                    `Fetching data for ${searchTicker}...`
+                    t('stockSearch.fetchingData', { symbol: searchTicker })
                   ) : analysisMode === 'auto' ? (
-                    `Auto-analyzing ${searchTicker}...`
+                    t('stockSearch.autoAnalyzing', { symbol: searchTicker })
                   ) : (
-                    `Analyzing ${searchTicker}...`
+                    t('stockSearch.analyzing', { symbol: searchTicker })
                   )}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {analysisPhase === 'syncing' ? (
-                    'Getting latest stock data from Yahoo Finance (this may take 10-30 seconds)'
+                    t('stockSearch.gettingLatestData')
                   ) : analysisMode === 'auto' ? (
-                    'Analysis triggered from dashboard • Running 12 technical indicators • 1 credit will be used'
+                    t('stockSearch.dashboardTriggered')
                   ) : (
-                    'Running 12 technical indicators'
+                    t('stockSearch.runningIndicators')
                   )}
                 </Typography>
                 <LinearProgress sx={{ mt: 2 }} />
@@ -468,15 +464,15 @@ const StockSearchPage = () => {
               </Box>
 
               <Typography variant="h6" gutterBottom>
-                Technical Indicators
+                {t('stockSearch.technicalIndicators')}
               </Typography>
               <TableContainer>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Indicator</TableCell>
-                      <TableCell>Score</TableCell>
-                      <TableCell>Description</TableCell>
+                      <TableCell>{t('stockSearch.indicator')}</TableCell>
+                      <TableCell>{t('stockSearch.score')}</TableCell>
+                      <TableCell>{t('stockSearch.description')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -511,7 +507,7 @@ const StockSearchPage = () => {
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2" color="text.secondary">
-                              {indicator.description || indicator.desc || 'Technical indicator'}
+                              {indicator.description || indicator.desc || t('stockSearch.technicalIndicatorFallback')}
                             </Typography>
                           </TableCell>
                         </TableRow>
@@ -527,14 +523,14 @@ const StockSearchPage = () => {
           <Paper sx={{ p: 3, mb: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Typography variant="h6" gutterBottom>
-                Browse Existing Reports
+                {t('stockSearch.browseExistingReports')}
               </Typography>
               <Button
                 variant="outlined"
                 onClick={() => navigate('/reports')}
                 sx={{ minWidth: 120 }}
               >
-                View All Reports
+                {t('stockSearch.viewAllReports')}
               </Button>
             </Box>
             
@@ -576,7 +572,7 @@ const StockSearchPage = () => {
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
-                          <Tooltip title="View Analysis Results">
+                          <Tooltip title={t('dashboard.viewAnalysisResults')}>
                             <IconButton
                               size="small"
                               onClick={() => navigate(`/analysis/${analysis.id}`)}
@@ -594,10 +590,10 @@ const StockSearchPage = () => {
             ) : (
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  No analysis reports yet
+                  {t('stockSearch.noAnalysisReportsYet')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Create your first report using the form above
+                  {t('stockSearch.createFirstReport')}
                 </Typography>
               </Box>
             )}
@@ -609,7 +605,7 @@ const StockSearchPage = () => {
           {/* Popular Stocks */}
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Popular Stocks
+              {t('stockSearch.popularStocks')}
             </Typography>
             <List dense>
               {popularStocks.map((stock, index) => (
@@ -637,7 +633,7 @@ const StockSearchPage = () => {
           {/* Analysis History */}
           <Paper sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6">Recent Analysis</Typography>
+              <Typography variant="h6">{t('stockSearch.recentAnalysis')}</Typography>
               <IconButton size="small">
                 <Refresh />
               </IconButton>
@@ -669,7 +665,7 @@ const StockSearchPage = () => {
               </List>
             ) : (
               <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-                No analysis history yet
+                {t('stockSearch.noAnalysisHistory')}
               </Typography>
             )}
           </Paper>
@@ -679,28 +675,28 @@ const StockSearchPage = () => {
       {/* Confirmation Dialog */}
       <Dialog open={confirmDialog} onClose={() => setConfirmDialog(false)}>
         <DialogTitle>
-          {analysisMode === 'auto' ? 'Auto-Analysis from Dashboard' : 'Confirm Analysis'}
+          {analysisMode === 'auto' ? t('stockSearch.autoAnalysisTitle') : t('stockSearch.confirmAnalysisTitle')}
         </DialogTitle>
         <DialogContent>
           <Typography gutterBottom>
-            {analysisMode === 'auto' 
-              ? `Auto-analyze ${searchTicker} (triggered from dashboard quick search)`
-              : `Analyze ${searchTicker} for 1 credit?`
+            {analysisMode === 'auto'
+              ? t('stockSearch.autoAnalyzeMessage', { symbol: searchTicker })
+              : t('stockSearch.analyzeForCredit', { symbol: searchTicker })
             }
           </Typography>
           <Alert severity="info" sx={{ mt: 2 }}>
-            This will use 1 credit from your balance ({userCredits} remaining)
+            {t('stockSearch.creditWarning', { credits: userCredits })}
           </Alert>
           {analysisMode === 'auto' && (
             <Alert severity="warning" sx={{ mt: 1 }}>
-              Analysis will start automatically after confirmation
+              {t('stockSearch.autoStartWarning')}
             </Alert>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCancelAnalysis}>Cancel</Button>
+          <Button onClick={handleCancelAnalysis}>{t('stockSearch.cancel')}</Button>
           <Button onClick={handleConfirmAnalysis} variant="contained">
-            {analysisMode === 'auto' ? 'Start Auto-Analysis' : 'Confirm Analysis'}
+            {analysisMode === 'auto' ? t('stockSearch.startAutoAnalysis') : t('stockSearch.confirm')}
           </Button>
         </DialogActions>
       </Dialog>

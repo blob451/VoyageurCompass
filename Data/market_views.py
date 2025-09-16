@@ -5,6 +5,7 @@ Additional API views for market data and synchronization.
 import logging
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 from rest_framework import status
@@ -55,7 +56,9 @@ def market_overview(request):
 
         # Get top gainers and losers from database
         # Use iterator to avoid loading all stocks into memory, limit to 200 for performance
-        active_stocks_iterator = Stock.objects.filter(is_active=True).iterator(chunk_size=50)
+        active_stocks_iterator = Stock.objects.filter(is_active=True).iterator(
+            chunk_size=getattr(settings, 'STOCK_ITERATOR_CHUNK_SIZE', 50)
+        )
         gainers = []
         losers = []
         processed_count = 0
@@ -201,8 +204,9 @@ def sector_performance(request):
 
         result = {"sectors": sorted_sectors, "last_updated": timezone.now().isoformat()}
 
-        # Cache for 10 minutes
-        cache.set(cache_key, result, 600)
+        # Cache with configurable timeout
+        cache_timeout = getattr(settings, 'CACHE_TIMEOUT_MINUTES', 10) * 60  # Convert to seconds
+        cache.set(cache_key, result, cache_timeout)
 
         return Response(result)
 
@@ -224,8 +228,9 @@ def compare_stocks(request):
     if not symbols or len(symbols) < 2:
         return Response({"error": "At least 2 symbols are required for comparison"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if len(symbols) > 10:
-        return Response({"error": "Maximum 10 symbols allowed for comparison"}, status=status.HTTP_400_BAD_REQUEST)
+    max_symbols = getattr(settings, 'MAX_COMPARISON_SYMBOLS', 10)
+    if len(symbols) > max_symbols:
+        return Response({"error": f"Maximum {max_symbols} symbols allowed for comparison"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         # Initialize comparison dictionary with all requested symbols to preserve order and count
@@ -340,7 +345,7 @@ def bulk_price_update(request):
         logger.info(f"Starting bulk price update for {len(stock_symbols)} stocks")
 
         # Process stocks in batches to avoid overwhelming the API
-        batch_size = 100
+        batch_size = getattr(settings, 'MARKET_DATA_BATCH_SIZE', 100)
         total_updated = 0
         total_failed = 0
 

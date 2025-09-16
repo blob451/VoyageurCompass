@@ -1,0 +1,1045 @@
+{
+  "app": {
+    "name": "VoyageurCompass",
+    "tagline": "Navega Tu Viaje de Inversión"
+  },
+  "navigation": {
+    "home": "Inicio",
+    "search": "Buscar",
+    "results": "Resultados",
+    "settings": "Configuración"
+  },
+  "search": {
+    "title": "Búsqueda de Análisis Bursátil",
+    "placeholder": "Ingrese el símbolo bursátil (ej: AAPL, MSFT)",
+    "button": "Analizar Acción",
+    "loading": "Analizando...",
+    "error": "Por favor ingrese un símbolo bursátil válido",
+    "noResults": "No se encontraron resultados de análisis"
+  },
+  "analysis": {
+    "title": "Resultados del Análisis Técnico",
+    "score": "Puntuación Técnica",
+    "outOf": "de 10",
+    "recommendation": "Recomendación",
+    "confidence": "Nivel de Confianza",
+    "sentiment": "Sentimiento del Mercado",
+    "technicalIndicators": "Indicadores Técnicos",
+    "riskAssessment": "Evaluación de Riesgo",
+    "marketContext": "Contexto del Mercado",
+    "loading": "Generando análisis...",
+    "error": "Error al cargar el análisis",
+    "retry": "Reintentar Análisis",
+    "backToDashboard": "Volver al Tablero",
+    "runNewAnalysis": "Nuevo Análisis",
+    "analysisDate": "Fecha de Análisis",
+    "failedToLoad": "Error al cargar los resultados del análisis",
+    "analysisNotFound": "Análisis no encontrado",
+    "indicator": "Indicador",
+    "description": "Descripción",
+    "newsSentiment": "SENTIMIENTO NOTICIAS",
+    "sentimentFromNews": "Sentimiento {{sentiment}} de {{count}} artículos de noticias",
+    "confidence": "Confianza",
+    "componentContribution": "Análisis de Contribución de Componentes",
+    "component": "Componente",
+    "weightedScore": "Puntuación Ponderada",
+    "contribution": "Contribución",
+    "impact": "Impacto",
+    "high": "Alto",
+    "medium": "Medio",
+    "low": "Bajo",
+    "scaledNote": "Las puntuaciones ponderadas están escaladas (×100) para legibilidad. Los porcentajes de contribución muestran el impacto relativo de cada componente en el análisis final. Los componentes están ordenados por contribución de mayor a menor.",
+    "newsSentimentAnalysis": "Análisis de Sentimiento de Noticias",
+    "overallSentiment": "Sentimiento General",
+    "sentimentScore": "Puntuación",
+    "basedOnNews": "Basado en {{count}} artículos de noticias",
+    "impactOnAnalysis": "Impacto en el Análisis",
+    "contributionToScore": "Contribución a la Puntuación Final",
+    "weightInScore": "Peso del 10% en la Puntuación Compuesta",
+    "sentimentDescription": "El análisis de sentimiento utiliza FinBERT para evaluar noticias financieras e incorporar el sentimiento del mercado en el marco de análisis técnico.",
+    "newsSourcesAnalysis": "Análisis de Fuentes de Noticias",
+    "source": "Fuente",
+    "articles": "Artículos",
+    "averageSentiment": "Sentimiento Promedio",
+    "analysisSummary": "Resumen del Análisis",
+    "compositeScore": "Puntuación Compuesta",
+    "analysisHorizon": "Horizonte de Análisis",
+    "rawScore": "Puntuación Bruta",
+    "standard": "Estándar",
+    "analysisPerformed": "Este análisis se realizó el {{date}} utilizando 12 indicadores técnicos con metodología de puntuación ponderada.",
+    "aiExplanations": "Explicaciones de Análisis con IA",
+    "multiModelActive": "IA Multi-Modelo Activa",
+    "serviceUnavailable": "Servicio No Disponible",
+    "templateMode": "Modo Plantilla",
+    "explanationDescription": "Obtenga explicaciones en lenguaje natural alimentadas por nuestro sistema IA multi-modelo optimizado para análisis financiero.",
+    "llmUnavailable": "Servicio LLM no disponible - usando explicaciones de plantilla.",
+    "quickAnalysis": "Análisis Rápido",
+    "detailedAnalysis": "Análisis Detallado",
+    "phi3Description": "Resúmenes rápidos y explicaciones estándar con rendimiento optimizado para análisis en tiempo real.",
+    "llamaDescription": "Explicaciones detalladas con contexto de mercado integral y razonamiento técnico."
+  },
+  "indicators": {
+    "sma50vs200": "SMA 50 vs 200",
+    "pricevs50": "Precio vs SMA 50",
+    "rsi14": "RSI (14)",
+    "macd12269": "MACD (12,26,9)",
+    "bbpos20": "Posición Bollinger",
+    "bbwidth20": "Ancho Bollinger",
+    "volsurge": "Pico de Volumen",
+    "obv20": "OBV (20)",
+    "rel1y": "Fuerza Relativa 1A",
+    "rel2y": "Fuerza Relativa 2A",
+    "candlerev": "Reversión Vela",
+    "srcontext": "Soporte/Resistencia",
+    "sentiment": "Sentimiento Noticias",
+    "prediction": "Predicción de Precio LSTM"
+  },
+  "explanations": {
+    "title": "Explicación del Análisis",
+    "compositeScore": "Puntuación Compuesta",
+    "stockAnalysis": "Análisis de Acciones",
+    "technicalIndicators": "Indicadores Técnicos",
+    "analysed": "Analizados",
+    "topPerformingIndicators": "Indicadores de Mejor Rendimiento",
+    "signalStrength": "Fuerza de la Señal",
+    "strong": "Fuerte",
+    "moderate": "Moderado",
+    "weak": "Débil",
+    "analysisComponentContributions": "Contribuciones de Componentes de Análisis",
+    "analysisFramework": "Marco de Análisis",
+    "compositeScoring": "Puntuación Compuesta",
+    "compositeScoringDesc": "12 indicadores técnicos con contribuciones ponderadas a la puntuación final",
+    "multiTimeframeAnalysis": "Análisis Multi-Temporal",
+    "multiTimeframeDesc": "Señales técnicas a corto, medio y largo plazo",
+    "riskAssessment": "Evaluación de Riesgo",
+    "riskAssessmentDesc": "Consideración de volatilidad, momentum y sentimiento del mercado",
+    "analysisMethodology": "Metodología de Análisis",
+    "methodologyDesc": "Este análisis técnico utiliza un marco integral que incorpora 12 indicadores técnicos incluyendo medias móviles (SMA), osciladores de momentum (RSI), indicadores de tendencia (MACD), medidas de volatilidad (Bandas de Bollinger), análisis de volumen y patrones de velas. Cada indicador se pondera según su precisión predictiva histórica y se combina para producir una puntuación de inversión compuesta."
+  },
+  "recommendations": {
+    "buy": "COMPRA",
+    "hold": "MANTENER",
+    "sell": "VENTA",
+    "strongBuy": "Compra Fuerte",
+    "strong": "Fuerte",
+    "moderate": "Moderada",
+    "weak": "Débil"
+  },
+  "settings": {
+    "title": "Configuración",
+    "language": "Idioma",
+    "theme": "Tema",
+    "notifications": "Notificaciones",
+    "privacy": "Privacidad",
+    "account": "Cuenta",
+    "about": "Acerca de",
+    "save": "Guardar Cambios",
+    "reset": "Restablecer por Defecto"
+  },
+  "languages": {
+    "en": "English (UK)",
+    "fr": "Français",
+    "es": "Español"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ocurrió un error",
+    "success": "Éxito",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "close": "Cerrar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "refresh": "Actualizar",
+    "unknown": "Desconocido",
+    "notAvailable": "N/D",
+    "loadingPage": "Cargando contenido de la página..."
+  },
+  "recommendations": {
+    "strongBuy": "Compra Fuerte",
+    "buy": "Compra",
+    "hold": "Mantener",
+    "sell": "Vender"
+  },
+  "errors": {
+    "networkError": "Error de red. Por favor verifique su conexión.",
+    "serverError": "Error del servidor. Por favor intente más tarde.",
+    "notFound": "El recurso solicitado no fue encontrado.",
+    "unauthorized": "No está autorizado para acceder a este recurso.",
+    "validation": "Por favor verifique su entrada e intente nuevamente.",
+    "pageNotFound": "Página no encontrada",
+    "pageNotFoundDescription": "La página que está buscando no existe."
+  },
+  "dashboard": {
+    "welcome": "Bienvenido de vuelta",
+    "subtitle": "Su tablero de análisis financieros",
+    "availableCredits": "Créditos Disponibles",
+    "creditEquation": "1 Crédito = 1 Análisis de Acción",
+    "buyMoreCredits": "Comprar Más Créditos",
+    "quickSearch": "Análisis Rápido de Acciones",
+    "searchPlaceholder": "Ingrese el símbolo bursátil (ej: AAPL, MSFT, GOOGL)",
+    "analyseButton": "Analizar",
+    "searchDescription": "Obtenga análisis técnicos instantáneos para cualquier acción. Costo: 1 crédito por análisis.",
+    "analysesThisMonth": "Análisis Este Mes",
+    "recentCount": "recientes",
+    "recentAnalyses": "Historial de Análisis Recientes",
+    "quickActions": "Acciones Rápidas",
+    "popularStocks": "Acciones Populares",
+    "marketOverview": "Resumen del Rendimiento del Mercado",
+    "totalAnalyses": "Análisis Totales",
+    "averageScore": "Puntuación Promedio",
+    "aboveAverage": "Por encima del promedio",
+    "average": "Promedio",
+    "belowAverage": "Por debajo del promedio",
+    "favoriteSector": "Sector Favorito",
+    "mostAnalysed": "Más analizado",
+    "topSector": "Sector Principal",
+    "marketSentiment": "Sentimiento del Mercado",
+    "sentiment": "Sentimiento",
+    "avgSentimentScore": "Puntuación de Sentimiento Promedio",
+    "newsCoverage": "Cobertura de Noticias",
+    "articlesAnalysed": "Artículos analizados",
+    "sentimentBreakdown": "Desglose de Sentimiento",
+    "positive": "Positivo",
+    "neutral": "Neutral",
+    "negative": "Negativo",
+    "noSentimentData": "Sin datos de sentimiento",
+    "fromAnalyses": "De {{count}} análisis",
+    "noDataYet": "Sin datos aún",
+    "noNewsData": "Sin datos de noticias",
+    "newsArticles": "{{count}} artículos de noticias",
+    "noAnalysisHistory": "Sin historial de análisis aún. ¡Comience analizando su primera acción!",
+    "viewAnalysisResults": "Ver Resultados del Análisis",
+    "stockAnalysis": "Análisis de Acciones",
+    "compareStocks": "Comparar Acciones",
+    "sectorAnalysis": "Análisis Sectorial",
+    "buyCredits": "Comprar Créditos",
+    "portfolioValue": "Valor del Portafolio",
+    "profitLoss": "Ganancia/Pérdida",
+    "viewAll": "Ver Todo",
+    "analyse": "Analizar",
+    "newAnalysis": "Nuevo Análisis",
+    "exportData": "Exportar Datos",
+    "statistics": "Estadísticas"
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "logout": "Cerrar Sesión",
+    "register": "Registrarse",
+    "email": "Email",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "rememberMe": "Recordarme",
+    "forgotPassword": "¿Olvidó su contraseña?",
+    "signIn": "Iniciar Sesión",
+    "signUp": "Registrarse",
+    "createAccount": "Crear Cuenta",
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "username": "Usuario",
+    "alreadyHaveAccount": "¿Ya tiene una cuenta?",
+    "dontHaveAccount": "¿No tiene una cuenta?",
+    "loginSuccess": "Inicio de sesión exitoso",
+    "logoutSuccess": "Cierre de sesión exitoso",
+    "loginSubtitle": "Inicie sesión para acceder a su tablero financiero",
+    "invalidCredentials": "Credenciales inválidas. Por favor intente nuevamente."
+  },
+  "reports": {
+    "title": "Informes de Análisis",
+    "generate": "Generar Informe",
+    "export": "Exportar",
+    "filter": "Filtrar",
+    "dateRange": "Rango de Fechas",
+    "symbol": "Símbolo",
+    "score": "Puntuación",
+    "actions": "Acciones",
+    "view": "Ver",
+    "download": "Descargar",
+    "from": "Desde",
+    "to": "Hasta",
+    "allSymbols": "Todos los Símbolos",
+    "noReports": "No se encontraron informes",
+    "generateFirst": "Genere su primer análisis para ver informes aquí"
+  },
+  "register": {
+    "title": "Crear Cuenta",
+    "subtitle": "Únase a VoyageurCompass y comience a analizar acciones hoy",
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "username": "Usuario",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "agreeTerms": "Acepto los {termsLink} y la {privacyLink}",
+    "termsOfService": "Términos de Servicio",
+    "privacyPolicy": "Política de Privacidad",
+    "createAccount": "Crear Cuenta",
+    "alreadyHaveAccount": "¿Ya tiene una cuenta?",
+    "signIn": "Iniciar Sesión",
+    "registrationSuccess": "¡Registro exitoso! Por favor inicie sesión para continuar.",
+    "whyJoin": "¿Por qué unirse a VoyageurCompass?",
+    "studentPricing": "Precios para Estudiantes",
+    "pricingDescription": "Solo pague por el análisis que necesita. Perfecto para estudiantes y profesionales.",
+    "validation": {
+      "usernameRequired": "El usuario es requerido",
+      "usernameMinLength": "El usuario debe tener al menos 3 caracteres",
+      "emailRequired": "El email es requerido",
+      "emailInvalid": "Por favor ingrese una dirección de email válida",
+      "passwordRequired": "La contraseña es requerida",
+      "passwordMinLength": "La contraseña debe tener al menos 8 caracteres",
+      "passwordsNoMatch": "Las contraseñas no coinciden",
+      "firstNameRequired": "El nombre es requerido",
+      "lastNameRequired": "El apellido es requerido",
+      "agreeTermsRequired": "Debe aceptar los términos y condiciones"
+    },
+    "benefits": {
+      "welcomeBonus": "Bono de Bienvenida",
+      "welcomeBonusDesc": "5 créditos gratis para comenzar",
+      "professionalAnalysis": "Análisis Profesional",
+      "professionalAnalysisDesc": "12 indicadores técnicos por acción",
+      "securePlatform": "Plataforma Segura",
+      "securePlatformDesc": "Sus datos están protegidos con seguridad empresarial"
+    },
+    "pricing": {
+      "creditLabel": "1 Crédito = €1",
+      "analysisLabel": "1 Análisis"
+    }
+  },
+  "navbar": {
+    "dashboard": "Tablero",
+    "tools": "Herramientas",
+    "stockAnalysis": "Análisis de Acciones",
+    "analysisReports": "Informes de Análisis",
+    "compareStocks": "Comparar Acciones",
+    "sectorAnalysis": "Análisis Sectorial",
+    "creditStore": "Tienda de Créditos",
+    "help": "Ayuda",
+    "credits": "Créditos",
+    "settings": "Configuración",
+    "signOut": "Cerrar Sesión",
+    "switchToDarkMode": "Cambiar a modo oscuro",
+    "switchToLightMode": "Cambiar a modo claro"
+  },
+  "stockSearch": {
+    "description": "Obtenga análisis técnicos completos para cualquier acción con 12 indicadores profesionales",
+    "availableCredits": "Créditos Disponibles",
+    "creditEquation": "1 Crédito = 1 Análisis",
+    "buyMoreCredits": "Comprar Más Créditos",
+    "createNewReport": "Crear Nuevo Informe",
+    "stockTickerSymbol": "Símbolo Bursátil",
+    "aiExplanations": "Explicaciones con IA",
+    "modelsLabel": "Phi3 & LLaMA 3.1",
+    "autoExplanation": "🤖 Las explicaciones de resumen con IA se generarán automáticamente para ayudarle a entender sus resultados de análisis",
+    "recentSearches": "Búsquedas recientes:",
+    "fetchingData": "Obteniendo datos para {{symbol}}...",
+    "gettingLatestData": "Obteniendo los últimos datos bursátiles de Yahoo Finance (esto puede tomar 10-30 segundos)",
+    "autoAnalyzing": "Auto-analizando {{symbol}}...",
+    "analyzing": "Analizando {{symbol}}...",
+    "dashboardTriggered": "Análisis activado desde el tablero • Ejecutando 12 indicadores técnicos • Se usará 1 crédito",
+    "runningIndicators": "Ejecutando 12 indicadores técnicos",
+    "analysisComplete": "Análisis completado para {{symbol}}",
+    "analysisSuccessful": "✅ ¡Análisis completado exitosamente! 1 crédito usado.",
+    "viewFullReport": "Ver Informe Completo",
+    "analysisError": "Error en el análisis. Por favor inténtelo de nuevo.",
+    "insufficientCredits": "Créditos insuficientes. Por favor compre más créditos para continuar.",
+    "pleaseEnterTicker": "Por favor ingrese un símbolo bursátil",
+    "confirmAnalysis": "Confirmar Análisis",
+    "analysisWillUse": "Este análisis usará 1 crédito. ¿Desea continuar?",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "technicalIndicators": "Indicadores Técnicos",
+    "indicator": "Indicador",
+    "score": "Puntuación",
+    "description": "Descripción",
+    "browseExistingReports": "Explorar Informes Existentes",
+    "viewAllReports": "Ver Todos los Informes",
+    "noAnalysisReportsYet": "Aún no hay informes de análisis",
+    "createFirstReport": "Cree su primer informe usando el formulario de arriba",
+    "popularStocks": "Acciones Populares",
+    "recentAnalysis": "Análisis Recientes",
+    "noAnalysisHistory": "Aún no hay historial de análisis",
+    "autoAnalysisTitle": "Auto-Análisis desde el Tablero",
+    "startAutoAnalysis": "Iniciar Auto-Análisis",
+    "confirmAnalysisTitle": "Confirmar Análisis",
+    "autoAnalyzeMessage": "Auto-analizar {{symbol}} (activado desde búsqueda rápida del tablero)",
+    "analyzeForCredit": "¿Analizar {{symbol}} por 1 crédito?",
+    "creditWarning": "Esto usará 1 crédito de su saldo ({{credits}} restantes)",
+    "autoStartWarning": "El análisis comenzará automáticamente después de la confirmación",
+    "comprehensiveAnalysis": "Obtenga análisis técnicos completos para cualquier acción con 12 indicadores profesionales",
+    "technicalIndicatorFallback": "Indicador técnico",
+    "enterTickerError": "Por favor ingrese un símbolo bursátil",
+    "insufficientCreditsError": "Créditos insuficientes. Por favor compre más créditos para continuar.",
+    "analysisFailedError": "Error en el análisis. Por favor inténtelo de nuevo.",
+    "syncingData": "Los datos bursátiles se están sincronizando. Esto puede tomar unos momentos...",
+    "syncTimeout": "La sincronización de datos está tomando más tiempo de lo esperado. Por favor inténtelo de nuevo."
+  },
+  "store": {
+    "title": "Tienda de Créditos",
+    "subtitle": "Compre créditos para desbloquear poderosas herramientas de análisis bursátil",
+    "currentBalance": "Saldo Actual",
+    "credits": "Créditos",
+    "creditEquation": "1 Crédito = 1 Análisis de Acción",
+    "choosePackage": "Elija Su Paquete de Créditos",
+    "purchaseNow": "Comprar Ahora",
+    "mostPopular": "Más Popular",
+    "save": "Ahorre {{percent}}%",
+    "purchaseHistory": "Historial de Compras",
+    "noPurchaseHistory": "Sin historial de compras aún",
+    "purchaseFirstPackage": "Compre su primer paquete de créditos para comenzar",
+    "completePurchase": "Complete Su Compra",
+    "purchaseComplete": "¡Compra Completada!",
+    "thankYou": "¡Gracias por su compra!",
+    "creditsAdded": "{{credits}} créditos han sido agregados a su cuenta.",
+    "cancel": "Cancelar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "completePurchaseButton": "Completar Compra",
+    "packages": {
+      "basic": {
+        "name": "Paquete Básico",
+        "description": "Perfecto para probar nuestra plataforma",
+        "features": [
+          "5 Análisis de Acciones",
+          "Válido por 30 días",
+          "Indicadores técnicos básicos",
+          "Soporte por email"
+        ]
+      },
+      "starter": {
+        "name": "Paquete Inicial",
+        "description": "Excelente para usuarios regulares",
+        "features": [
+          "10 Análisis de Acciones",
+          "Válido por 60 días",
+          "Todos los indicadores técnicos",
+          "Soporte por email",
+          "Herramientas de comparación"
+        ]
+      },
+      "value": {
+        "name": "Paquete de Valor",
+        "description": "Mejor valor para inversores serios",
+        "features": [
+          "25 Análisis de Acciones",
+          "Válido por 90 días",
+          "Todos los indicadores técnicos",
+          "Soporte prioritario por email",
+          "Herramientas de comparación",
+          "Análisis sectorial"
+        ]
+      },
+      "professional": {
+        "name": "Paquete Profesional",
+        "description": "Para traders y analistas profesionales",
+        "features": [
+          "50 Análisis de Acciones",
+          "Válido por 120 días",
+          "Todos los indicadores técnicos",
+          "Soporte prioritario por email",
+          "Herramientas de comparación",
+          "Análisis sectorial",
+          "Capacidades de exportación"
+        ]
+      },
+      "enterprise": {
+        "name": "Paquete Empresarial",
+        "description": "Máximo valor para usuarios intensivos",
+        "features": [
+          "100 Análisis de Acciones",
+          "Válido por 365 días",
+          "Todos los indicadores técnicos",
+          "Soporte premium",
+          "Todas las herramientas y funciones",
+          "Acceso a API",
+          "Reportes personalizados"
+        ]
+      }
+    },
+    "checkout": {
+      "steps": {
+        "selectPackage": "Seleccionar Paquete",
+        "paymentMethod": "Método de Pago",
+        "confirmation": "Confirmación"
+      },
+      "selectedPackage": "Paquete Seleccionado",
+      "selectPaymentMethod": "Seleccione Método de Pago",
+      "paymentMethods": {
+        "creditCard": "Tarjeta de Crédito",
+        "paypal": "PayPal",
+        "bankTransfer": "Transferencia Bancaria"
+      },
+      "cardNumber": "Número de Tarjeta",
+      "expiryDate": "Fecha de Vencimiento",
+      "cvv": "CVV",
+      "cardholderName": "Nombre del Titular",
+      "securityNotice": "Su información de pago está segura y encriptada",
+      "orderConfirmation": "Confirmación de Pedido",
+      "total": "Total",
+      "creditsAddedNotice": "Los créditos se agregarán a su cuenta inmediatamente después del pago"
+    }
+  },
+  "home": {
+    "hero": {
+      "title": "VoyageurCompass",
+      "subtitle": "Plataforma de Análisis Financiero Profesional",
+      "description": "Análisis bursátil integral con 12 indicadores técnicos, comparaciones sectoriales e insights inteligentes. Construido con Django, React y PostgreSQL para análisis financiero de grado profesional.",
+      "getStarted": "Comenzar",
+      "goToDashboard": "Ir al Tablero",
+      "login": "Iniciar Sesión",
+      "createFreeAccount": "Crear Cuenta Gratuita",
+      "learnMore": "Saber Más"
+    },
+    "sampleAnalysis": {
+      "title": "Vista Previa de Análisis",
+      "technicalScore": "Puntuación Técnica",
+      "company": "AAPL • Apple Inc. • Sector Tecnológico",
+      "smaTrend": "Tendencia SMA",
+      "strong": "Fuerte",
+      "rsi": "RSI",
+      "macd": "MACD",
+      "bullish": "Alcista"
+    },
+    "features": {
+      "title": "Herramientas de Análisis Financiero Potentes",
+      "technicalAnalysis": {
+        "title": "Análisis Técnico",
+        "description": "12 indicadores avanzados que proporcionan análisis bursátil integral con puntuaciones 0-10",
+        "highlight": "Potenciado por IA"
+      },
+      "stockComparison": {
+        "title": "Comparación de Acciones",
+        "description": "Comparación lado a lado de múltiples acciones con métricas detalladas",
+        "highlight": "Multi-Acción"
+      },
+      "sectorAnalysis": {
+        "title": "Análisis Sectorial",
+        "description": "Rastree el rendimiento sectorial e identifique industrias tendencia",
+        "highlight": "Insights de Mercado"
+      },
+      "creditSystem": {
+        "title": "Sistema de Créditos",
+        "description": "Modelo de pago por análisis - 1 crédito = €1 = 1 análisis detallado",
+        "highlight": "Asequible"
+      }
+    },
+    "benefits": {
+      "title": "¿Por qué elegir VoyageurCompass?",
+      "items": [
+        "Integración de datos de Yahoo Finance en tiempo real",
+        "Almacenamiento de datos confiable respaldado por PostgreSQL",
+        "Suite integral de indicadores técnicos",
+        "Análisis financiero de grado profesional",
+        "Diseño responsivo para todos los dispositivos",
+        "Autenticación JWT segura"
+      ],
+      "fastAnalysis": {
+        "title": "Análisis Rápido",
+        "description": "Resultados en segundos"
+      },
+      "securePlatform": {
+        "title": "Plataforma Segura",
+        "description": "Autenticación JWT"
+      },
+      "creditSystemCard": {
+        "title": "Sistema de Créditos",
+        "description": "Pague solo por lo que usa - 1 crédito = €1 = 1 análisis"
+      }
+    },
+    "callToAction": {
+      "title": "¿Listo para comenzar a analizar?",
+      "subtitle": "Únase a miles de inversores que usan VoyageurCompass para análisis bursátil profesional."
+    }
+  },
+  "logout": {
+    "sessionExpired": {
+      "title": "Sesión Expirada",
+      "message": "Su sesión ha expirado debido a inactividad por razones de seguridad."
+    },
+    "sessionEnded": {
+      "title": "Sesión Finalizada",
+      "message": "Su sesión ha finalizado. Por favor inicie sesión nuevamente para continuar."
+    },
+    "manual": {
+      "title": "Sesión Cerrada Exitosamente",
+      "message": "Ha cerrado sesión exitosamente. Gracias por usar VoyageurCompass."
+    },
+    "securityNotice": "Por su seguridad, cerramos su sesión automáticamente después de 15 minutos de inactividad. Sus datos están seguros y puede iniciar sesión nuevamente en cualquier momento.",
+    "redirectingIn": "Redirigiendo a la página de inicio en {{count}} segundos...",
+    "stayHere": "Quedarse Aquí",
+    "goToHomepage": "Ir a la Página de Inicio",
+    "homepage": "Página de Inicio",
+    "loginAgain": "Iniciar Sesión Nuevamente",
+    "tagline": "VoyageurCompass - Su Socio de Navegación Financiera",
+    "supportText": "¿Preguntas? Visite nuestra sección de Ayuda o contacte al soporte."
+  },
+  "session": {
+    "expiring": {
+      "title": "Sesión Expirando Pronto",
+      "message": "Su sesión expirará en {{time}} debido a inactividad.",
+      "timeRemaining": "Tiempo restante: {{time}}",
+      "securityNotice": "Por su seguridad, cerramos su sesión automáticamente después de 15 minutos de inactividad. Haga clic en \"Mantener Sesión\" para continuar su sesión, o \"Cerrar Sesión\" para terminarla ahora.",
+      "tip": "💡 Consejo: Cualquier actividad (hacer clic, escribir, desplazarse) extenderá automáticamente su sesión.",
+      "logoutNow": "Cerrar Sesión Ahora",
+      "stayLoggedIn": "Mantener Sesión"
+    }
+  },
+  "help": {
+    "title": "Ayuda y Soporte",
+    "subtitle": "Todo lo que necesita saber sobre el uso de VoyageurCompass",
+    "stats": {
+      "indicators": {
+        "title": "12 Indicadores",
+        "subtitle": "Análisis profesional"
+      },
+      "analysisTime": {
+        "title": "2-5 Segundos",
+        "subtitle": "Tiempo de análisis"
+      },
+      "pricing": {
+        "title": "€1 = 1 Análisis",
+        "subtitle": "Precios asequibles"
+      },
+      "mobileSupport": {
+        "title": "Compatible con Móviles",
+        "subtitle": "Diseño responsivo"
+      }
+    },
+    "tabs": {
+      "userGuide": "Guía del Usuario",
+      "technical": "Indicadores Técnicos",
+      "faq": "FAQ",
+      "contact": "Contacto"
+    },
+    "disclaimer": {
+      "title": "Descargo de Responsabilidad Educativo:",
+      "content": "VoyageurCompass es un proyecto universitario creado con fines educativos. Esta plataforma demuestra conceptos de análisis técnico y no debe utilizarse para decisiones de trading reales. Siempre consulte con asesores financieros calificados para orientación de inversión."
+    },
+    "contactForm": {
+      "name": "Nombre",
+      "email": "Email",
+      "subject": "Asunto",
+      "message": "Mensaje",
+      "send": "Enviar Mensaje",
+      "success": "¡Gracias por su mensaje! Le responderemos pronto.",
+      "contactInfo": "Información de Contacto",
+      "getInTouch": "Ponerse en Contacto",
+      "studentProject": "Aviso de Proyecto Estudiantil",
+      "projectDescription": "VoyageurCompass es un proyecto educativo diseñado para un curso universitario. Aunque utiliza datos de mercado reales y técnicas de análisis profesionales, está diseñado para propósitos de aprendizaje y demostración."
+    },
+    "features": {
+      "technicalAnalysis": {
+        "title": "Análisis Técnico",
+        "description": "12 indicadores integrales que proporcionan análisis bursátil detallado",
+        "details": [
+          "Análisis de tendencia SMA50 vs SMA200",
+          "Precio vs promedio móvil de 50 días",
+          "Indicador de momentum RSI (14 períodos)",
+          "Señal e histograma MACD",
+          "Posición y ancho de Bandas de Bollinger",
+          "Detección de aumento de volumen",
+          "Tendencia de Volumen en Balance",
+          "Fuerza relativa vs sector/mercado",
+          "Reconocimiento de patrones de velas",
+          "Contexto de soporte/resistencia"
+        ]
+      },
+      "stockComparison": {
+        "title": "Comparación de Acciones",
+        "description": "Análisis lado a lado de múltiples acciones",
+        "details": [
+          "Compare hasta 5 acciones simultáneamente",
+          "Tablas de comparación de métricas visuales",
+          "Exporte resultados a CSV",
+          "Clasificación de rendimiento",
+          "Comparaciones específicas del sector"
+        ]
+      },
+      "sectorAnalysis": {
+        "title": "Análisis Sectorial",
+        "description": "Rendimiento y tendencias de sectores del mercado",
+        "details": [
+          "Seguimiento de rendimiento industrial",
+          "Análisis de momentum sectorial",
+          "Métricas de capitalización de mercado y volumen",
+          "Acciones de mejor rendimiento por sector",
+          "Identificación de tendencias"
+        ]
+      },
+      "creditSystem": {
+        "title": "Sistema de Créditos",
+        "description": "Precios asequibles de pago por análisis",
+        "details": [
+          "1 Crédito = €1 = 1 Análisis de Acción",
+          "Sin suscripciones mensuales",
+          "Los créditos nunca expiran",
+          "Precios amigables para estudiantes",
+          "Descuentos por compras al mayor"
+        ]
+      }
+    },
+    "technicalGuide": {
+      "title": "Guía de Indicadores Técnicos",
+      "description": "Nuestro motor de análisis técnico utiliza 12 indicadores profesionales para generar una puntuación integral (0-10) para cada acción. Puntuaciones más altas indican un rendimiento técnico más fuerte.",
+      "indicators": [
+        {
+          "name": "SMA50 vs SMA200",
+          "description": "Dirección de tendencia basada en cruce de promedios móviles",
+          "range": "0-10"
+        },
+        {
+          "name": "Precio vs 50MA",
+          "description": "Precio actual relativo al promedio móvil de 50 días",
+          "range": "0-10"
+        },
+        {
+          "name": "RSI (14)",
+          "description": "Oscilador de momentum Índice de Fuerza Relativa",
+          "range": "0-100"
+        },
+        {
+          "name": "MACD",
+          "description": "Convergencia Divergencia de Promedios Móviles",
+          "range": "Señal/Histograma"
+        },
+        {
+          "name": "Posición Bollinger",
+          "description": "Posición dentro de las Bandas de Bollinger",
+          "range": "0-10"
+        },
+        {
+          "name": "Aumento de Volumen",
+          "description": "Volumen de trading comparado con el promedio",
+          "range": "0-10"
+        },
+        {
+          "name": "Tendencia OBV",
+          "description": "Análisis de tendencia de Volumen en Balance",
+          "range": "0-10"
+        },
+        {
+          "name": "Relativo 1A/2A",
+          "description": "Rendimiento vs referencia sectorial",
+          "range": "Porcentaje"
+        }
+      ],
+      "tableHeaders": {
+        "indicator": "Indicador",
+        "description": "Descripción",
+        "range": "Rango/Escala"
+      },
+      "scoreInterpretation": {
+        "title": "Interpretación de Puntuación"
+      }
+    },
+    "faq": {
+      "title": "Preguntas Frecuentes",
+      "items": [
+        {
+          "question": "¿Qué es VoyageurCompass?",
+          "answer": "VoyageurCompass es una plataforma integral de análisis financiero que proporciona análisis bursátil de grado profesional utilizando 12 indicadores técnicos. Diseñado para estudiantes y profesionales, ofrece precios asequibles de pago por análisis sin suscripciones mensuales."
+        },
+        {
+          "question": "¿Cómo funciona el sistema de créditos?",
+          "answer": "Nuestro sistema de créditos es simple: 1 Crédito = €1 = 1 Análisis de Acción. Solo paga por lo que usa. Los créditos nunca expiran, y puede comprarlos en varios paquetes con descuentos por volumen. No se requieren tarifas mensuales o suscripciones."
+        },
+        {
+          "question": "¿Qué indicadores técnicos proporcionan?",
+          "answer": "Proporcionamos 12 indicadores técnicos integrales incluyendo tendencias SMA, RSI, MACD, Bandas de Bollinger, análisis de volumen, OBV, rendimiento relativo y patrones de velas. Cada análisis recibe una puntuación de 0-10 basada en estos indicadores."
+        },
+        {
+          "question": "¿De dónde obtienen sus datos?",
+          "answer": "Utilizamos la API de Yahoo Finance para datos bursátiles en tiempo real e históricos. Nuestros datos se actualizan regularmente y se almacenan en una base de datos PostgreSQL segura con caché Redis para acceso rápido."
+        },
+        {
+          "question": "¿Cómo funciona la comparación de acciones?",
+          "answer": "Puede comparar 2-5 acciones lado a lado con métricas detalladas. Cada acción en la comparación cuesta 1 crédito. Los resultados incluyen gráficos visuales, clasificaciones de rendimiento e informes CSV exportables."
+        },
+        {
+          "question": "¿Qué es el análisis sectorial?",
+          "answer": "El análisis sectorial compara diferentes sectores del mercado (Tecnología, Salud, Finanzas, etc.) mostrando tendencias de rendimiento, momentum, volatilidad y mejores ejecutores. Puede analizar 2+ sectores por créditos (2 sectores = 1 crédito)."
+        },
+        {
+          "question": "¿Es esta una plataforma de trading real?",
+          "answer": "VoyageurCompass es un proyecto educativo construido para un curso universitario. Aunque utiliza datos de mercado reales y técnicas de análisis profesionales, está diseñado para propósitos de aprendizaje y demostración."
+        },
+        {
+          "question": "¿Qué acciones puedo analizar?",
+          "answer": "Puede analizar cualquier acción cotizada públicamente con un símbolo bursátil válido. Nuestro sistema soporta las principales bolsas incluyendo NYSE, NASDAQ y otras a través de la integración con Yahoo Finance."
+        },
+        {
+          "question": "¿Cuánto tiempo toma el análisis?",
+          "answer": "El análisis de acciones típicamente toma 2-5 segundos. El sistema obtiene datos en tiempo real, ejecuta 12 indicadores técnicos y calcula una puntuación integral. Los resultados se muestran inmediatamente."
+        },
+        {
+          "question": "¿Puedo usarlo en dispositivos móviles?",
+          "answer": "¡Sí! VoyageurCompass está construido con diseño responsivo usando Material-UI, haciéndolo completamente funcional en escritorio, tablet y dispositivos móviles."
+        }
+      ]
+    }
+  },
+  "recommendations": {
+    "strongBuy": "Compra Fuerte",
+    "buy": "Comprar",
+    "hold": "Mantener",
+    "sell": "Vender"
+  },
+  "indicators": {
+    "sma50_200": "Tendencia SMA50 vs SMA200",
+    "price_sma50": "Precio vs Promedio Móvil 50 Días",
+    "rsi": "RSI (14 períodos)",
+    "macd": "Señal MACD",
+    "bollinger_position": "Posición Bandas Bollinger",
+    "volume_sma": "Volumen vs Promedio",
+    "obv_trend": "Tendencia Volumen en Balance",
+    "relative_1y": "Rendimiento Relativo 1 Año",
+    "relative_2y": "Rendimiento Relativo 2 Años",
+    "candlestick": "Patrones de Velas",
+    "sentiment": "Análisis Sentimiento Noticias",
+    "descriptions": {
+      "sma50_200": "Dirección de tendencia basada en cruce de promedios móviles de 50 vs 200 días",
+      "price_sma50": "Posición del precio actual relativa al promedio móvil de 50 días",
+      "rsi": "Oscilador de momentum Índice de Fuerza Relativa (escala 0-100)",
+      "macd": "Análisis de señal de Convergencia Divergencia de Promedios Móviles",
+      "bollinger_position": "Posición de la acción dentro del canal de Bandas de Bollinger",
+      "volume_sma": "Comparación del volumen de trading con el promedio histórico",
+      "obv_trend": "Análisis de tendencia de Volumen en Balance para confirmación de precio",
+      "relative_1y": "Rendimiento de un año relativo al benchmark sectorial",
+      "relative_2y": "Rendimiento de dos años relativo al benchmark sectorial",
+      "candlestick": "Análisis de reconocimiento de patrones de velas japonesas",
+      "sentiment": "Análisis del sentimiento del mercado a partir de artículos de noticias y redes sociales",
+      "sma50vs200": "Cruce de Medias Móviles",
+      "obv20": "Volumen en Balance",
+      "rel1y": "Fuerza Relativa 1A",
+      "rel2y": "Fuerza Relativa 2A",
+      "rsi14": "Índice de Fuerza Relativa",
+      "bbpos20": "Posición Bollinger",
+      "volsurge": "Pico de Volumen",
+      "bbwidth20": "Ancho Bollinger",
+      "candlerev": "Patrón: Martillo Invertido",
+      "macd12269": "Histograma MACD",
+      "pricevs50": "Precio vs Promedio 50 Días",
+      "srcontext": "Soporte/Resistencia",
+      "prediction": "Predicción de Precio LSTM"
+    }
+  },
+  "settings": {
+    "title": "Configuración de Cuenta",
+    "subtitle": "Gestione sus preferencias de cuenta y seguridad",
+    "tabs": {
+      "profile": "Perfil",
+      "security": "Seguridad",
+      "notifications": "Notificaciones",
+      "appearance": "Apariencia"
+    },
+    "profile": {
+      "personalInfo": "Información Personal",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "username": "Usuario",
+      "email": "Correo Electrónico",
+      "phone": "Número de Teléfono",
+      "saveChanges": "Guardar Cambios",
+      "updating": "Actualizando...",
+      "updateSuccess": "¡Perfil actualizado exitosamente!",
+      "updateError": "Error al actualizar el perfil"
+    },
+    "security": {
+      "title": "Configuración de Seguridad",
+      "changePassword": "Cambiar Contraseña",
+      "currentPassword": "Contraseña Actual",
+      "newPassword": "Nueva Contraseña",
+      "confirmPassword": "Confirmar Nueva Contraseña",
+      "twoFactor": "Autenticación de Dos Factores",
+      "twoFactorDesc": "Agregar una capa adicional de seguridad a su cuenta",
+      "loginNotifications": "Notificaciones de Inicio de Sesión",
+      "loginNotificationsDesc": "Recibir notificaciones cuando alguien inicie sesión en su cuenta",
+      "passwordUpdated": "Contraseña actualizada exitosamente",
+      "passwordError": "Error al actualizar la contraseña"
+    },
+    "notifications": {
+      "title": "Preferencias de Notificación",
+      "email": "Notificaciones por Email",
+      "emailDesc": "Recibir notificaciones por correo electrónico",
+      "analysisComplete": "Análisis Completado",
+      "analysisCompleteDesc": "Notificar cuando el análisis de acciones esté terminado",
+      "weeklyReport": "Informe Semanal",
+      "weeklyReportDesc": "Obtener un resumen de su actividad",
+      "marketAlerts": "Alertas de Mercado",
+      "marketAlertsDesc": "Noticias importantes del mercado y actualizaciones",
+      "creditLowAlert": "Alerta de Crédito Bajo",
+      "creditLowAlertDesc": "Notificar cuando sus créditos estén bajos",
+      "promotionalEmails": "Emails Promocionales",
+      "promotionalEmailsDesc": "Ofertas especiales y actualizaciones de productos",
+      "notificationsUpdated": "Preferencias de notificación actualizadas"
+    },
+    "preferences": {
+      "title": "Preferencias de la Aplicación",
+      "theme": "Tema",
+      "themeLight": "Claro",
+      "themeDark": "Oscuro",
+      "themeAuto": "Automático",
+      "language": "Idioma",
+      "timezone": "Zona Horaria",
+      "timezoneEastern": "Hora del Este",
+      "timezoneCentral": "Hora Central",
+      "timezoneMountain": "Hora de Montaña",
+      "timezonePacific": "Hora del Pacífico",
+      "defaultAnalysisView": "Vista de Análisis por Defecto",
+      "viewSummary": "Resumen",
+      "viewDetailed": "Detallado",
+      "viewCharts": "Gráficos",
+      "autoRefresh": "Actualización Automática de Datos",
+      "autoRefreshDesc": "Actualizar automáticamente los datos del mercado",
+      "soundEffects": "Efectos de Sonido",
+      "soundEffectsDesc": "Reproducir sonidos para notificaciones y alertas"
+    },
+    "deleteAccount": {
+      "title": "Eliminar Cuenta",
+      "description": "Eliminar permanentemente su cuenta y todos los datos asociados. Esta acción no se puede deshacer.",
+      "warning": "Esto eliminará permanentemente su cuenta",
+      "confirmText": "¿Está seguro de que desea eliminar su cuenta? Esta acción no se puede deshacer y todos sus datos serán eliminados permanentemente.",
+      "confirmButton": "Eliminar Cuenta",
+      "cancelButton": "Cancelar"
+    }
+  },
+  "sectors": {
+    "technology": {
+      "name": "Tecnología",
+      "description": "Software, hardware, semiconductores"
+    },
+    "healthcare": {
+      "name": "Atención Médica",
+      "description": "Farmacéuticos, dispositivos médicos, biotecnología"
+    },
+    "financials": {
+      "name": "Servicios Financieros",
+      "description": "Bancos, seguros, servicios de inversión"
+    },
+    "consumer_discretionary": {
+      "name": "Bienes de Consumo Discrecional",
+      "description": "Retail, automotriz, entretenimiento"
+    },
+    "industrials": {
+      "name": "Industriales",
+      "description": "Manufactura, aeroespacial, transporte"
+    },
+    "real_estate": {
+      "name": "Bienes Raíces",
+      "description": "REITs, desarrollo inmobiliario"
+    },
+    "utilities": {
+      "name": "Servicios Públicos",
+      "description": "Servicios de electricidad, gas, agua"
+    },
+    "telecommunications": {
+      "name": "Telecomunicaciones",
+      "description": "Servicios de telecomunicaciones, medios"
+    },
+    "energy": {
+      "name": "Energía",
+      "description": "Petróleo, gas, energía renovable"
+    },
+    "materials": {
+      "name": "Materiales",
+      "description": "Minería, químicos, metales"
+    }
+  },
+  "comparison": {
+    "title": "Comparación de Acciones",
+    "subtitle": "Compare múltiples acciones lado a lado con análisis técnico completo",
+    "availableCredits": "Créditos Disponibles",
+    "cost": "Costo: {{credits}} Créditos ({{stocks}} acciones)",
+    "buyMoreCredits": "Comprar Más Créditos",
+    "selectStocks": "Seleccionar Acciones para Comparar",
+    "addStockSymbol": "Agregar Símbolo de Acción",
+    "typeToSearch": "Escriba para buscar...",
+    "comparing": "Comparando...",
+    "compareStocks": "Comparar Acciones",
+    "confirmComparison": "Confirmar Comparación de Acciones",
+    "confirmMessage": "¿Comparar <strong>{{stocks}}</strong> por {{credits}} créditos?",
+    "creditUsage": "Esto usará {{used}} créditos de su saldo ({{remaining}} restantes)",
+    "confirmButton": "Confirmar Comparación",
+    "instructions": "Seleccione 2-5 acciones para comparación. Cada acción cuesta 1 crédito analizar.",
+    "insufficientCredits": "Créditos insuficientes. Se necesitan {{needed}} créditos para esta comparación.",
+    "creditsUsed": "{{used}} créditos utilizados",
+    "comparingStocks": "Comparando {{count}} acciones...",
+    "runningAnalysis": "Ejecutando análisis técnico para cada acción",
+    "detailedComparison": "Comparación Detallada",
+    "exportCSV": "Exportar CSV",
+    "metric": "Métrica",
+    "technicalScore": "Puntuación Técnica",
+    "summary": "Resumen de Comparación",
+    "bestPerformers": "Mejores Rendimientos",
+    "analysisDetails": "Detalles del Análisis",
+    "analyzedStocks": "{{count}} acciones analizadas",
+    "analysisCompleted": "Análisis completado a las {{time}}"
+  },
+  "reports": {
+    "title": "Informes de Análisis",
+    "subtitle": "Examinar y gestionar todos sus informes de análisis de acciones",
+    "createNewReport": "Crear Nuevo Informe",
+    "searchPlaceholder": "Buscar por símbolo, empresa, sector... (Próximamente con búsqueda del lado del servidor)",
+    "sortBy": "Ordenar por",
+    "order": "Orden",
+    "sortOptions": {
+      "date": "Fecha",
+      "symbol": "Símbolo",
+      "score": "Puntuación",
+      "sector": "Sector"
+    },
+    "orderOptions": {
+      "descending": "Descendente",
+      "ascending": "Ascendente"
+    },
+    "loadingReports": "Cargando sus informes...",
+    "loading": "Cargando...",
+    "failedToLoad": "Error al cargar informes",
+    "tryAgainLater": "Por favor intente más tarde",
+    "reportsTotal": "<strong>{{count}}</strong> informes en total",
+    "showingOnPage": " • Mostrando {{count}} en esta página",
+    "table": {
+      "stock": "Acción",
+      "company": "Empresa",
+      "sector": "Sector",
+      "score": "Puntuación",
+      "recommendation": "Recomendación",
+      "analysisDate": "Fecha de Análisis",
+      "actions": "Acciones"
+    },
+    "actions": {
+      "viewResults": "Ver Resultados del Análisis",
+      "runNewAnalysis": "Nuevo Análisis"
+    },
+    "noMatchingReports": "No hay informes que coincidan con su búsqueda",
+    "noReportsFound": "No se encontraron informes",
+    "tryAdjustingSearch": "Intente ajustar sus términos de búsqueda o filtros",
+    "getStartedMessage": "Comience creando su primer informe de análisis",
+    "createFirstReport": "Crear Su Primer Informe"
+  },
+  "sectorAnalysis": {
+    "title": "Análisis Sectorial",
+    "subtitle": "Comparar el rendimiento sectorial e identificar tendencias del mercado",
+    "availableCredits": "Créditos Disponibles",
+    "cost": "Costo: {{credits}} Créditos ({{sectors}} sectores)",
+    "selectSectors": "Seleccionar Sectores",
+    "timeframe": "Período de Tiempo",
+    "analyzing": "Analizando...",
+    "analyzeSectors": "Analizar Sectores",
+    "analyzingCount": "Analizando {{count}} sectores...",
+    "processing": "Procesando datos de mercado y métricas de rendimiento",
+    "summary": "Resumen de Análisis Sectorial",
+    "confirmAnalysis": "Confirmar Análisis Sectorial"
+  },
+  "footer": {
+    "copyright": "© 2025 Voyageur Compass. Todos los derechos reservados."
+  },
+  "formatting": {
+    "currency": "€",
+    "currencyPosition": "after",
+    "decimalSeparator": ",",
+    "thousandsSeparator": ".",
+    "dateFormat": "DD/MM/YYYY",
+    "timeFormat": "HH:mm"
+  }
+}

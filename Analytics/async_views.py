@@ -3,6 +3,7 @@ Async Processing Views for Analytics app.
 Provides endpoints for concurrent batch processing of analysis and explanation requests.
 """
 
+import logging
 from datetime import datetime
 
 from drf_spectacular.types import OpenApiTypes
@@ -115,8 +116,12 @@ def batch_analyze(request):
             }
         )
 
+    except (ValueError, TypeError) as e:
+        logging.warning(f"Invalid input for batch analysis: {str(e)}")
+        return Response({"error": f"Invalid input: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return Response({"error": f"Batch analysis failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logging.error(f"Batch analysis failed: {str(e)}", exc_info=True)
+        return Response({"error": "Batch analysis failed due to an internal error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @extend_schema(
@@ -178,8 +183,12 @@ def batch_explain(request):
             }
         )
 
+    except (ValueError, TypeError) as e:
+        logging.warning(f"Invalid input for batch explanation: {str(e)}")
+        return Response({"error": f"Invalid input: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return Response({"error": f"Batch explanation failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logging.error(f"Batch explanation failed: {str(e)}", exc_info=True)
+        return Response({"error": "Batch explanation failed due to an internal error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @extend_schema(

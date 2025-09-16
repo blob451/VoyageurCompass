@@ -41,9 +41,11 @@ import {
   History,
   CardGiftcard
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 // import { useSelector } from 'react-redux'; // Not used currently
 
 const StorePage = () => {
+  const { t } = useTranslation();
   // const { user } = useSelector((state) => state.auth); // Not used currently
   const [userCredits] = useState(25); // Mock credit balance
   const [selectedPackage, setSelectedPackage] = useState(null);
@@ -63,102 +65,72 @@ const StorePage = () => {
   const creditPackages = [
     {
       id: 'basic',
-      name: 'Basic Pack',
+      name: t('store.packages.basic.name'),
       credits: 5,
       price: 5,
       originalPrice: 5,
       discount: 0,
       popular: false,
-      features: [
-        '5 Stock Analysis',
-        'Valid for 30 days',
-        'Basic technical indicators',
-        'Email support'
-      ],
-      description: 'Perfect for trying out our platform'
+      features: t('store.packages.basic.features', { returnObjects: true }),
+      description: t('store.packages.basic.description')
     },
     {
       id: 'starter',
-      name: 'Starter Pack',
+      name: t('store.packages.starter.name'),
       credits: 10,
       price: 10,
       originalPrice: 10,
       discount: 0,
       popular: false,
-      features: [
-        '10 Stock Analysis',
-        'Valid for 60 days',
-        'All technical indicators',
-        'Email support',
-        'Comparison tools'
-      ],
-      description: 'Great for regular users'
+      features: t('store.packages.starter.features', { returnObjects: true }),
+      description: t('store.packages.starter.description')
     },
     {
       id: 'value',
-      name: 'Value Pack',
+      name: t('store.packages.value.name'),
       credits: 25,
       price: 23,
       originalPrice: 25,
       discount: 8,
       popular: true,
-      features: [
-        '25 Stock Analysis',
-        'Valid for 90 days',
-        'All technical indicators',
-        'Priority email support',
-        'Comparison tools',
-        'Sector analysis'
-      ],
-      description: 'Best value for serious investors'
+      features: t('store.packages.value.features', { returnObjects: true }),
+      description: t('store.packages.value.description')
     },
     {
       id: 'professional',
-      name: 'Professional Pack',
+      name: t('store.packages.professional.name'),
       credits: 50,
       price: 45,
       originalPrice: 50,
       discount: 10,
       popular: false,
-      features: [
-        '50 Stock Analysis',
-        'Valid for 120 days',
-        'All technical indicators',
-        'Priority email support',
-        'Comparison tools',
-        'Sector analysis',
-        'Export capabilities'
-      ],
-      description: 'For professional traders and analysts'
+      features: t('store.packages.professional.features', { returnObjects: true }),
+      description: t('store.packages.professional.description')
     },
     {
       id: 'enterprise',
-      name: 'Enterprise Pack',
+      name: t('store.packages.enterprise.name'),
       credits: 100,
       price: 85,
       originalPrice: 100,
       discount: 15,
       popular: false,
-      features: [
-        '100 Stock Analysis',
-        'Valid for 365 days',
-        'All technical indicators',
-        'Premium support',
-        'All tools and features',
-        'API access',
-        'Custom reporting'
-      ],
-      description: 'Maximum value for heavy users'
+      features: t('store.packages.enterprise.features', { returnObjects: true }),
+      description: t('store.packages.enterprise.description')
     }
   ];
 
   const paymentMethods = [
-    { id: 'credit_card', name: 'Credit Card', icon: <CreditCard /> },
-    { id: 'paypal', name: 'PayPal', icon: <AccountBalanceWallet /> },
-    { id: 'bank_transfer', name: 'Bank Transfer', icon: <Payment /> }
+    { id: 'credit_card', name: t('store.checkout.paymentMethods.creditCard'), icon: <CreditCard /> },
+    { id: 'paypal', name: t('store.checkout.paymentMethods.paypal'), icon: <AccountBalanceWallet /> },
+    { id: 'bank_transfer', name: t('store.checkout.paymentMethods.bankTransfer'), icon: <Payment /> }
   ];
 
-  const steps = ['Select Package', 'Payment Method', 'Confirmation'];
+  const steps = [
+    t('store.checkout.steps.selectPackage'),
+    t('store.checkout.steps.paymentMethod'),
+    t('store.checkout.steps.confirmation')
+  ];
 
   const handleSelectPackage = (pkg) => {
     setSelectedPackage(pkg);
@@ -210,7 +182,7 @@ const StorePage = () => {
         return (
           <Box>
             <Typography variant="h6" gutterBottom>
-              Selected Package
+              {t('store.checkout.selectedPackage')}
             </Typography>
             {selectedPackage && (
               <Card sx={{ mb: 2 }}>
@@ -218,7 +190,7 @@ const StorePage = () => {
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="h6">{selectedPackage.name}</Typography>
                     {selectedPackage.popular && (
-                      <Chip label="Most Popular" color="primary" icon={<Star />} />
+                      <Chip label={t('store.mostPopular')} color="primary" icon={<Star />} />
                     )}
                   </Box>
                   <Typography variant="h4" color="primary.main" gutterBottom>
@@ -235,7 +207,7 @@ const StorePage = () => {
                     )}
                   </Typography>
                   <Typography variant="body1" gutterBottom>
-                    {selectedPackage.credits} Credits • {selectedPackage.description}
+                    {selectedPackage.credits} {t('store.credits')} • {selectedPackage.description}
                   </Typography>
                   <List dense>
                     {selectedPackage.features.map((feature, index) => (
@@ -256,14 +228,14 @@ const StorePage = () => {
         return (
           <Box>
             <Typography variant="h6" gutterBottom>
-              Select Payment Method
+              {t('store.checkout.selectPaymentMethod')}
             </Typography>
             <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Payment Method</InputLabel>
+              <InputLabel>{t('store.checkout.selectPaymentMethod')}</InputLabel>
               <Select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                label="Payment Method"
+                label={t('store.checkout.selectPaymentMethod')}
               >
                 {paymentMethods.map((method) => (
                   <MenuItem key={method.id} value={method.id}>
@@ -281,7 +253,7 @@ const StorePage = () => {
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
-                    label="Card Number"
+                    label={t('store.checkout.cardNumber')}
                     placeholder="1234 5678 9012 3456"
                     InputProps={{
                       startAdornment: <CreditCard sx={{ mr: 1, color: 'action.active' }} />
@@ -291,21 +263,21 @@ const StorePage = () => {
                 <Grid item xs={6}>
                   <TextField
                     fullWidth
-                    label="Expiry Date"
+                    label={t('store.checkout.expiryDate')}
                     placeholder="MM/YY"
                   />
                 </Grid>
                 <Grid item xs={6}>
                   <TextField
                     fullWidth
-                    label="CVV"
+                    label={t('store.checkout.cvv')}
                     placeholder="123"
                   />
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
-                    label="Cardholder Name"
+                    label={t('store.checkout.cardholderName')}
                     placeholder="John Doe"
                   />
                 </Grid>
@@ -315,7 +287,7 @@ const StorePage = () => {
             <Alert severity="info" sx={{ mt: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Security />
-                Your payment information is secure and encrypted
+                {t('store.checkout.securityNotice')}
               </Box>
             </Alert>
           </Box>
@@ -324,7 +296,7 @@ const StorePage = () => {
         return (
           <Box>
             <Typography variant="h6" gutterBottom>
-              Order Confirmation
+              {t('store.checkout.orderConfirmation')}
             </Typography>
             <Card>
               <CardContent>
@@ -332,7 +304,7 @@ const StorePage = () => {
                   <Grid item xs={8}>
                     <Typography variant="body1">{selectedPackage?.name}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {selectedPackage?.credits} Credits
+                      {selectedPackage?.credits} {t('store.credits')}
                     </Typography>
                   </Grid>
                   <Grid item xs={4} sx={{ textAlign: 'right' }}>
@@ -342,7 +314,7 @@ const StorePage = () => {
                 <Divider sx={{ my: 2 }} />
                 <Grid container spacing={2}>
                   <Grid item xs={8}>
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>Total</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>{t('store.checkout.total')}</Typography>
                   </Grid>
                   <Grid item xs={4} sx={{ textAlign: 'right' }}>
                     <Typography variant="h6" color="primary.main">
@@ -354,7 +326,7 @@ const StorePage = () => {
             </Card>
             
             <Alert severity="success" sx={{ mt: 2 }}>
-              Credits will be added to your account immediately after payment
+              {t('store.checkout.creditsAddedNotice')}
             </Alert>
           </Box>
         );
@@ -368,10 +340,10 @@ const StorePage = () => {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
-          Credit Store
+          {t('store.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Purchase credits to unlock powerful stock analysis tools
+          {t('store.subtitle')}
         </Typography>
       </Box>
 
@@ -379,10 +351,10 @@ const StorePage = () => {
       <Card sx={{ mb: 4, backgroundColor: 'primary.main', color: 'white' }}>
         <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="h6">Current Balance</Typography>
-            <Typography variant="h3">{userCredits} Credits</Typography>
+            <Typography variant="h6">{t('store.currentBalance')}</Typography>
+            <Typography variant="h3">{userCredits} {t('store.credits')}</Typography>
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
-              1 Credit = 1 Stock Analysis
+              {t('store.creditEquation')}
             </Typography>
           </Box>
           <Box sx={{ textAlign: 'center' }}>
@@ -393,7 +365,7 @@ const StorePage = () => {
 
       {/* Credit Packages */}
       <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
-        Choose Your Credit Package
+        {t('store.choosePackage')}
       </Typography>
       
       <Grid container spacing={3} sx={{ mb: 6 }}>
@@ -414,7 +386,7 @@ const StorePage = () => {
             >
               {pkg.popular && (
                 <Chip
-                  label="Most Popular"
+                  label={t('store.mostPopular')}
                   color="primary"
                   icon={<Star />}
                   sx={{
@@ -447,13 +419,13 @@ const StorePage = () => {
                     )}
                   </Typography>
                   <Typography variant="body1" color="text.secondary">
-                    {pkg.credits} Credits
+                    {pkg.credits} {t('store.credits')}
                   </Typography>
                   {pkg.discount > 0 && (
-                    <Chip 
-                      label={`Save ${pkg.discount}%`} 
-                      color="success" 
-                      size="small" 
+                    <Chip
+                      label={t('store.save', { percent: pkg.discount })}
+                      color="success"
+                      size="small"
                       sx={{ mt: 1 }}
                     />
                   )}
@@ -485,7 +457,7 @@ const StorePage = () => {
                   startIcon={<ShoppingCart />}
                   sx={{ mt: 2 }}
                 >
-                  Purchase Now
+                  {t('store.purchaseNow')}
                 </Button>
               </CardContent>
             </Card>
@@ -497,7 +469,7 @@ const StorePage = () => {
       <Paper sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
           <History sx={{ mr: 1 }} />
-          <Typography variant="h6">Purchase History</Typography>
+          <Typography variant="h6">{t('store.purchaseHistory')}</Typography>
         </Box>
         
         {purchaseHistory.length > 0 ? (
@@ -519,15 +491,17 @@ const StorePage = () => {
                     secondary={
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
                         <Typography variant="body2" color="text.secondary">
-                          {purchase.credits} Credits • {purchase.date}
+                          {purchase.credits} {t('store.credits')} • {purchase.date}
                         </Typography>
-                        <Chip 
-                          label={purchase.status} 
-                          size="small" 
+                        <Chip
+                          label={purchase.status}
+                          size="small"
                           color="success"
                         />
                       </Box>
                     }
+                    primaryTypographyProps={{ component: 'div' }}
+                    secondaryTypographyProps={{ component: 'div' }}
                   />
                 </ListItem>
                 {index < purchaseHistory.length - 1 && <Divider />}
@@ -537,10 +511,10 @@ const StorePage = () => {
         ) : (
           <Box sx={{ textAlign: 'center', py: 4 }}>
             <Typography variant="body1" color="text.secondary">
-              No purchase history yet
+              {t('store.noPurchaseHistory')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Purchase your first credit package to get started
+              {t('store.purchaseFirstPackage')}
             </Typography>
           </Box>
         )}
@@ -557,10 +531,10 @@ const StorePage = () => {
           {purchaseComplete ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <CheckCircle color="success" />
-              Purchase Complete!
+              {t('store.purchaseComplete')}
             </Box>
           ) : (
-            'Complete Your Purchase'
+            t('store.completePurchase')
           )}
         </DialogTitle>
         
@@ -569,10 +543,10 @@ const StorePage = () => {
             <Box sx={{ textAlign: 'center', py: 3 }}>
               <CheckCircle color="success" sx={{ fontSize: 60, mb: 2 }} />
               <Typography variant="h6" gutterBottom>
-                Thank you for your purchase!
+                {t('store.thankYou')}
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                {selectedPackage?.credits} credits have been added to your account.
+                {t('store.creditsAdded', { credits: selectedPackage?.credits })}
               </Typography>
             </Box>
           ) : (
@@ -593,11 +567,11 @@ const StorePage = () => {
         {!purchaseComplete && (
           <DialogActions>
             <Button onClick={() => setPurchaseDialog(false)}>
-              Cancel
+              {t('store.cancel')}
             </Button>
             {activeStep > 0 && (
               <Button onClick={handleBack}>
-                Back
+                {t('store.back')}
               </Button>
             )}
             <Button 
@@ -608,9 +582,9 @@ const StorePage = () => {
               {processing ? (
                 <CircularProgress size={24} />
               ) : activeStep === steps.length - 1 ? (
-                'Complete Purchase'
+                t('store.completePurchaseButton')
               ) : (
-                'Next'
+                t('store.next')
               )}
             </Button>
           </DialogActions>

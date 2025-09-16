@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Typography,
@@ -35,20 +36,21 @@ import {
 } from '../features/api/apiSlice';
 import { explanationLogger } from '../utils/logger';
 
-const TechnicalExplanation = ({ 
-  analysisId, 
+const TechnicalExplanation = ({
+  analysisId,
   analysisData,
-  defaultExpanded = true 
+  defaultExpanded = true
 }) => {
+  const { t, i18n } = useTranslation();
   const [currentDetailLevel, setCurrentDetailLevel] = React.useState('summary'); // 'summary' = Standard level
   const [generateExplanation, { isLoading: isGenerating }] = useGenerateExplanationMutation();
-  const { 
-    data: explanation, 
-    error: explanationError, 
+  const {
+    data: explanation,
+    error: explanationError,
     isLoading: isLoadingExplanation,
-    refetch: refetchExplanation 
+    refetch: refetchExplanation
   } = useGetExplanationQuery(
-    { analysisId, detailLevel: currentDetailLevel }, 
+    { analysisId, detailLevel: currentDetailLevel, language: i18n.language },
     { skip: !analysisId }
   );
 
@@ -72,10 +74,10 @@ const TechnicalExplanation = ({
   };
 
   const getScoreLabel = (score) => {
-    if (score >= 8) return 'Strong Buy';
-    if (score >= 6) return 'Buy';
-    if (score >= 4) return 'Hold';
-    return 'Sell';
+    if (score >= 8) return t('recommendations.strongBuy');
+    if (score >= 6) return t('recommendations.buy');
+    if (score >= 4) return t('recommendations.hold');
+    return t('recommendations.sell');
   };
 
   const getIndicatorIcon = (indicatorKey) => {
@@ -127,7 +129,8 @@ const TechnicalExplanation = ({
       await generateExplanation({
         analysisId,
         detailLevel,
-        forceRegenerate: true  // Always force regeneration when user clicks Generate
+        forceRegenerate: true,  // Always force regeneration when user clicks Generate
+        language: i18n.language
       }).unwrap();
       
       const duration = performance.now() - startTime;
@@ -176,7 +179,7 @@ const TechnicalExplanation = ({
 
   return (
     <ExplanationCard
-      title="Analysis Explanation"
+      title={t('explanations.title')}
       analysisId={analysisId}
       explanation={technicalExplanation}
       isLoading={isGenerating || isLoadingExplanation}
@@ -203,7 +206,7 @@ const TechnicalExplanation = ({
               size="small"
             />
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Composite Score
+              {t('explanations.compositeScore')}
             </Typography>
           </Paper>
         </Grid>
@@ -217,7 +220,7 @@ const TechnicalExplanation = ({
               {name}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Stock Analysis
+              {t('explanations.stockAnalysis')}
             </Typography>
           </Paper>
         </Grid>
@@ -228,10 +231,10 @@ const TechnicalExplanation = ({
               {Object.keys(indicators).length}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Technical Indicators
+              {t('explanations.technicalIndicators')}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Analyzed
+              {t('explanations.analysed')}
             </Typography>
           </Paper>
         </Grid>
@@ -239,16 +242,16 @@ const TechnicalExplanation = ({
 
       {/* Top Performing Indicators */}
       <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
-        Top Performing Indicators
+        {t('explanations.topPerformingIndicators')}
       </Typography>
       
       <TableContainer component={Paper} sx={{ mb: 3 }}>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Indicator</TableCell>
-              <TableCell align="center">Score</TableCell>
-              <TableCell>Signal Strength</TableCell>
+              <TableCell>{t('analysis.indicator')}</TableCell>
+              <TableCell align="center">{t('dashboard.averageScore')}</TableCell>
+              <TableCell>{t('explanations.signalStrength')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -276,7 +279,7 @@ const TechnicalExplanation = ({
                       color={indicator.score >= 0.7 ? 'success' : indicator.score >= 0.4 ? 'warning' : 'error'}
                     />
                     <Typography variant="caption" color="text.secondary">
-                      {indicator.score >= 0.7 ? 'Strong' : indicator.score >= 0.4 ? 'Moderate' : 'Weak'}
+                      {indicator.score >= 0.7 ? t('explanations.strong') : indicator.score >= 0.4 ? t('explanations.moderate') : t('explanations.weak')}
                     </Typography>
                   </Box>
                 </TableCell>
@@ -288,7 +291,7 @@ const TechnicalExplanation = ({
 
       {/* Component Contributions */}
       <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
-        Analysis Component Contributions
+        {t('explanations.analysisComponentContributions')}
       </Typography>
       
       <Grid container spacing={1} sx={{ mb: 3 }}>
@@ -310,7 +313,7 @@ const TechnicalExplanation = ({
                 </Typography>
               </Box>
               <Typography variant="caption" color="text.secondary">
-                Impact: {contributor.percentage >= 15 ? 'High' : contributor.percentage >= 8 ? 'Medium' : 'Low'}
+                {t('analysis.impact')}: {contributor.percentage >= 15 ? t('analysis.high') : contributor.percentage >= 8 ? t('analysis.medium') : t('analysis.low')}
               </Typography>
             </Paper>
           </Grid>
@@ -319,7 +322,7 @@ const TechnicalExplanation = ({
 
       {/* Analysis Methodology */}
       <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
-        Analysis Framework
+        {t('explanations.analysisFramework')}
       </Typography>
       
       <List dense>
@@ -328,8 +331,8 @@ const TechnicalExplanation = ({
             <Assessment />
           </ListItemIcon>
           <ListItemText
-            primary="Composite Scoring"
-            secondary="12 technical indicators with weighted contributions to final score"
+            primary={t('explanations.compositeScoring')}
+            secondary={t('explanations.compositeScoringDesc')}
           />
         </ListItem>
         
@@ -338,8 +341,8 @@ const TechnicalExplanation = ({
             <Timeline />
           </ListItemIcon>
           <ListItemText
-            primary="Multi-Timeframe Analysis"
-            secondary="Short-term, medium-term, and long-term technical signals"
+            primary={t('explanations.multiTimeframeAnalysis')}
+            secondary={t('explanations.multiTimeframeDesc')}
           />
         </ListItem>
         
@@ -348,8 +351,8 @@ const TechnicalExplanation = ({
             <Insights />
           </ListItemIcon>
           <ListItemText
-            primary="Risk Assessment"
-            secondary="Volatility, momentum, and market sentiment consideration"
+            primary={t('explanations.riskAssessment')}
+            secondary={t('explanations.riskAssessmentDesc')}
           />
         </ListItem>
       </List>
@@ -357,11 +360,7 @@ const TechnicalExplanation = ({
       {/* Methodology Note */}
       <Box sx={{ mt: 3, p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
         <Typography variant="body2" color="text.secondary">
-          <strong>Analysis Methodology:</strong> This technical analysis uses a comprehensive 
-          framework incorporating 12 technical indicators including moving averages (SMA), 
-          momentum oscillators (RSI), trend indicators (MACD), volatility measures (Bollinger Bands), 
-          volume analysis, and candlestick patterns. Each indicator is weighted based on its 
-          historical predictive accuracy and combined to produce a composite investment score.
+          <strong>{t('explanations.analysisMethodology')}:</strong> {t('explanations.methodologyDesc')}
         </Typography>
       </Box>
     </ExplanationCard>

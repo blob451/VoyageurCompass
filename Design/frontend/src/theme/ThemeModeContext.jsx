@@ -17,12 +17,18 @@ export const ThemeModeProvider = ({ children }) => {
     try {
       const saved = localStorage.getItem('themeMode');
       if (saved === 'light' || saved === 'dark') return saved;
-    } catch (_) {}
+    } catch {
+      // Error accessing localStorage - ignore
+    }
     return prefersDark ? 'dark' : 'light';
   });
 
   useEffect(() => {
-    try { localStorage.setItem('themeMode', mode); } catch (_) {}
+    try {
+      localStorage.setItem('themeMode', mode);
+    } catch {
+      // Error saving to localStorage - ignore
+    }
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('data-color-scheme', mode);
     }
@@ -42,5 +48,6 @@ export const ThemeModeProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useThemeMode = () => useContext(ThemeModeContext);
 

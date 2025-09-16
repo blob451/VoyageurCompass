@@ -89,6 +89,7 @@ MIDDLEWARE = [
     "Core.middleware.compression.StaticFileCompressionMiddleware",  # Static file compression
     "corsheaders.middleware.CorsMiddleware",  # Standard CORS middleware
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",  # Language detection and switching
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -242,7 +243,7 @@ CACHES = {
         "KEY_PREFIX": "voyageur_l2",
         "VERSION": 1,
     },
-    # Session cache optimized for user sessions
+    # Session cache optimised for user sessions
     "sessions": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2",
@@ -302,10 +303,63 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "en"
 TIME_ZONE = "America/Vancouver"
 USE_I18N = True
+USE_L10N = True
 USE_TZ = True
+
+# Multilingual Support Configuration
+LANGUAGES = [
+    ('en', 'English'),
+    ('fr', 'Français'),
+    ('es', 'Español'),
+]
+
+# Locale paths for translation files
+LOCALE_PATHS = [
+    BASE_DIR / 'locale',
+]
+
+# Default language for user preferences
+DEFAULT_USER_LANGUAGE = env("DEFAULT_USER_LANGUAGE", default="en")
+
+# Language detection settings
+LANGUAGE_DETECTION_ENABLED = env.bool("LANGUAGE_DETECTION_ENABLED", default=True)
+LANGUAGE_COOKIE_NAME = 'voyageur_language'
+LANGUAGE_COOKIE_AGE = 365 * 24 * 60 * 60  # 1 year
+
+# Formatting settings for different locales
+USE_THOUSAND_SEPARATOR = True
+NUMBER_GROUPING = 3
+
+# Regional financial formatting preferences
+FINANCIAL_FORMATTING = {
+    'en': {
+        'currency_symbol': '$',
+        'currency_position': 'before',
+        'decimal_separator': '.',
+        'thousands_separator': ',',
+        'date_format': 'M/d/Y',
+        'time_format': 'g:i A',
+    },
+    'fr': {
+        'currency_symbol': '€',
+        'currency_position': 'after',
+        'decimal_separator': ',',
+        'thousands_separator': ' ',
+        'date_format': 'd/m/Y',
+        'time_format': 'H:i',
+    },
+    'es': {
+        'currency_symbol': '€',
+        'currency_position': 'after',
+        'decimal_separator': ',',
+        'thousands_separator': '.',
+        'date_format': 'd/m/Y',
+        'time_format': 'H:i',
+    },
+}
 
 
 # Static files (CSS, JavaScript, Images)
@@ -768,6 +822,54 @@ OLLAMA_GPU_LAYERS = int(env("OLLAMA_GPU_LAYERS", default=-1))  # -1 = use all av
 OLLAMA_RETRY_ATTEMPTS = int(env("OLLAMA_RETRY_ATTEMPTS", default=3))
 OLLAMA_RETRY_DELAY = int(env("OLLAMA_RETRY_DELAY", default=1))
 
+# Multilingual LLM Configuration
+MULTILINGUAL_LLM_ENABLED = env.bool("MULTILINGUAL_LLM_ENABLED", default=True)
+
+# Language-specific model assignments
+LLM_MODELS_BY_LANGUAGE = {
+    'en': env("LLM_MODEL_EN", default="llama3.1:8b"),
+    'fr': env("LLM_MODEL_FR", default="qwen2:3b"),
+    'es': env("LLM_MODEL_ES", default="qwen2:3b"),
+}
+
+# Translation service configuration
+TRANSLATION_SERVICE_ENABLED = env.bool("TRANSLATION_SERVICE_ENABLED", default=True)
+TRANSLATION_CACHE_TTL = int(env("TRANSLATION_CACHE_TTL", default=86400))  # 24 hours
+TRANSLATION_TIMEOUT = int(env("TRANSLATION_TIMEOUT", default=30))
+TRANSLATION_MAX_RETRIES = int(env("TRANSLATION_MAX_RETRIES", default=2))
+
+# Quality thresholds for multilingual content
+TRANSLATION_QUALITY_THRESHOLD = float(env("TRANSLATION_QUALITY_THRESHOLD", default=0.8))
+FINANCIAL_TERMINOLOGY_VALIDATION = env.bool("FINANCIAL_TERMINOLOGY_VALIDATION", default=True)
+
+# Cultural adaptation settings
+CULTURAL_FORMATTING_ENABLED = env.bool("CULTURAL_FORMATTING_ENABLED", default=True)
+REGIONAL_MARKET_DATA_ENABLED = env.bool("REGIONAL_MARKET_DATA_ENABLED", default=True)
+
+# Financial terminology mapping for translations
+FINANCIAL_TERMINOLOGY_MAPPING = {
+    'fr': {
+        'stock': 'action',
+        'market_cap': 'capitalisation_boursiere',
+        'dividend': 'dividende',
+        'earnings': 'benefices',
+        'revenue': 'chiffre_affaires',
+        'portfolio': 'portefeuille',
+        'analysis': 'analyse',
+        'recommendation': 'recommandation',
+    },
+    'es': {
+        'stock': 'accion',
+        'market_cap': 'capitalizacion_bursatil',
+        'dividend': 'dividendo',
+        'earnings': 'ganancias',
+        'revenue': 'ingresos',
+        'portfolio': 'cartera',
+        'analysis': 'analisis',
+        'recommendation': 'recomendacion',
+    },
+}
+
 # Explainability Settings
 EXPLAINABILITY_ENABLED = env.bool("EXPLAINABILITY_ENABLED", default=True)
 EXPLANATION_CACHE_TTL = int(env("EXPLANATION_CACHE_TTL", default=300))  # 5 minutes
@@ -796,6 +898,12 @@ TRENDING_STOCKS = env.list(
         "MA",
     ],
 )
+
+# API Configuration Values
+MAX_COMPARISON_SYMBOLS = int(env("MAX_COMPARISON_SYMBOLS", default=10))
+STOCK_ITERATOR_CHUNK_SIZE = int(env("STOCK_ITERATOR_CHUNK_SIZE", default=50))
+MARKET_DATA_BATCH_SIZE = int(env("MARKET_DATA_BATCH_SIZE", default=100))
+CACHE_TIMEOUT_MINUTES = int(env("CACHE_TIMEOUT_MINUTES", default=10))
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5 MB

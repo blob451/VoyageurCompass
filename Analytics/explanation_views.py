@@ -19,6 +19,7 @@ from rest_framework.response import Response
 
 from Analytics.services.explanation_service import get_explanation_service
 from Analytics.services.translation_service import get_translation_service
+from Analytics.services.multilingual_pipeline import get_multilingual_pipeline
 from Analytics.views import AnalysisThrottle
 from Data.models import AnalyticsResults
 
@@ -314,37 +315,77 @@ def generate_explanation(request, analysis_id):
             logger.error(f"Failed to save explanation after retries: {str(e)}")
             # Continue execution - explanation generation was successful, only save failed
 
-        # Handle translation if requested language is not English
-        translation_result = None
+        # Handle multilingual generation if requested language is not English
+        multilingual_result = None
         if language != "en":
-            logger.info(f"[TRANSLATION] Translating explanation to {language}")
+            logger.info(f"[MULTILINGUAL] Generating explanation in {language} using multilingual pipeline")
             try:
-                translation_service = get_translation_service()
-                
-                # Prepare translation context
-                translation_context = {
+                multilingual_pipeline = get_multilingual_pipeline()
+
+                # Prepare analysis data for multilingual pipeline
+                analysis_data = {
                     "symbol": analysis_result.stock.symbol,
-                    "score": analysis_result.score_0_10,
-                    "analysis_id": analysis_id
+                    "currentPrice": analysis_result.analysis_data.get("currentPrice", 0) if analysis_result.analysis_data else 0,
+                    "score_0_10": analysis_result.score_0_10,
+                    "analysis_id": analysis_id,
+                    "analysis_data": analysis_result.analysis_data or {},
+                    "timestamp": analysis_result.created_at.isoformat(),
                 }
-                
-                translation_result = translation_service.translate_explanation(
-                    english_text=explanation_result.get("content", ""),
+
+                # User preferences from request (could be expanded)
+                user_preferences = {
+                    "detail_level": detail_level,
+                    "preferred_format": request.query_params.get("format", "standard"),
+                }
+
+                multilingual_result = multilingual_pipeline.generate_explanation(
+                    analysis_data=analysis_data,
                     target_language=language,
-                    context=translation_context
+                    detail_level=detail_level,
+                    explanation_type="technical_analysis",
+                    user_preferences=user_preferences
                 )
-                
-                if translation_result:
+
+                if multilingual_result:
                     logger.info(
-                        f"[TRANSLATION] Translation successful - quality: {translation_result.get('quality_score', 0):.2f}, "
-                        f"time: {translation_result.get('generation_time', 0):.2f}s"
+                        f"[MULTILINGUAL] Generation successful - quality: {multilingual_result.get('quality_metrics', {}).get('overall_score', 0):.2f}, "
+                        f"method: {multilingual_result.get('generation_method', 'unknown')}"
                     )
                 else:
-                    logger.warning(f"[TRANSLATION] Translation failed, will return English version")
-                    
-            except Exception as translation_error:
-                logger.error(f"[TRANSLATION] Translation error: {str(translation_error)}")
-                translation_result = None
+                    logger.warning(f"[MULTILINGUAL] Pipeline failed, falling back to translation service")
+
+                    # Fallback to translation service
+                    translation_service = get_translation_service()
+                    translation_context = {
+                        "symbol": analysis_result.stock.symbol,
+                        "score": analysis_result.score_0_10,
+                        "analysis_id": analysis_id
+                    }
+
+                    translation_result = translation_service.translate_explanation(
+                        english_text=explanation_result.get("content", ""),
+                        target_language=language,
+                        context=translation_context
+                    )
+
+                    if translation_result:
+                        # Convert translation result to multilingual format
+                        multilingual_result = {
+                            "explanation": translation_result.get("translated_text", ""),
+                            "language": language,
+                            "generation_method": "translated_fallback",
+                            "model_used": translation_result.get("translation_model", "unknown"),
+                            "quality_metrics": {
+                                "overall_score": translation_result.get("quality_score", 0.0),
+                                "translation_quality": translation_result.get("quality_score", 0.0),
+                            },
+                            "cultural_formatting_applied": False,
+                            "timestamp": datetime.now().isoformat(),
+                        }
+
+            except Exception as multilingual_error:
+                logger.error(f"[MULTILINGUAL] Pipeline error: {str(multilingual_error)}")
+                multilingual_result = None
 
         # Prepare response data with multilingual support
         explanation_data = {
@@ -360,21 +401,28 @@ def generate_explanation(request, analysis_id):
             "language": "en",  # Original language
             "model_used": explanation_result.get("model_used", "unknown"),
         }
-        
-        # Add translation data if available
-        if translation_result:
+
+        # Add multilingual data if available
+        if multilingual_result:
+            quality_metrics = multilingual_result.get("quality_metrics", {})
             explanation_data.update({
-                "translated_content": translation_result.get("translated_text", ""),
-                "translation_quality": translation_result.get("quality_score", 0.0),
-                "translation_model": translation_result.get("translation_model", "unknown"),
-                "translation_time": translation_result.get("generation_time", 0.0),
+                "multilingual_content": multilingual_result.get("explanation", ""),
+                "multilingual_quality": quality_metrics.get("overall_score", 0.0),
+                "multilingual_model": multilingual_result.get("model_used", "unknown"),
+                "generation_method": multilingual_result.get("generation_method", "unknown"),
                 "target_language": language,
-                "total_generation_time": explanation_result.get("generation_time", 0.0) + translation_result.get("generation_time", 0.0),
+                "cultural_formatting_applied": multilingual_result.get("cultural_formatting_applied", False),
+                "pipeline_version": multilingual_result.get("pipeline_version", "1.0"),
+                "quality_breakdown": {
+                    "terminology_score": quality_metrics.get("terminology_score", 0.0),
+                    "completeness_score": quality_metrics.get("completeness_score", 0.0),
+                    "cultural_appropriateness": quality_metrics.get("cultural_appropriateness", 0.0),
+                },
             })
-            # Use translated content as primary content for non-English requests
-            explanation_data["content"] = translation_result.get("translated_text", explanation_data["content"])
+            # Use multilingual content as primary content for non-English requests
+            explanation_data["content"] = multilingual_result.get("explanation", explanation_data["content"])
             explanation_data["language"] = language
-            explanation_data["word_count"] = translation_result.get("word_count_translated", explanation_data["word_count"])
+            explanation_data["word_count"] = len(multilingual_result.get("explanation", "").split())
         
         response_data = {
             "success": True,
@@ -383,8 +431,11 @@ def generate_explanation(request, analysis_id):
             "explanation": explanation_data,
             "multilingual": {
                 "requested_language": language,
-                "translation_available": translation_result is not None,
+                "pipeline_available": multilingual_result is not None,
                 "supported_languages": ["en", "fr", "es"],
+                "pipeline_enabled": get_multilingual_pipeline().enabled,
+                "quality_metrics_available": multilingual_result is not None and "quality_metrics" in multilingual_result,
+                "cultural_formatting_applied": multilingual_result.get("cultural_formatting_applied", False) if multilingual_result else False,
             },
         }
 
@@ -510,6 +561,13 @@ def get_explanation(request, analysis_id):
         Existing explanation data if available
     """
     detail_level = request.query_params.get("detail_level", None)
+    language = request.query_params.get("language", "en")
+
+    # Validate language
+    if language not in ["en", "fr", "es"]:
+        return Response(
+            {"error": "language must be one of: en, fr, es"}, status=status.HTTP_400_BAD_REQUEST
+        )
 
     try:
         # Get the analysis result and ensure it belongs to the user
@@ -601,4 +659,66 @@ def get_explanation(request, analysis_id):
         logger.error(f"Error retrieving explanation for analysis {analysis_id}: {str(e)}")
         return Response(
             {"error": f"Failed to retrieve explanation: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@extend_schema(
+    summary="Get multilingual pipeline status",
+    description="Get current status of the multilingual explanation pipeline and supported features",
+    responses={
+        200: {
+            "description": "Pipeline status retrieved",
+            "example": {
+                "success": True,
+                "pipeline_status": {
+                    "enabled": True,
+                    "supported_languages": ["en", "fr", "es"],
+                    "default_language": "en",
+                    "llm_service_available": True,
+                    "cultural_formatter_enabled": True,
+                    "quality_threshold": 0.8,
+                    "validation_enabled": True,
+                    "models_by_language": {
+                        "en": "llama3.1:8b",
+                        "fr": "qwen2:3b",
+                        "es": "qwen2:3b"
+                    },
+                    "cultural_formatting": {
+                        "en": {"currency_symbol": "$", "currency_position": "before"},
+                        "fr": {"currency_symbol": "€", "currency_position": "after"},
+                        "es": {"currency_symbol": "€", "currency_position": "after"}
+                    }
+                }
+            }
+        }
+    },
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def multilingual_pipeline_status(request):
+    """
+    Get multilingual pipeline status and configuration.
+
+    Returns:
+        Current status of multilingual pipeline and supported features
+    """
+    try:
+        multilingual_pipeline = get_multilingual_pipeline()
+        pipeline_status = multilingual_pipeline.get_pipeline_status()
+
+        # Add additional configuration details
+        from django.conf import settings
+
+        pipeline_status.update({
+            "models_by_language": getattr(settings, "LLM_MODELS_BY_LANGUAGE", {}),
+            "cultural_formatting": getattr(settings, "FINANCIAL_FORMATTING", {}),
+            "financial_terminology_mapping": getattr(settings, "FINANCIAL_TERMINOLOGY_MAPPING", {}),
+        })
+
+        return Response({"success": True, "pipeline_status": pipeline_status})
+
+    except Exception as e:
+        logger.error(f"Error getting multilingual pipeline status: {str(e)}")
+        return Response(
+            {"error": f"Failed to get pipeline status: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

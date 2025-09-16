@@ -2,8 +2,11 @@ import React from 'react';
 import { Box, Container, Typography } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
+import { useTranslation } from 'react-i18next';
 
 const Layout = () => {
+  const { t } = useTranslation();
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <Navbar />
@@ -24,7 +27,7 @@ const Layout = () => {
       >
         <Container maxWidth="sm">
           <Typography variant="body2" color="text.secondary" align="center">
-            © 2025 Voyageur Compass. All rights reserved.
+            {t('footer.copyright')}
           </Typography>
         </Container>
       </Box>

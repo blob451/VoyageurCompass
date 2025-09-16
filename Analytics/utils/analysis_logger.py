@@ -22,11 +22,11 @@ class AnalysisLogger:
 
     def __init__(self, username: str, symbol: str, log_dir: Optional[str] = None):
         """
-        Initialize the analysis logger.
+        Initialise the analysis logger.
 
         Args:
             username: Username of the user requesting analysis
-            symbol: Stock ticker symbol being analyzed
+            symbol: Stock ticker symbol being analysed
             log_dir: Directory to store log files (optional)
         """
         self.username = username

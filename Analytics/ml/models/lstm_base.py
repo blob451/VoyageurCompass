@@ -284,7 +284,7 @@ else:
 
         def forward(self, x: Tensor) -> Tensor:
             """Enhanced forward pass through the bidirectional LSTM model with attention."""
-            # Initialize hidden state (account for bidirectional)
+            # Initialise hidden state (account for bidirectional)
             num_directions = 2 if self.bidirectional else 1
             h0 = torch.zeros(self.num_layers * num_directions, x.size(0), self.hidden_size).to(x.device)
             c0 = torch.zeros(self.num_layers * num_directions, x.size(0), self.hidden_size).to(x.device)
@@ -400,7 +400,7 @@ else:
             self.model_version = "4.0.0"
             self.created_at = datetime.now()
 
-            # Initialize embeddings with Xavier uniform
+            # Initialise embeddings with Xavier uniform
             nn.init.xavier_uniform_(self.sector_embedding.weight)
             nn.init.xavier_uniform_(self.industry_embedding.weight)
 

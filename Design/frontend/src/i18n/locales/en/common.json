@@ -1,0 +1,1045 @@
+{
+  "app": {
+    "name": "VoyageurCompass",
+    "tagline": "Navigate Your Investment Journey"
+  },
+  "navigation": {
+    "home": "Home",
+    "search": "Search",
+    "results": "Results",
+    "settings": "Settings"
+  },
+  "search": {
+    "title": "Stock Analysis Search",
+    "placeholder": "Enter stock symbol (e.g., AAPL, MSFT)",
+    "button": "Analyse Stock",
+    "loading": "Analysing...",
+    "error": "Please enter a valid stock symbol",
+    "noResults": "No analysis results found"
+  },
+  "analysis": {
+    "title": "Technical Analysis Results",
+    "score": "Technical Score",
+    "outOf": "out of 10",
+    "recommendation": "Recommendation",
+    "confidence": "Confidence Level",
+    "sentiment": "Market Sentiment",
+    "technicalIndicators": "Technical Indicators",
+    "riskAssessment": "Risk Assessment",
+    "marketContext": "Market Context",
+    "loading": "Generating analysis...",
+    "error": "Failed to load analysis",
+    "retry": "Retry Analysis",
+    "backToDashboard": "Back to Dashboard",
+    "runNewAnalysis": "Run New Analysis",
+    "analysisDate": "Analysis Date",
+    "failedToLoad": "Failed to load analysis results",
+    "analysisNotFound": "Analysis not found",
+    "indicator": "Indicator",
+    "description": "Description",
+    "newsSentiment": "NEWS SENTIMENT",
+    "sentimentFromNews": "{{sentiment}} sentiment from {{count}} news articles",
+    "confidence": "Confidence",
+    "componentContribution": "Component Contribution Analysis",
+    "component": "Component",
+    "weightedScore": "Weighted Score",
+    "contribution": "Contribution",
+    "impact": "Impact",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "scaledNote": "Weighted scores are scaled (×100) for readability. Contribution percentages show each component's relative impact on the final analysis. Components are sorted by contribution from highest to lowest.",
+    "newsSentimentAnalysis": "News Sentiment Analysis",
+    "overallSentiment": "Overall Sentiment",
+    "sentimentScore": "Score",
+    "basedOnNews": "Based on {{count}} news articles",
+    "impactOnAnalysis": "Impact on Analysis",
+    "contributionToScore": "Contribution to Final Score",
+    "weightInScore": "10% Weight in Composite Score",
+    "sentimentDescription": "Sentiment analysis uses FinBERT to evaluate financial news and incorporate market sentiment into the technical analysis framework.",
+    "newsSourcesAnalysis": "News Sources Analysis",
+    "source": "Source",
+    "articles": "Articles",
+    "averageSentiment": "Average Sentiment",
+    "analysisSummary": "Analysis Summary",
+    "compositeScore": "Composite Score",
+    "analysisHorizon": "Analysis Horizon",
+    "rawScore": "Raw Score",
+    "standard": "Standard",
+    "analysisPerformed": "This analysis was performed on {{date}} using 12 technical indicators with weighted scoring methodology.",
+    "aiExplanations": "AI-Powered Analysis Explanations",
+    "multiModelActive": "Multi-Model AI Active",
+    "serviceUnavailable": "Service Unavailable",
+    "templateMode": "Template Mode",
+    "explanationDescription": "Get natural language explanations powered by our multi-model AI system optimised for financial analysis.",
+    "llmUnavailable": "LLM service unavailable - using template explanations.",
+    "quickAnalysis": "Quick Analysis",
+    "detailedAnalysis": "Detailed Analysis",
+    "phi3Description": "Fast summaries and standard explanations with optimised performance for real-time analysis.",
+    "llamaDescription": "In-depth explanations with comprehensive market context and technical reasoning."
+  },
+  "indicators": {
+    "sma50vs200": "SMA 50 vs 200",
+    "pricevs50": "Price vs SMA 50",
+    "rsi14": "RSI (14)",
+    "macd12269": "MACD (12,26,9)",
+    "bbpos20": "Bollinger Position",
+    "bbwidth20": "Bollinger Width",
+    "volsurge": "Volume Surge",
+    "obv20": "OBV (20)",
+    "rel1y": "1Y Relative Strength",
+    "rel2y": "2Y Relative Strength",
+    "candlerev": "Candlestick Reversal",
+    "srcontext": "Support/Resistance",
+    "sentiment": "News Sentiment",
+    "prediction": "LSTM Price Prediction"
+  },
+  "explanations": {
+    "title": "Analysis Explanation",
+    "compositeScore": "Composite Score",
+    "stockAnalysis": "Stock Analysis",
+    "technicalIndicators": "Technical Indicators",
+    "analysed": "Analysed",
+    "topPerformingIndicators": "Top Performing Indicators",
+    "signalStrength": "Signal Strength",
+    "strong": "Strong",
+    "moderate": "Moderate",
+    "weak": "Weak",
+    "analysisComponentContributions": "Analysis Component Contributions",
+    "analysisFramework": "Analysis Framework",
+    "compositeScoring": "Composite Scoring",
+    "compositeScoringDesc": "12 technical indicators with weighted contributions to final score",
+    "multiTimeframeAnalysis": "Multi-Timeframe Analysis",
+    "multiTimeframeDesc": "Short-term, medium-term, and long-term technical signals",
+    "riskAssessment": "Risk Assessment",
+    "riskAssessmentDesc": "Volatility, momentum, and market sentiment consideration",
+    "analysisMethodology": "Analysis Methodology",
+    "methodologyDesc": "This technical analysis uses a comprehensive framework incorporating 12 technical indicators including moving averages (SMA), momentum oscillators (RSI), trend indicators (MACD), volatility measures (Bollinger Bands), volume analysis, and candlestick patterns. Each indicator is weighted based on its historical predictive accuracy and combined to produce a composite investment score."
+  },
+  "recommendations": {
+    "buy": "BUY",
+    "hold": "HOLD",
+    "sell": "SELL",
+    "strongBuy": "Strong Buy",
+    "strong": "Strong",
+    "moderate": "Moderate",
+    "weak": "Weak"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "account": "Account",
+    "about": "About",
+    "save": "Save Changes",
+    "reset": "Reset to Defaults"
+  },
+  "languages": {
+    "en": "English (UK)",
+    "fr": "Français",
+    "es": "Español"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "refresh": "Refresh",
+    "unknown": "Unknown",
+    "notAvailable": "N/A",
+    "loadingPage": "Loading page content..."
+  },
+  "recommendations": {
+    "strongBuy": "Strong Buy",
+    "buy": "Buy",
+    "hold": "Hold",
+    "sell": "Sell"
+  },
+  "errors": {
+    "networkError": "Network error. Please check your connection.",
+    "serverError": "Server error. Please try again later.",
+    "notFound": "The requested resource was not found.",
+    "unauthorized": "You are not authorized to access this resource.",
+    "validation": "Please check your input and try again.",
+    "pageNotFound": "Page Not Found",
+    "pageNotFoundDescription": "The page you are looking for doesn't exist."
+  },
+  "dashboard": {
+    "welcome": "Welcome back",
+    "subtitle": "Your financial analytics dashboard",
+    "availableCredits": "Available Credits",
+    "creditEquation": "1 Credit = 1 Stock Analysis",
+    "buyMoreCredits": "Buy More Credits",
+    "quickSearch": "Quick Stock Analysis",
+    "searchPlaceholder": "Enter stock ticker (e.g., AAPL, MSFT, GOOGL)",
+    "analyseButton": "Analyse",
+    "searchDescription": "Get instant technical analysis for any stock. Cost: 1 credit per analysis.",
+    "analysesThisMonth": "Analyses This Month",
+    "recentCount": "recent",
+    "recentAnalyses": "Recent Analysis History",
+    "quickActions": "Quick Actions",
+    "popularStocks": "Popular Stocks",
+    "marketOverview": "Market Performance Overview",
+    "totalAnalyses": "Total Analyses",
+    "averageScore": "Average Score",
+    "aboveAverage": "Above average",
+    "average": "Average",
+    "belowAverage": "Below average",
+    "favoriteSector": "Favourite Sector",
+    "mostAnalysed": "Most analysed",
+    "topSector": "Top Sector",
+    "marketSentiment": "Market Sentiment",
+    "sentiment": "Sentiment",
+    "avgSentimentScore": "Avg Sentiment Score",
+    "newsCoverage": "News Coverage",
+    "articlesAnalysed": "Articles analysed",
+    "sentimentBreakdown": "Sentiment Breakdown",
+    "positive": "Positive",
+    "neutral": "Neutral",
+    "negative": "Negative",
+    "noSentimentData": "No sentiment data",
+    "fromAnalyses": "From {{count}} analyses",
+    "noDataYet": "No data yet",
+    "noNewsData": "No news data",
+    "newsArticles": "{{count}} news articles",
+    "noAnalysisHistory": "No analysis history yet. Start by analysing your first stock!",
+    "viewAnalysisResults": "View Analysis Results",
+    "stockAnalysis": "Stock Analysis",
+    "compareStocks": "Compare Stocks",
+    "sectorAnalysis": "Sector Analysis",
+    "buyCredits": "Buy Credits",
+    "portfolioValue": "Portfolio Value",
+    "profitLoss": "Profit/Loss",
+    "viewAll": "View All",
+    "analyse": "Analyse",
+    "newAnalysis": "New Analysis",
+    "exportData": "Export Data",
+    "statistics": "Statistics"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "rememberMe": "Remember Me",
+    "forgotPassword": "Forgot Password?",
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "createAccount": "Create Account",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "username": "Username",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?",
+    "loginSuccess": "Login successful",
+    "logoutSuccess": "Logout successful",
+    "loginSubtitle": "Sign in to access your financial dashboard",
+    "invalidCredentials": "Invalid credentials. Please try again."
+  },
+  "register": {
+    "title": "Create Account",
+    "subtitle": "Join VoyageurCompass and start analysing stocks today",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "username": "Username",
+    "email": "Email Address",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "agreeTerms": "I agree to the {termsLink} and {privacyLink}",
+    "termsOfService": "Terms of Service",
+    "privacyPolicy": "Privacy Policy",
+    "createAccount": "Create Account",
+    "alreadyHaveAccount": "Already have an account?",
+    "signIn": "Sign In",
+    "registrationSuccess": "Registration successful! Please log in to continue.",
+    "whyJoin": "Why Join VoyageurCompass?",
+    "studentPricing": "Student-Friendly Pricing",
+    "pricingDescription": "Only pay for the analysis you need. Perfect for students and professionals.",
+    "validation": {
+      "usernameRequired": "Username is required",
+      "usernameMinLength": "Username must be at least 3 characters",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Please enter a valid email address",
+      "passwordRequired": "Password is required",
+      "passwordMinLength": "Password must be at least 8 characters",
+      "passwordsNoMatch": "Passwords do not match",
+      "firstNameRequired": "First name is required",
+      "lastNameRequired": "Last name is required",
+      "agreeTermsRequired": "You must agree to the terms and conditions"
+    },
+    "benefits": {
+      "welcomeBonus": "Welcome Bonus",
+      "welcomeBonusDesc": "5 free credits to get started",
+      "professionalAnalysis": "Professional Analysis",
+      "professionalAnalysisDesc": "12 technical indicators per stock",
+      "securePlatform": "Secure Platform",
+      "securePlatformDesc": "Your data is protected with enterprise security"
+    },
+    "pricing": {
+      "creditLabel": "1 Credit = $1",
+      "analysisLabel": "1 Analysis"
+    }
+  },
+  "navbar": {
+    "dashboard": "Dashboard",
+    "tools": "Tools",
+    "stockAnalysis": "Stock Analysis",
+    "analysisReports": "Analysis Reports",
+    "compareStocks": "Compare Stocks",
+    "sectorAnalysis": "Sector Analysis",
+    "creditStore": "Credit Store",
+    "help": "Help",
+    "credits": "Credits",
+    "settings": "Settings",
+    "signOut": "Sign Out",
+    "switchToDarkMode": "Switch to dark mode",
+    "switchToLightMode": "Switch to light mode"
+  },
+  "stockSearch": {
+    "description": "Get comprehensive technical analysis for any stock with 12 professional indicators",
+    "availableCredits": "Available Credits",
+    "creditEquation": "1 Credit = 1 Analysis",
+    "buyMoreCredits": "Buy More Credits",
+    "createNewReport": "Create New Report",
+    "stockTickerSymbol": "Stock Ticker Symbol",
+    "aiExplanations": "AI-Powered Explanations",
+    "modelsLabel": "Phi3 & LLaMA 3.1",
+    "autoExplanation": "🤖 Summary AI explanations will be automatically generated to help you understand your analysis results",
+    "recentSearches": "Recent searches:",
+    "fetchingData": "Fetching data for {{symbol}}...",
+    "gettingLatestData": "Getting latest stock data from Yahoo Finance (this may take 10-30 seconds)",
+    "autoAnalyzing": "Auto-analyzing {{symbol}}...",
+    "analyzing": "Analyzing {{symbol}}...",
+    "dashboardTriggered": "Analysis triggered from dashboard • Running 12 technical indicators • 1 credit will be used",
+    "runningIndicators": "Running 12 technical indicators",
+    "analysisComplete": "Analysis complete for {{symbol}}",
+    "analysisSuccessful": "✅ Analysis completed successfully! Used 1 credit.",
+    "viewFullReport": "View Full Report",
+    "analysisError": "Analysis failed. Please try again.",
+    "insufficientCredits": "Insufficient credits. Please purchase more credits to continue.",
+    "pleaseEnterTicker": "Please enter a stock ticker symbol",
+    "confirmAnalysis": "Confirm Analysis",
+    "analysisWillUse": "This analysis will use 1 credit. Do you want to continue?",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "technicalIndicators": "Technical Indicators",
+    "indicator": "Indicator",
+    "score": "Score",
+    "description": "Description",
+    "browseExistingReports": "Browse Existing Reports",
+    "viewAllReports": "View All Reports",
+    "noAnalysisReportsYet": "No analysis reports yet",
+    "createFirstReport": "Create your first report using the form above",
+    "popularStocks": "Popular Stocks",
+    "recentAnalysis": "Recent Analysis",
+    "noAnalysisHistory": "No analysis history yet",
+    "autoAnalysisTitle": "Auto-Analysis from Dashboard",
+    "startAutoAnalysis": "Start Auto-Analysis",
+    "confirmAnalysisTitle": "Confirm Analysis",
+    "autoAnalyzeMessage": "Auto-analyze {{symbol}} (triggered from dashboard quick search)",
+    "analyzeForCredit": "Analyze {{symbol}} for 1 credit?",
+    "creditWarning": "This will use 1 credit from your balance ({{credits}} remaining)",
+    "autoStartWarning": "Analysis will start automatically after confirmation",
+    "comprehensiveAnalysis": "Get comprehensive technical analysis for any stock with 12 professional indicators",
+    "technicalIndicatorFallback": "Technical indicator",
+    "enterTickerError": "Please enter a stock ticker symbol",
+    "insufficientCreditsError": "Insufficient credits. Please purchase more credits to continue.",
+    "analysisFailedError": "Analysis failed. Please try again.",
+    "syncingData": "Stock data is being synchronized. This may take a few moments...",
+    "syncTimeout": "Data synchronization is taking longer than expected. Please try again."
+  },
+  "reports": {
+    "title": "Analysis Reports",
+    "generate": "Generate Report",
+    "export": "Export",
+    "filter": "Filter",
+    "dateRange": "Date Range",
+    "symbol": "Symbol",
+    "score": "Score",
+    "actions": "Actions",
+    "view": "View",
+    "download": "Download",
+    "from": "From",
+    "to": "To",
+    "allSymbols": "All Symbols",
+    "noReports": "No reports found",
+    "generateFirst": "Generate your first analysis to see reports here"
+  },
+  "store": {
+    "title": "Credit Store",
+    "subtitle": "Purchase credits to unlock powerful stock analysis tools",
+    "currentBalance": "Current Balance",
+    "credits": "Credits",
+    "creditEquation": "1 Credit = 1 Stock Analysis",
+    "choosePackage": "Choose Your Credit Package",
+    "purchaseNow": "Purchase Now",
+    "mostPopular": "Most Popular",
+    "save": "Save {{percent}}%",
+    "purchaseHistory": "Purchase History",
+    "noPurchaseHistory": "No purchase history yet",
+    "purchaseFirstPackage": "Purchase your first credit package to get started",
+    "completePurchase": "Complete Your Purchase",
+    "purchaseComplete": "Purchase Complete!",
+    "thankYou": "Thank you for your purchase!",
+    "creditsAdded": "{{credits}} credits have been added to your account.",
+    "cancel": "Cancel",
+    "back": "Back",
+    "next": "Next",
+    "completePurchaseButton": "Complete Purchase",
+    "packages": {
+      "basic": {
+        "name": "Basic Pack",
+        "description": "Perfect for trying out our platform",
+        "features": [
+          "5 Stock Analysis",
+          "Valid for 30 days",
+          "Basic technical indicators",
+          "Email support"
+        ]
+      },
+      "starter": {
+        "name": "Starter Pack",
+        "description": "Great for regular users",
+        "features": [
+          "10 Stock Analysis",
+          "Valid for 60 days",
+          "All technical indicators",
+          "Email support",
+          "Comparison tools"
+        ]
+      },
+      "value": {
+        "name": "Value Pack",
+        "description": "Best value for serious investors",
+        "features": [
+          "25 Stock Analysis",
+          "Valid for 90 days",
+          "All technical indicators",
+          "Priority email support",
+          "Comparison tools",
+          "Sector analysis"
+        ]
+      },
+      "professional": {
+        "name": "Professional Pack",
+        "description": "For professional traders and analysts",
+        "features": [
+          "50 Stock Analysis",
+          "Valid for 120 days",
+          "All technical indicators",
+          "Priority email support",
+          "Comparison tools",
+          "Sector analysis",
+          "Export capabilities"
+        ]
+      },
+      "enterprise": {
+        "name": "Enterprise Pack",
+        "description": "Maximum value for heavy users",
+        "features": [
+          "100 Stock Analysis",
+          "Valid for 365 days",
+          "All technical indicators",
+          "Premium support",
+          "All tools and features",
+          "API access",
+          "Custom reporting"
+        ]
+      }
+    },
+    "checkout": {
+      "steps": {
+        "selectPackage": "Select Package",
+        "paymentMethod": "Payment Method",
+        "confirmation": "Confirmation"
+      },
+      "selectedPackage": "Selected Package",
+      "selectPaymentMethod": "Select Payment Method",
+      "paymentMethods": {
+        "creditCard": "Credit Card",
+        "paypal": "PayPal",
+        "bankTransfer": "Bank Transfer"
+      },
+      "cardNumber": "Card Number",
+      "expiryDate": "Expiry Date",
+      "cvv": "CVV",
+      "cardholderName": "Cardholder Name",
+      "securityNotice": "Your payment information is secure and encrypted",
+      "orderConfirmation": "Order Confirmation",
+      "total": "Total",
+      "creditsAddedNotice": "Credits will be added to your account immediately after payment"
+    }
+  },
+  "home": {
+    "hero": {
+      "title": "VoyageurCompass",
+      "subtitle": "Professional Financial Analytics Platform",
+      "description": "Comprehensive stock analysis with 12 technical indicators, sector comparisons, and intelligent insights. Built with Django, React, and PostgreSQL for professional-grade financial analysis.",
+      "getStarted": "Get Started",
+      "goToDashboard": "Go to Dashboard",
+      "login": "Login",
+      "createFreeAccount": "Create Free Account",
+      "learnMore": "Learn More"
+    },
+    "sampleAnalysis": {
+      "title": "Sample Analysis Preview",
+      "technicalScore": "Technical Score",
+      "company": "AAPL • Apple Inc. • Technology Sector",
+      "smaTrend": "SMA Trend",
+      "strong": "Strong",
+      "rsi": "RSI",
+      "macd": "MACD",
+      "bullish": "Bullish"
+    },
+    "features": {
+      "title": "Powerful Financial Analysis Tools",
+      "technicalAnalysis": {
+        "title": "Technical Analysis",
+        "description": "12 advanced indicators providing comprehensive stock analysis with scores 0-10",
+        "highlight": "AI-Powered"
+      },
+      "stockComparison": {
+        "title": "Stock Comparison",
+        "description": "Side-by-side comparison of multiple stocks with detailed metrics",
+        "highlight": "Multi-Stock"
+      },
+      "sectorAnalysis": {
+        "title": "Sector Analysis",
+        "description": "Track sector performance and identify trending industries",
+        "highlight": "Market Insights"
+      },
+      "creditSystem": {
+        "title": "Credit System",
+        "description": "Pay-per-analysis model - 1 credit = $1 = 1 detailed analysis",
+        "highlight": "Affordable"
+      }
+    },
+    "benefits": {
+      "title": "Why Choose VoyageurCompass?",
+      "items": [
+        "Real-time Yahoo Finance data integration",
+        "PostgreSQL-backed reliable data storage",
+        "Comprehensive technical indicator suite",
+        "Professional-grade financial analytics",
+        "Responsive design for all devices",
+        "Secure JWT authentication"
+      ],
+      "fastAnalysis": {
+        "title": "Fast Analysis",
+        "description": "Results in seconds"
+      },
+      "securePlatform": {
+        "title": "Secure Platform",
+        "description": "JWT authentication"
+      },
+      "creditSystemCard": {
+        "title": "Credit System",
+        "description": "Pay only for what you use - 1 credit = $1 = 1 analysis"
+      }
+    },
+    "callToAction": {
+      "title": "Ready to Start Analysing?",
+      "subtitle": "Join thousands of investors using VoyageurCompass for professional stock analysis."
+    }
+  },
+  "logout": {
+    "sessionExpired": {
+      "title": "Session Expired",
+      "message": "Your session has expired due to inactivity for security reasons."
+    },
+    "sessionEnded": {
+      "title": "Session Ended",
+      "message": "Your session has ended. Please log in again to continue."
+    },
+    "manual": {
+      "title": "Logged Out Successfully",
+      "message": "You have been successfully logged out. Thank you for using VoyageurCompass."
+    },
+    "securityNotice": "For your security, we automatically log you out after 15 minutes of inactivity. Your data is safe and you can log back in at any time.",
+    "redirectingIn": "Redirecting to homepage in {{count}} seconds...",
+    "stayHere": "Stay Here",
+    "goToHomepage": "Go to Homepage",
+    "homepage": "Homepage",
+    "loginAgain": "Login Again",
+    "tagline": "VoyageurCompass - Your Financial Navigation Partner",
+    "supportText": "Questions? Visit our Help section or contact support."
+  },
+  "session": {
+    "expiring": {
+      "title": "Session Expiring Soon",
+      "message": "Your session will expire in {{time}} due to inactivity.",
+      "timeRemaining": "Time remaining: {{time}}",
+      "securityNotice": "For your security, we automatically log you out after 15 minutes of inactivity. Click \"Stay Logged In\" to continue your session, or \"Logout\" to end it now.",
+      "tip": "💡 Tip: Any activity (clicking, typing, scrolling) will automatically extend your session.",
+      "logoutNow": "Logout Now",
+      "stayLoggedIn": "Stay Logged In"
+    }
+  },
+  "help": {
+    "title": "Help & Support",
+    "subtitle": "Everything you need to know about using VoyageurCompass",
+    "stats": {
+      "indicators": {
+        "title": "12 Indicators",
+        "subtitle": "Professional analysis"
+      },
+      "analysisTime": {
+        "title": "2-5 Seconds",
+        "subtitle": "Analysis time"
+      },
+      "pricing": {
+        "title": "$1 = 1 Analysis",
+        "subtitle": "Affordable pricing"
+      },
+      "mobileSupport": {
+        "title": "Mobile Ready",
+        "subtitle": "Responsive design"
+      }
+    },
+    "tabs": {
+      "userGuide": "User Guide",
+      "technical": "Technical Indicators",
+      "faq": "FAQ",
+      "contact": "Contact"
+    },
+    "disclaimer": {
+      "title": "Educational Disclaimer:",
+      "content": "VoyageurCompass is a university project created for educational purposes. This platform demonstrates technical analysis concepts and should not be used for actual trading decisions. Always consult with qualified financial advisors for investment guidance."
+    },
+    "contactForm": {
+      "name": "Name",
+      "email": "Email",
+      "subject": "Subject",
+      "message": "Message",
+      "send": "Send Message",
+      "success": "Thank you for your message! We'll get back to you soon.",
+      "contactInfo": "Contact Information",
+      "getInTouch": "Get in Touch",
+      "studentProject": "Student Project Notice",
+      "projectDescription": "VoyageurCompass is an educational project built for a university course. Whilst it uses real market data and professional analysis techniques, it's designed for learning and demonstration purposes."
+    },
+    "features": {
+      "technicalAnalysis": {
+        "title": "Technical Analysis",
+        "description": "12 comprehensive indicators providing detailed stock analysis",
+        "details": [
+          "SMA50 vs SMA200 trend analysis",
+          "Price vs 50-day moving average",
+          "RSI (14-period) momentum indicator",
+          "MACD signal and histogram",
+          "Bollinger Bands position and width",
+          "Volume surge detection",
+          "On-Balance Volume trend",
+          "Relative strength vs sector/market",
+          "Candlestick pattern recognition",
+          "Support/resistance context"
+        ]
+      },
+      "stockComparison": {
+        "title": "Stock Comparison",
+        "description": "Side-by-side analysis of multiple stocks",
+        "details": [
+          "Compare up to 5 stocks simultaneously",
+          "Visual metric comparison tables",
+          "Export results to CSV",
+          "Performance ranking",
+          "Sector-specific comparisons"
+        ]
+      },
+      "sectorAnalysis": {
+        "title": "Sector Analysis",
+        "description": "Market sector performance and trends",
+        "details": [
+          "Industry performance tracking",
+          "Sector momentum analysis",
+          "Market cap and volume metrics",
+          "Top performing stocks by sector",
+          "Trend identification"
+        ]
+      },
+      "creditSystem": {
+        "title": "Credit System",
+        "description": "Pay-per-analysis affordable pricing",
+        "details": [
+          "1 Credit = $1 = 1 Stock Analysis",
+          "No monthly subscriptions",
+          "Credits never expire",
+          "Student-friendly pricing",
+          "Bulk purchase discounts"
+        ]
+      }
+    },
+    "technicalGuide": {
+      "title": "Technical Indicator Guide",
+      "description": "Our technical analysis engine uses 12 professional indicators to generate a comprehensive score (0-10) for each stock. Higher scores indicate stronger technical performance.",
+      "indicators": [
+        {
+          "name": "SMA50 vs SMA200",
+          "description": "Trend direction based on moving average crossover",
+          "range": "0-10"
+        },
+        {
+          "name": "Price vs 50MA",
+          "description": "Current price relative to 50-day moving average",
+          "range": "0-10"
+        },
+        {
+          "name": "RSI (14)",
+          "description": "Relative Strength Index momentum oscillator",
+          "range": "0-100"
+        },
+        {
+          "name": "MACD",
+          "description": "Moving Average Convergence Divergence",
+          "range": "Signal/Histogram"
+        },
+        {
+          "name": "Bollinger Position",
+          "description": "Position within Bollinger Bands",
+          "range": "0-10"
+        },
+        {
+          "name": "Volume Surge",
+          "description": "Trading volume compared to average",
+          "range": "0-10"
+        },
+        {
+          "name": "OBV Trend",
+          "description": "On-Balance Volume trend analysis",
+          "range": "0-10"
+        },
+        {
+          "name": "Relative 1Y/2Y",
+          "description": "Performance vs sector benchmark",
+          "range": "Percentage"
+        }
+      ],
+      "tableHeaders": {
+        "indicator": "Indicator",
+        "description": "Description",
+        "range": "Range/Scale"
+      },
+      "scoreInterpretation": {
+        "title": "Score Interpretation"
+      }
+    },
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "items": [
+        {
+          "question": "What is VoyageurCompass?",
+          "answer": "VoyageurCompass is a comprehensive financial analytics platform that provides professional-grade stock analysis using 12 technical indicators. Built for students and professionals, it offers affordable pay-per-analysis pricing without monthly subscriptions."
+        },
+        {
+          "question": "How does the credit system work?",
+          "answer": "Our credit system is simple: 1 Credit = $1 = 1 Stock Analysis. You only pay for what you use. Credits never expire, and you can purchase them in various packages with bulk discounts. No monthly fees or subscriptions required."
+        },
+        {
+          "question": "What technical indicators do you provide?",
+          "answer": "We provide 12 comprehensive technical indicators including SMA trends, RSI, MACD, Bollinger Bands, volume analysis, OBV, relative performance, and candlestick patterns. Each analysis receives a score from 0-10 based on these indicators."
+        },
+        {
+          "question": "Where do you get your data?",
+          "answer": "We use Yahoo Finance API for real-time and historical stock data. Our data is updated regularly and stored in a secure PostgreSQL database with Redis caching for fast access."
+        },
+        {
+          "question": "How does stock comparison work?",
+          "answer": "You can compare 2-5 stocks side-by-side with detailed metrics. Each stock in the comparison costs 1 credit. Results include visual charts, performance rankings, and exportable CSV reports."
+        },
+        {
+          "question": "What is sector analysis?",
+          "answer": "Sector analysis compares different market sectors (Technology, Healthcare, Finance, etc.) showing performance trends, momentum, volatility, and top performers. You can analyse 2+ sectors for credits (2 sectors = 1 credit)."
+        },
+        {
+          "question": "Is this a real trading platform?",
+          "answer": "VoyageurCompass is an educational project built for a university course. Whilst it uses real market data and professional analysis techniques, it's designed for learning and demonstration purposes."
+        },
+        {
+          "question": "Which stocks can I analyse?",
+          "answer": "You can analyse any publicly traded stock with a valid ticker symbol. Our system supports major exchanges including NYSE, NASDAQ, and others through Yahoo Finance integration."
+        },
+        {
+          "question": "How long does analysis take?",
+          "answer": "Stock analysis typically takes 2-5 seconds. The system fetches real-time data, runs 12 technical indicators, and calculates a comprehensive score. Results are displayed immediately."
+        },
+        {
+          "question": "Can I use this on mobile devices?",
+          "answer": "Yes! VoyageurCompass is built with responsive design using Material-UI, making it fully functional on desktop, tablet, and mobile devices."
+        }
+      ]
+    }
+  },
+  "recommendations": {
+    "strongBuy": "Strong Buy",
+    "buy": "Buy",
+    "hold": "Hold",
+    "sell": "Sell"
+  },
+  "indicators": {
+    "sma50_200": "SMA50 vs SMA200 Trend",
+    "price_sma50": "Price vs 50-Day Moving Average",
+    "rsi": "RSI (14-period)",
+    "macd": "MACD Signal",
+    "bollinger_position": "Bollinger Bands Position",
+    "volume_sma": "Volume vs Average",
+    "obv_trend": "On-Balance Volume Trend",
+    "relative_1y": "1-Year Relative Performance",
+    "relative_2y": "2-Year Relative Performance",
+    "candlestick": "Candlestick Patterns",
+    "sentiment": "News Sentiment Analysis",
+    "descriptions": {
+      "sma50_200": "Trend direction based on 50-day vs 200-day moving average crossover",
+      "price_sma50": "Current price position relative to 50-day moving average",
+      "rsi": "Relative Strength Index momentum oscillator (0-100 scale)",
+      "macd": "Moving Average Convergence Divergence signal analysis",
+      "bollinger_position": "Stock position within Bollinger Bands channel",
+      "volume_sma": "Trading volume comparison to historical average",
+      "obv_trend": "On-Balance Volume trend analysis for price confirmation",
+      "relative_1y": "One-year performance relative to sector benchmark",
+      "relative_2y": "Two-year performance relative to sector benchmark",
+      "candlestick": "Japanese candlestick pattern recognition analysis",
+      "sentiment": "Market sentiment analysis from news articles and social media",
+      "sma50vs200": "Moving Average Crossover",
+      "obv20": "On-Balance Volume",
+      "rel1y": "Relative Strength 1Y",
+      "rel2y": "Relative Strength 2Y",
+      "rsi14": "Relative Strength Index",
+      "bbpos20": "Bollinger Position",
+      "volsurge": "Volume Surge",
+      "bbwidth20": "Bollinger Bandwidth",
+      "candlerev": "Pattern: Inverted Hammer",
+      "macd12269": "MACD Histogram",
+      "pricevs50": "Price vs 50-Day Average",
+      "srcontext": "Support/Resistance",
+      "prediction": "LSTM Price Prediction"
+    }
+  },
+  "settings": {
+    "title": "Account Settings",
+    "subtitle": "Manage your account preferences and security",
+    "tabs": {
+      "profile": "Profile",
+      "security": "Security",
+      "notifications": "Notifications",
+      "appearance": "Appearance"
+    },
+    "profile": {
+      "personalInfo": "Personal Information",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "username": "Username",
+      "email": "Email Address",
+      "phone": "Phone Number",
+      "saveChanges": "Save Changes",
+      "updating": "Updating...",
+      "updateSuccess": "Profile updated successfully!",
+      "updateError": "Failed to update profile"
+    },
+    "security": {
+      "title": "Security Settings",
+      "changePassword": "Change Password",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm New Password",
+      "twoFactor": "Two-Factor Authentication",
+      "twoFactorDesc": "Add an extra layer of security to your account",
+      "loginNotifications": "Login Notifications",
+      "loginNotificationsDesc": "Get notified when someone signs into your account",
+      "passwordUpdated": "Password updated successfully",
+      "passwordError": "Failed to update password"
+    },
+    "notifications": {
+      "title": "Notification Preferences",
+      "email": "Email Notifications",
+      "emailDesc": "Receive notifications via email",
+      "analysisComplete": "Analysis Complete",
+      "analysisCompleteDesc": "Notify when stock analysis is finished",
+      "weeklyReport": "Weekly Report",
+      "weeklyReportDesc": "Get a summary of your activity",
+      "marketAlerts": "Market Alerts",
+      "marketAlertsDesc": "Important market news and updates",
+      "creditLowAlert": "Low Credit Alert",
+      "creditLowAlertDesc": "Notify when your credits are running low",
+      "promotionalEmails": "Promotional Emails",
+      "promotionalEmailsDesc": "Special offers and product updates",
+      "notificationsUpdated": "Notification preferences updated"
+    },
+    "preferences": {
+      "title": "Application Preferences",
+      "theme": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeAuto": "Auto",
+      "language": "Language",
+      "timezone": "Timezone",
+      "timezoneEastern": "Eastern Time",
+      "timezoneCentral": "Central Time",
+      "timezoneMountain": "Mountain Time",
+      "timezonePacific": "Pacific Time",
+      "defaultAnalysisView": "Default Analysis View",
+      "viewSummary": "Summary",
+      "viewDetailed": "Detailed",
+      "viewCharts": "Charts",
+      "autoRefresh": "Auto Refresh Data",
+      "autoRefreshDesc": "Automatically refresh market data",
+      "soundEffects": "Sound Effects",
+      "soundEffectsDesc": "Play sounds for notifications and alerts"
+    },
+    "deleteAccount": {
+      "title": "Delete Account",
+      "description": "Permanently delete your account and all associated data. This action cannot be undone.",
+      "warning": "This will permanently delete your account",
+      "confirmText": "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.",
+      "confirmButton": "Delete Account",
+      "cancelButton": "Cancel"
+    }
+  },
+  "sectors": {
+    "technology": {
+      "name": "Technology",
+      "description": "Software, hardware, semiconductors"
+    },
+    "healthcare": {
+      "name": "Healthcare",
+      "description": "Pharmaceuticals, medical devices, biotech"
+    },
+    "financials": {
+      "name": "Financials",
+      "description": "Banks, insurance, investment services"
+    },
+    "consumer_discretionary": {
+      "name": "Consumer Discretionary",
+      "description": "Retail, automotive, entertainment"
+    },
+    "industrials": {
+      "name": "Industrials",
+      "description": "Manufacturing, aerospace, transportation"
+    },
+    "real_estate": {
+      "name": "Real Estate",
+      "description": "REITs, property development"
+    },
+    "utilities": {
+      "name": "Utilities",
+      "description": "Electric, gas, water utilities"
+    },
+    "telecommunications": {
+      "name": "Telecommunications",
+      "description": "Telecom services, media"
+    },
+    "energy": {
+      "name": "Energy",
+      "description": "Oil, gas, renewable energy"
+    },
+    "materials": {
+      "name": "Materials",
+      "description": "Mining, chemicals, metals"
+    }
+  },
+  "comparison": {
+    "title": "Stock Comparison",
+    "subtitle": "Compare multiple stocks side-by-side with comprehensive technical analysis",
+    "availableCredits": "Available Credits",
+    "cost": "Cost: {{credits}} Credits ({{stocks}} stocks)",
+    "buyMoreCredits": "Buy More Credits",
+    "selectStocks": "Select Stocks to Compare",
+    "addStockSymbol": "Add Stock Symbol",
+    "typeToSearch": "Type to search...",
+    "comparing": "Comparing...",
+    "compareStocks": "Compare Stocks",
+    "confirmComparison": "Confirm Stock Comparison",
+    "confirmMessage": "Compare <strong>{{stocks}}</strong> for {{credits}} credits?",
+    "creditUsage": "This will use {{used}} credits from your balance ({{remaining}} remaining)",
+    "confirmButton": "Confirm Comparison",
+    "instructions": "Select 2-5 stocks for comparison. Each stock costs 1 credit to analyze.",
+    "insufficientCredits": "Insufficient credits. Need {{needed}} credits for this comparison.",
+    "creditsUsed": "Used {{used}} credits",
+    "comparingStocks": "Comparing {{count}} stocks...",
+    "runningAnalysis": "Running technical analysis for each stock",
+    "detailedComparison": "Detailed Comparison",
+    "exportCSV": "Export CSV",
+    "metric": "Metric",
+    "technicalScore": "Technical Score",
+    "summary": "Comparison Summary",
+    "bestPerformers": "Best Performers",
+    "analysisDetails": "Analysis Details",
+    "analyzedStocks": "Analyzed {{count}} stocks",
+    "analysisCompleted": "Analysis completed at {{time}}"
+  },
+  "reports": {
+    "title": "Analysis Reports",
+    "subtitle": "Browse and manage all your stock analysis reports",
+    "createNewReport": "Create New Report",
+    "searchPlaceholder": "Search by symbol, company, sector... (Coming soon with server-side search)",
+    "sortBy": "Sort By",
+    "order": "Order",
+    "sortOptions": {
+      "date": "Date",
+      "symbol": "Symbol",
+      "score": "Score",
+      "sector": "Sector"
+    },
+    "orderOptions": {
+      "descending": "Descending",
+      "ascending": "Ascending"
+    },
+    "loadingReports": "Loading your reports...",
+    "loading": "Loading...",
+    "failedToLoad": "Failed to load reports",
+    "tryAgainLater": "Please try again later",
+    "reportsTotal": "<strong>{{count}}</strong> reports total",
+    "showingOnPage": " • Showing {{count}} on this page",
+    "table": {
+      "stock": "Stock",
+      "company": "Company",
+      "sector": "Sector",
+      "score": "Score",
+      "recommendation": "Recommendation",
+      "analysisDate": "Analysis Date",
+      "actions": "Actions"
+    },
+    "actions": {
+      "viewResults": "View Analysis Results",
+      "runNewAnalysis": "Run New Analysis"
+    },
+    "noMatchingReports": "No reports match your search",
+    "noReportsFound": "No reports found",
+    "tryAdjustingSearch": "Try adjusting your search terms or filters",
+    "getStartedMessage": "Get started by creating your first analysis report",
+    "createFirstReport": "Create Your First Report"
+  },
+  "sectorAnalysis": {
+    "title": "Sector Analysis",
+    "subtitle": "Compare sector performance and identify market trends across industries",
+    "availableCredits": "Available Credits",
+    "cost": "Cost: {{credits}} Credits ({{sectors}} sectors)",
+    "selectSectors": "Select Sectors",
+    "timeframe": "Timeframe",
+    "analyzing": "Analyzing...",
+    "analyzeSectors": "Analyze Sectors",
+    "analyzingCount": "Analyzing {{count}} sectors...",
+    "processing": "Processing market data and performance metrics",
+    "summary": "Sector Analysis Summary",
+    "confirmAnalysis": "Confirm Sector Analysis"
+  },
+  "footer": {
+    "copyright": "© 2025 Voyageur Compass. All rights reserved."
+  },
+  "formatting": {
+    "currency": "$",
+    "currencyPosition": "before",
+    "decimalSeparator": ".",
+    "thousandsSeparator": ",",
+    "dateFormat": "MM/DD/YYYY",
+    "timeFormat": "h:mm A"
+  }
+}

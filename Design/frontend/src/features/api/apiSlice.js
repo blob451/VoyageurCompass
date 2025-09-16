@@ -240,20 +240,24 @@ export const apiSlice = createApi({
     }),
     // LLaMA 3.1 70B Explanation Endpoints
     generateExplanation: builder.mutation({
-      query: ({ analysisId, detailLevel = 'standard', forceRegenerate = false }) => ({
+      query: ({ analysisId, detailLevel = 'standard', forceRegenerate = false, language = 'en' }) => ({
         url: `/analytics/explain/${analysisId}/`,
         method: 'POST',
-        params: { 
+        params: {
           detail_level: detailLevel,
-          force_regenerate: forceRegenerate 
+          force_regenerate: forceRegenerate,
+          language: language
         },
       }),
       invalidatesTags: (result, error, { analysisId }) => [{ type: 'Analysis', id: analysisId }],
     }),
     getExplanation: builder.query({
-      query: ({ analysisId, detailLevel }) => ({
+      query: ({ analysisId, detailLevel, language = 'en' }) => ({
         url: `/analytics/explanation/${analysisId}/`,
-        params: detailLevel ? { detail_level: detailLevel } : {},
+        params: {
+          ...(detailLevel && { detail_level: detailLevel }),
+          language: language
+        },
       }),
       providesTags: (result, error, { analysisId, detailLevel }) => [
         { type: 'Analysis', id: `explanation-${analysisId}` },

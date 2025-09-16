@@ -103,6 +103,15 @@ class FinancialTerminologyMapper:
         else:
             return "Use accurate financial terminology appropriate for the target language."
 
+    def get_terminology_for_language(self, target_language: str) -> Dict[str, str]:
+        """Get terminology dictionary for a specific language."""
+        if target_language == "fr":
+            return self.en_to_fr
+        elif target_language == "es":
+            return self.en_to_es
+        else:
+            return {}
+
 
 class TranslationQualityScorer:
     """Quality scoring system for translation assessment."""
@@ -243,6 +252,8 @@ class TranslationService:
         self.translation_model = getattr(settings, "OLLAMA_TRANSLATION_MODEL", "qwen2:3b")
         self.cache_ttl = getattr(settings, "EXPLANATION_CACHE_TTL", 1800)  # 30 minutes default
         self.translation_timeout = 45  # Shorter timeout for translation
+        self.high_quality_cache_ttl = 7200  # 2 hours for high-quality translations
+        self.batch_size = 3  # Maximum concurrent translations
         
         # Translation support configuration
         self.supported_languages = ["en", "fr", "es"]
@@ -317,7 +328,9 @@ class TranslationService:
             
             if not llm_service.is_available():
                 logger.error("LLM service not available for translation")
-                return self._create_fallback_translation(english_text, target_language)
+                # Try enhanced fallback first
+                enhanced_fallback = self._create_enhanced_fallback_translation(english_text, target_language, context)
+                return enhanced_fallback or self._create_fallback_translation(english_text, target_language)
             
             # Security validation for input
             sanitized_text = sanitize_financial_input(english_text)
@@ -342,7 +355,8 @@ class TranslationService:
                 logger.error("Invalid response from translation model")
                 with self._metrics_lock:
                     self.translation_metrics["failed_translations"] += 1
-                return self._create_fallback_translation(english_text, target_language)
+                enhanced_fallback = self._create_enhanced_fallback_translation(english_text, target_language, context)
+                return enhanced_fallback or self._create_fallback_translation(english_text, target_language)
             
             translated_text = response["response"].strip()
             
@@ -379,10 +393,13 @@ class TranslationService:
                 "input_sanitized": sanitized_text != english_text,
             }
             
-            # Cache successful translation
-            if quality_score >= 0.6:  # Only cache good quality translations
+            # Cache successful translation with dynamic TTL based on quality
+            if quality_score >= 0.8:  # High-quality translations get longer cache time
+                cache.set(cache_key, result, self.high_quality_cache_ttl)
+                logger.info(f"Cached high-quality translation with score {quality_score:.2f} for {self.high_quality_cache_ttl}s")
+            elif quality_score >= 0.6:  # Standard quality translations
                 cache.set(cache_key, result, self.cache_ttl)
-                logger.info(f"Cached translation with quality score {quality_score:.2f}")
+                logger.info(f"Cached standard translation with score {quality_score:.2f} for {self.cache_ttl}s")
             
             # Update metrics
             with self._metrics_lock:
@@ -405,7 +422,8 @@ class TranslationService:
             logger.error(f"Error during translation to {target_language}: {str(e)}")
             with self._metrics_lock:
                 self.translation_metrics["failed_translations"] += 1
-            return self._create_fallback_translation(english_text, target_language)
+            enhanced_fallback = self._create_enhanced_fallback_translation(english_text, target_language, context)
+            return enhanced_fallback or self._create_fallback_translation(english_text, target_language)
     
     def _build_translation_prompt(self, text: str, target_language: str, context: Optional[Dict[str, Any]]) -> str:
         """Build specialised translation prompt for financial content."""
@@ -468,10 +486,50 @@ Provide only the {target_lang_name} translation:"""
         text_hash = hashlib.blake2b(f"{text}_{target_language}{context_str}".encode(), digest_size=16).hexdigest()
         return f"{self.cache_prefix}{target_language}_{text_hash}"
     
+    def _create_enhanced_fallback_translation(self, english_text: str, target_language: str, context: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """Create enhanced fallback translation with terminology mapping."""
+        try:
+            logger.info(f"Using enhanced fallback translation for {target_language}")
+
+            # Get terminology context for better fallback
+            terminology_context = self.terminology_mapper.get_terminology_context(target_language)
+
+            # Apply basic terminology mapping
+            enhanced_text = english_text
+            terminology = self.terminology_mapper.get_terminology_for_language(target_language)
+
+            for english_term, translated_term in terminology.items():
+                if english_term.lower() in enhanced_text.lower():
+                    enhanced_text = enhanced_text.replace(english_term.upper(), translated_term.upper())
+                    enhanced_text = enhanced_text.replace(english_term.lower(), translated_term.lower())
+                    enhanced_text = enhanced_text.replace(english_term.capitalize(), translated_term.capitalize())
+
+            fallback_text = f"[Enhanced {self.language_names[target_language]} translation] {enhanced_text}"
+
+            return {
+                "original_text": english_text,
+                "translated_text": fallback_text,
+                "target_language": target_language,
+                "language_name": self.language_names[target_language],
+                "translation_model": "enhanced_fallback",
+                "quality_score": 0.5,  # Better than basic fallback
+                "generation_time": 0.1,
+                "timestamp": time.time(),
+                "word_count_original": len(english_text.split()),
+                "word_count_translated": len(fallback_text.split()),
+                "cached": False,
+                "fallback": True,
+                "enhanced_fallback": True,
+            }
+
+        except Exception as e:
+            logger.error(f"Enhanced fallback translation failed: {str(e)}")
+            return None
+
     def _create_fallback_translation(self, english_text: str, target_language: str) -> Dict[str, Any]:
-        """Create fallback translation result when model translation fails."""
-        logger.info(f"Using fallback translation for {target_language}")
-        
+        """Create basic fallback translation result when model translation fails."""
+        logger.info(f"Using basic fallback translation for {target_language}")
+
         fallback_text = f"[{self.language_names[target_language]} translation not available] {english_text}"
         
         return {

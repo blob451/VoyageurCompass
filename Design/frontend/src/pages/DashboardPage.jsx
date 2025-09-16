@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useLocaleFormat, useFinancialFormat } from '../hooks/useLocaleFormat';
 import {
   Container,
   Grid,
@@ -55,6 +57,9 @@ import { useGetUserAnalysisHistoryQuery } from '../features/api/apiSlice';
 const DashboardPage = () => {
   const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
+  const { formatLargeNumber } = useLocaleFormat();
+  const { formatScore } = useFinancialFormat();
   
   // API queries
   const { data: analysisHistoryData, isLoading: analysisLoading } = useGetUserAnalysisHistoryQuery({ limit: 5 });
@@ -187,10 +192,10 @@ const DashboardPage = () => {
     <Container component="main" role="main" aria-label="Dashboard main content" maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" gutterBottom>
-          Welcome back, {user?.username || 'Investor'}!
+          {t('dashboard.welcome')}, {user?.username || 'Investor'}!
         </Typography>
         <Typography variant="body1" color="textSecondary">
-          Your financial analytics dashboard
+          {t('dashboard.subtitle')}
         </Typography>
       </Box>
 
@@ -202,14 +207,14 @@ const DashboardPage = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <AccountBalanceWallet sx={{ mr: 1 }} />
                 <Typography variant="h6">
-                  Available Credits
+                  {t('dashboard.availableCredits')}
                 </Typography>
               </Box>
               <Typography variant="h3" gutterBottom>
-                {userCredits}
+                {formatLargeNumber(userCredits)}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>
-                1 Credit = 1 Stock Analysis
+                {t('dashboard.creditEquation')}
               </Typography>
               <Button
                 variant="outlined"
@@ -225,7 +230,7 @@ const DashboardPage = () => {
                 }}
                 startIcon={<ShoppingCart />}
               >
-                Buy More Credits
+                {t('dashboard.buyMoreCredits')}
               </Button>
             </CardContent>
           </Card>
@@ -237,12 +242,12 @@ const DashboardPage = () => {
             <CardContent>
               <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                 <Search sx={{ mr: 1 }} />
-                Quick Stock Analysis
+                {t('dashboard.quickSearch')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
                 <TextField
                   fullWidth
-                  placeholder="Enter stock ticker (e.g., AAPL, MSFT, GOOGL)"
+                  placeholder={t('dashboard.searchPlaceholder')}
                   value={quickSearch}
                   onChange={(e) => setQuickSearch(e.target.value.toUpperCase())}
                   onKeyPress={(e) => e.key === 'Enter' && handleQuickSearch()}
@@ -256,11 +261,11 @@ const DashboardPage = () => {
                   disabled={!quickSearch.trim()}
                   sx={{ minWidth: 120 }}
                 >
-                  Analyze
+                  {t('dashboard.analyseButton')}
                 </Button>
               </Box>
               <Typography variant="body2" color="text.secondary">
-                Get instant technical analysis for any stock. Cost: 1 credit per analysis.
+                {t('dashboard.searchDescription')}
               </Typography>
             </CardContent>
           </Card>
@@ -271,13 +276,13 @@ const DashboardPage = () => {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Analyses This Month
+                {t('dashboard.analysesThisMonth')}
               </Typography>
               <Typography variant="h5" component="div">
-                {totalAnalyses}
+                {formatLargeNumber(totalAnalyses)}
               </Typography>
               <Typography variant="body2" color="success.main">
-                {recentAnalyses.length} recent
+                {recentAnalyses.length} {t('dashboard.recentCount')}
               </Typography>
             </CardContent>
           </Card>
@@ -287,13 +292,13 @@ const DashboardPage = () => {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Average Score
+                {t('dashboard.averageScore')}
               </Typography>
               <Typography variant="h5" component="div">
-                {averageScore}/10
+                {formatScore(parseFloat(averageScore))}/10
               </Typography>
               <Typography variant="body2" color={parseFloat(averageScore) >= 6 ? "success.main" : parseFloat(averageScore) >= 4 ? "warning.main" : "error.main"}>
-                {parseFloat(averageScore) >= 6 ? 'Above average' : parseFloat(averageScore) >= 4 ? 'Average' : 'Below average'}
+                {parseFloat(averageScore) >= 6 ? t('dashboard.aboveAverage') : parseFloat(averageScore) >= 4 ? t('dashboard.average') : t('dashboard.belowAverage')}
               </Typography>
             </CardContent>
           </Card>
@@ -303,13 +308,13 @@ const DashboardPage = () => {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Favorite Sector
+                {t('dashboard.favoriteSector')}
               </Typography>
               <Typography variant="h5" component="div">
                 {topSector}
               </Typography>
               <Typography variant="body2" color="textSecondary">
-                Most analyzed
+                {t('dashboard.mostAnalysed')}
               </Typography>
             </CardContent>
           </Card>
@@ -319,7 +324,7 @@ const DashboardPage = () => {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Market Sentiment
+                {t('dashboard.marketSentiment')}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 {getSentimentIcon(dominantSentiment)}
@@ -328,7 +333,7 @@ const DashboardPage = () => {
                 </Typography>
               </Box>
               <Typography variant="body2" color={`${getSentimentColor(dominantSentiment)}.main`}>
-                {sentimentStats.total > 0 ? `From ${sentimentStats.total} analyses` : 'No data yet'}
+                {sentimentStats.total > 0 ? t('dashboard.fromAnalyses', { count: sentimentStats.total }) : t('dashboard.noDataYet')}
               </Typography>
             </CardContent>
           </Card>
@@ -339,13 +344,13 @@ const DashboardPage = () => {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Avg Sentiment Score
+                {t('dashboard.avgSentimentScore')}
               </Typography>
               <Typography variant="h5" component="div">
                 {formatSentimentScore(avgSentimentScore)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {sentimentStats.totalNews > 0 ? `${sentimentStats.totalNews} news articles` : 'No news data'}
+                {sentimentStats.totalNews > 0 ? t('dashboard.newsArticles', { count: sentimentStats.totalNews }) : t('dashboard.noNewsData')}
               </Typography>
             </CardContent>
           </Card>
@@ -358,14 +363,14 @@ const DashboardPage = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <NewspaperOutlined color="action" sx={{ mr: 1 }} />
                 <Typography color="textSecondary">
-                  News Coverage
+                  {t('dashboard.newsCoverage')}
                 </Typography>
               </Box>
               <Typography variant="h5" component="div">
                 {sentimentStats.totalNews}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Articles analyzed
+                {t('dashboard.articlesAnalysed')}
               </Typography>
             </CardContent>
           </Card>
@@ -376,14 +381,14 @@ const DashboardPage = () => {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Sentiment Breakdown
+                {t('dashboard.sentimentBreakdown')}
               </Typography>
               {sentimentStats.total > 0 ? (
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <SentimentSatisfied color="success" fontSize="small" sx={{ mr: 0.5 }} />
-                      <Typography variant="body2">Positive</Typography>
+                      <Typography variant="body2">{t('dashboard.positive')}</Typography>
                     </Box>
                     <Typography variant="body2" color="success.main">
                       {Math.round((sentimentStats.positive / sentimentStats.total) * 100)}%
@@ -392,7 +397,7 @@ const DashboardPage = () => {
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <SentimentNeutral color="warning" fontSize="small" sx={{ mr: 0.5 }} />
-                      <Typography variant="body2">Neutral</Typography>
+                      <Typography variant="body2">{t('dashboard.neutral')}</Typography>
                     </Box>
                     <Typography variant="body2" color="warning.main">
                       {Math.round((sentimentStats.neutral / sentimentStats.total) * 100)}%
@@ -401,7 +406,7 @@ const DashboardPage = () => {
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <SentimentDissatisfied color="error" fontSize="small" sx={{ mr: 0.5 }} />
-                      <Typography variant="body2">Negative</Typography>
+                      <Typography variant="body2">{t('dashboard.negative')}</Typography>
                     </Box>
                     <Typography variant="body2" color="error.main">
                       {Math.round((sentimentStats.negative / sentimentStats.total) * 100)}%
@@ -410,7 +415,7 @@ const DashboardPage = () => {
                 </Box>
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  No sentiment data
+                  {t('dashboard.noSentimentData')}
                 </Typography>
               )}
             </CardContent>
@@ -423,14 +428,14 @@ const DashboardPage = () => {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
                 <History sx={{ mr: 1 }} />
-                Recent Analysis History
+                {t('dashboard.recentAnalyses')}
               </Typography>
               <Button 
                 variant="outlined" 
                 size="small"
                 onClick={() => navigate('/reports')}
               >
-                View All
+                {t('dashboard.viewAll')}
               </Button>
             </Box>
             
@@ -464,7 +469,7 @@ const DashboardPage = () => {
                       <IconButton 
                         size="small"
                         onClick={() => navigate(`/analysis/${analysis.id}`)}
-                        title="View Analysis Results"
+                        title={t('dashboard.viewAnalysisResults')}
                       >
                         <TrendingUp />
                       </IconButton>
@@ -475,7 +480,7 @@ const DashboardPage = () => {
               </List>
             ) : (
               <Alert severity="info">
-                No analysis history yet. Start by analyzing your first stock!
+                {t('dashboard.noAnalysisHistory')}
               </Alert>
             )}
           </Paper>
@@ -485,7 +490,7 @@ const DashboardPage = () => {
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Quick Actions
+              {t('dashboard.quickActions')}
             </Typography>
             
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -495,7 +500,7 @@ const DashboardPage = () => {
                 startIcon={<Analytics />}
                 onClick={() => navigate('/stocks')}
               >
-                Stock Analysis
+                {t('dashboard.stockAnalysis')}
               </Button>
               
               <Button
@@ -504,7 +509,7 @@ const DashboardPage = () => {
                 startIcon={<TrendingUp />}
                 onClick={() => navigate('/compare')}
               >
-                Compare Stocks
+                {t('dashboard.compareStocks')}
               </Button>
               
               <Button
@@ -513,7 +518,7 @@ const DashboardPage = () => {
                 startIcon={<AccountBalanceWallet />}
                 onClick={() => navigate('/sectors')}
               >
-                Sector Analysis
+                {t('dashboard.sectorAnalysis')}
               </Button>
               
               <Button
@@ -522,14 +527,14 @@ const DashboardPage = () => {
                 startIcon={<ShoppingCart />}
                 onClick={() => navigate('/store')}
               >
-                Buy Credits
+                {t('dashboard.buyCredits')}
               </Button>
             </Box>
 
             <Divider sx={{ my: 2 }} />
 
             <Typography variant="h6" gutterBottom>
-              Popular Stocks
+              {t('dashboard.popularStocks')}
             </Typography>
             
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -553,7 +558,7 @@ const DashboardPage = () => {
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Market Performance Overview
+              {t('dashboard.marketOverview')}
             </Typography>
             {analysisLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -573,7 +578,7 @@ const DashboardPage = () => {
                     stroke="#1976d2"
                     fill="#1976d2"
                     fillOpacity={0.6}
-                    name="Portfolio Value"
+                    name={t('dashboard.portfolioValue')}
                   />
                   <Area
                     type="monotone"
@@ -581,7 +586,7 @@ const DashboardPage = () => {
                     stroke="#2e7d32"
                     fill="#2e7d32"
                     fillOpacity={0.6}
-                    name="Profit/Loss"
+                    name={t('dashboard.profitLoss')}
                   />
                 </AreaChart>
               </ResponsiveContainer>

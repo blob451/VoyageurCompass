@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import {
   Container,
   Paper,
@@ -18,6 +19,7 @@ import { authLogger } from '../utils/logger';
 const LoginPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { t } = useTranslation('common');
   
   const [formData, setFormData] = useState({
     username: '',
@@ -51,8 +53,8 @@ const LoginPage = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.username) newErrors.username = 'Username is required';
-    if (!formData.password) newErrors.password = 'Password is required';
+    if (!formData.username) newErrors.username = t('errors.validation');
+    if (!formData.password) newErrors.password = t('errors.validation');
     return newErrors;
   };
 
@@ -88,15 +90,15 @@ const LoginPage = () => {
       >
         <Paper elevation={3} sx={{ padding: 4, width: '100%' }}>
           <Typography component="h1" variant="h4" align="center" gutterBottom>
-            Welcome Back
+            {t('dashboard.welcome')}
           </Typography>
           <Typography variant="body2" align="center" color="textSecondary" paragraph>
-            Sign in to access your financial dashboard
+            {t('auth.loginSubtitle')}
           </Typography>
           
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {error.data?.error || 'Invalid credentials. Please try again.'}
+              {error.data?.error || t('auth.invalidCredentials')}
             </Alert>
           )}
           
@@ -106,7 +108,7 @@ const LoginPage = () => {
               required
               fullWidth
               id="username"
-              label="Username"
+              label={t('auth.username')}
               name="username"
               autoComplete="username"
               autoFocus
@@ -120,7 +122,7 @@ const LoginPage = () => {
               required
               fullWidth
               name="password"
-              label="Password"
+              label={t('auth.password')}
               type="password"
               id="password"
               autoComplete="current-password"
@@ -136,12 +138,12 @@ const LoginPage = () => {
               sx={{ mt: 3, mb: 2 }}
               disabled={isLoading}
             >
-              {isLoading ? <CircularProgress size={24} /> : 'Sign In'}
+              {isLoading ? <CircularProgress size={24} /> : t('auth.signIn')}
             </Button>
             <Box sx={{ textAlign: 'center' }}>
               <Link to="/register" style={{ textDecoration: 'none' }}>
                 <Typography variant="body2" color="primary">
-                  Don't have an account? Sign Up
+                  {t('auth.dontHaveAccount')} {t('auth.signUp')}
                 </Typography>
               </Link>
             </Box>

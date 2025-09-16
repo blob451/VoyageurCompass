@@ -1,11 +1,11 @@
 import React from 'react';
-import { 
-  Box, 
-  Container, 
-  Typography, 
-  Button, 
-  Grid, 
-  Card, 
+import {
+  Box,
+  Container,
+  Typography,
+  Button,
+  Grid,
+  Card,
   CardContent,
   CardActions,
   Paper,
@@ -15,10 +15,10 @@ import {
   ListItemText,
   Chip
 } from '@mui/material';
-import { 
-  TrendingUp, 
-  Analytics, 
-  Compare, 
+import {
+  TrendingUp,
+  Analytics,
+  Compare,
   AccountBalance,
   CheckCircle,
   Star,
@@ -27,46 +27,41 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 
 const HomePage = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
+  const { t } = useTranslation();
 
   const features = [
     {
       icon: <Analytics sx={{ fontSize: 40, color: 'primary.main' }} />,
-      title: 'Technical Analysis',
-      description: '12 advanced indicators providing comprehensive stock analysis with scores 0-10',
-      highlight: 'AI-Powered'
+      title: t('home.features.technicalAnalysis.title'),
+      description: t('home.features.technicalAnalysis.description'),
+      highlight: t('home.features.technicalAnalysis.highlight')
     },
     {
       icon: <Compare sx={{ fontSize: 40, color: 'primary.main' }} />,
-      title: 'Stock Comparison',
-      description: 'Side-by-side comparison of multiple stocks with detailed metrics',
-      highlight: 'Multi-Stock'
+      title: t('home.features.stockComparison.title'),
+      description: t('home.features.stockComparison.description'),
+      highlight: t('home.features.stockComparison.highlight')
     },
     {
       icon: <TrendingUp sx={{ fontSize: 40, color: 'primary.main' }} />,
-      title: 'Sector Analysis',
-      description: 'Track sector performance and identify trending industries',
-      highlight: 'Market Insights'
+      title: t('home.features.sectorAnalysis.title'),
+      description: t('home.features.sectorAnalysis.description'),
+      highlight: t('home.features.sectorAnalysis.highlight')
     },
     {
       icon: <AccountBalance sx={{ fontSize: 40, color: 'primary.main' }} />,
-      title: 'Credit System',
-      description: 'Pay-per-analysis model - 1 credit = $1 = 1 detailed analysis',
-      highlight: 'Affordable'
+      title: t('home.features.creditSystem.title'),
+      description: t('home.features.creditSystem.description'),
+      highlight: t('home.features.creditSystem.highlight')
     }
   ];
 
-  const benefits = [
-    'Real-time Yahoo Finance data integration',
-    'PostgreSQL-backed reliable data storage',
-    'Comprehensive technical indicator suite',
-    'Professional-grade financial analytics',
-    'Responsive design for all devices',
-    'Secure JWT authentication'
-  ];
+  const benefits = t('home.benefits.items', { returnObjects: true });
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
@@ -96,44 +91,42 @@ const HomePage = () => {
         <Container maxWidth="lg">
           <Grid container spacing={4} alignItems="center" minHeight="60vh">
             <Grid item xs={12} md={6}>
-              <Typography 
-                variant="h2" 
-                component="h1" 
+              <Typography
+                variant="h2"
+                component="h1"
                 gutterBottom
-                sx={{ 
+                sx={{
                   fontWeight: 700,
                   fontSize: { xs: '2.5rem', md: '3.5rem' },
                   mb: 3
                 }}
               >
-                VoyageurCompass
+                {t('home.hero.title')}
               </Typography>
-              <Typography 
-                variant="h5" 
-                component="h2" 
+              <Typography
+                variant="h5"
+                component="h2"
                 gutterBottom
-                sx={{ 
+                sx={{
                   fontWeight: 400,
                   opacity: 0.9,
                   mb: 4,
                   lineHeight: 1.4
                 }}
               >
-                Professional Financial Analytics Platform
+                {t('home.hero.subtitle')}
               </Typography>
-              <Typography 
-                variant="h6" 
+              <Typography
+                variant="h6"
                 component="p"
-                sx={{ 
+                sx={{
                   opacity: 0.8,
                   mb: 4,
                   fontSize: '1.1rem',
                   lineHeight: 1.6
                 }}
               >
-                Comprehensive stock analysis with 12 technical indicators, 
-                sector comparisons, and intelligent insights. Built with Django, 
-                React, and PostgreSQL for professional-grade financial analysis.
+                {t('home.hero.description')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <Button
@@ -151,7 +144,7 @@ const HomePage = () => {
                     }
                   }}
                 >
-                  {isAuthenticated ? 'Go to Dashboard' : 'Get Started'}
+                  {isAuthenticated ? t('home.hero.goToDashboard') : t('home.hero.getStarted')}
                 </Button>
                 {!isAuthenticated && (
                   <Button
@@ -170,7 +163,7 @@ const HomePage = () => {
                       }
                     }}
                   >
-                    Login
+                    {t('home.hero.login')}
                   </Button>
                 )}
               </Box>
@@ -188,26 +181,26 @@ const HomePage = () => {
                   }}
                 >
                   <Typography variant="h6" gutterBottom color="primary.main">
-                    Sample Analysis Preview
+                    {t('home.sampleAnalysis.title')}
                   </Typography>
                   <Typography variant="body1" gutterBottom>
-                    Technical Score: <strong>7/10</strong>
+                    {t('home.sampleAnalysis.technicalScore')}: <strong>7/10</strong>
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    AAPL • Apple Inc. • Technology Sector
+                    {t('home.sampleAnalysis.company')}
                   </Typography>
                   <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-around' }}>
                     <Box textAlign="center">
-                      <Typography variant="body2" color="success.main">SMA Trend</Typography>
-                      <Typography variant="h6">Strong</Typography>
+                      <Typography variant="body2" color="success.main">{t('home.sampleAnalysis.smaTrend')}</Typography>
+                      <Typography variant="h6">{t('home.sampleAnalysis.strong')}</Typography>
                     </Box>
                     <Box textAlign="center">
-                      <Typography variant="body2" color="info.main">RSI</Typography>
+                      <Typography variant="body2" color="info.main">{t('home.sampleAnalysis.rsi')}</Typography>
                       <Typography variant="h6">59.8</Typography>
                     </Box>
                     <Box textAlign="center">
-                      <Typography variant="body2" color="warning.main">MACD</Typography>
-                      <Typography variant="h6">Bullish</Typography>
+                      <Typography variant="body2" color="warning.main">{t('home.sampleAnalysis.macd')}</Typography>
+                      <Typography variant="h6">{t('home.sampleAnalysis.bullish')}</Typography>
                     </Box>
                   </Box>
                 </Paper>
@@ -219,14 +212,14 @@ const HomePage = () => {
 
       {/* Features Section */}
       <Container maxWidth="lg" sx={{ py: 8 }}>
-        <Typography 
-          variant="h3" 
-          component="h2" 
-          textAlign="center" 
+        <Typography
+          variant="h3"
+          component="h2"
+          textAlign="center"
           gutterBottom
           sx={{ mb: 6, fontWeight: 600 }}
         >
-          Powerful Financial Analysis Tools
+          {t('home.features.title')}
         </Typography>
         
         <Grid container spacing={4}>
@@ -270,13 +263,13 @@ const HomePage = () => {
         <Container maxWidth="lg">
           <Grid container spacing={6} alignItems="center">
             <Grid item xs={12} md={6}>
-              <Typography 
-                variant="h4" 
-                component="h2" 
+              <Typography
+                variant="h4"
+                component="h2"
                 gutterBottom
                 sx={{ fontWeight: 600, mb: 3 }}
               >
-                Why Choose VoyageurCompass?
+                {t('home.benefits.title')}
               </Typography>
               <List>
                 {benefits.map((benefit, index) => (
@@ -297,27 +290,27 @@ const HomePage = () => {
                 <Grid item xs={6}>
                   <Card sx={{ textAlign: 'center', p: 2 }}>
                     <Speed sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-                    <Typography variant="h6">Fast Analysis</Typography>
+                    <Typography variant="h6">{t('home.benefits.fastAnalysis.title')}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Results in seconds
+                      {t('home.benefits.fastAnalysis.description')}
                     </Typography>
                   </Card>
                 </Grid>
                 <Grid item xs={6}>
                   <Card sx={{ textAlign: 'center', p: 2 }}>
                     <Security sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-                    <Typography variant="h6">Secure Platform</Typography>
+                    <Typography variant="h6">{t('home.benefits.securePlatform.title')}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      JWT authentication
+                      {t('home.benefits.securePlatform.description')}
                     </Typography>
                   </Card>
                 </Grid>
                 <Grid item xs={12}>
                   <Card sx={{ textAlign: 'center', p: 2, backgroundColor: 'primary.main', color: 'white' }}>
                     <Star sx={{ fontSize: 40, mb: 1 }} />
-                    <Typography variant="h6">Credit System</Typography>
+                    <Typography variant="h6">{t('home.benefits.creditSystemCard.title')}</Typography>
                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Pay only for what you use - 1 credit = $1 = 1 analysis
+                      {t('home.benefits.creditSystemCard.description')}
                     </Typography>
                   </Card>
                 </Grid>
@@ -330,21 +323,21 @@ const HomePage = () => {
       {/* Call to Action */}
       <Box sx={{ py: 8, textAlign: 'center' }}>
         <Container maxWidth="md">
-          <Typography 
-            variant="h4" 
-            component="h2" 
+          <Typography
+            variant="h4"
+            component="h2"
             gutterBottom
             sx={{ fontWeight: 600, mb: 3 }}
           >
-            Ready to Start Analyzing?
+            {t('home.callToAction.title')}
           </Typography>
-          <Typography 
-            variant="h6" 
-            color="text.secondary" 
+          <Typography
+            variant="h6"
+            color="text.secondary"
             gutterBottom
             sx={{ mb: 4 }}
           >
-            Join thousands of investors using VoyageurCompass for professional stock analysis.
+            {t('home.callToAction.subtitle')}
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Button
@@ -353,7 +346,7 @@ const HomePage = () => {
               onClick={handleGetStarted}
               sx={{ px: 4, py: 1.5, fontSize: '1.1rem' }}
             >
-              {isAuthenticated ? 'Go to Dashboard' : 'Create Free Account'}
+              {isAuthenticated ? t('home.hero.goToDashboard') : t('home.hero.createFreeAccount')}
             </Button>
             <Button
               variant="outlined"
@@ -361,7 +354,7 @@ const HomePage = () => {
               onClick={() => navigate('/help')}
               sx={{ px: 4, py: 1.5, fontSize: '1.1rem' }}
             >
-              Learn More
+              {t('home.hero.learnMore')}
             </Button>
           </Box>
         </Container>

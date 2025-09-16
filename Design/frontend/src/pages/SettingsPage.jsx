@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Container,
@@ -49,6 +50,7 @@ import { useSelector } from 'react-redux';
 
 const SettingsPage = () => {
   const { user } = useSelector((state) => state.auth);
+  const { t, i18n } = useTranslation('common');
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -121,10 +123,13 @@ const SettingsPage = () => {
   };
 
   const handlePreferenceChange = (field) => (event) => {
-    setPreferenceData(prev => ({
-      ...prev,
-      [field]: event.target.type === 'checkbox' ? event.target.checked : event.target.value
-    }));
+    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
+    setPreferenceData(prev => ({ ...prev, [field]: value }));
+
+    // Handle language change immediately
+    if (field === 'language') {
+      i18n.changeLanguage(value);
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -141,8 +146,8 @@ const SettingsPage = () => {
         setSaveDialog(false);
       }, 2000);
       
-    } catch (error) {
-      console.error('Failed to save settings:', error);
+    } catch {
+      // Error handling could be added here if needed
     } finally {
       setLoading(false);
     }
@@ -156,10 +161,9 @@ const SettingsPage = () => {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // In real app, would redirect to login or show confirmation
-      console.log('Account deletion requested');
       
-    } catch (error) {
-      console.error('Failed to delete account:', error);
+    } catch {
+      // Error handling could be added here if needed
     } finally {
       setLoading(false);
       setDeleteDialog(false);
@@ -177,14 +181,14 @@ const SettingsPage = () => {
     <Paper sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Person />
-        Profile Information
+        {t('settings.profile.personalInfo')}
       </Typography>
       
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label="First Name"
+            label={t('settings.profile.firstName')}
             value={profileData.firstName}
             onChange={handleProfileChange('firstName')}
           />
@@ -192,7 +196,7 @@ const SettingsPage = () => {
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label="Last Name"
+            label={t('settings.profile.lastName')}
             value={profileData.lastName}
             onChange={handleProfileChange('lastName')}
           />
@@ -200,7 +204,7 @@ const SettingsPage = () => {
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label="Username"
+            label={t('settings.profile.username')}
             value={profileData.username}
             onChange={handleProfileChange('username')}
           />
@@ -208,7 +212,7 @@ const SettingsPage = () => {
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label="Email"
+            label={t('settings.profile.email')}
             type="email"
             value={profileData.email}
             onChange={handleProfileChange('email')}
@@ -251,7 +255,7 @@ const SettingsPage = () => {
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Lock />
-            Change Password
+            {t('settings.security.changePassword')}
           </Typography>
           
           <Grid container spacing={2}>
@@ -259,7 +263,7 @@ const SettingsPage = () => {
               <TextField
                 fullWidth
                 type={showPassword ? 'text' : 'password'}
-                label="Current Password"
+                label={t('settings.security.currentPassword')}
                 value={securityData.currentPassword}
                 onChange={handleSecurityChange('currentPassword')}
                 InputProps={{
@@ -278,7 +282,7 @@ const SettingsPage = () => {
               <TextField
                 fullWidth
                 type="password"
-                label="New Password"
+                label={t('settings.security.newPassword')}
                 value={securityData.newPassword}
                 onChange={handleSecurityChange('newPassword')}
                 helperText="Minimum 8 characters"
@@ -288,7 +292,7 @@ const SettingsPage = () => {
               <TextField
                 fullWidth
                 type="password"
-                label="Confirm New Password"
+                label={t('settings.security.confirmPassword')}
                 value={securityData.confirmPassword}
                 onChange={handleSecurityChange('confirmPassword')}
                 error={securityData.newPassword !== securityData.confirmPassword && securityData.confirmPassword !== ''}
@@ -301,7 +305,6 @@ const SettingsPage = () => {
                 disabled={!validatePasswordChange()}
                 onClick={() => {
                   // Handle password change
-                  console.log('Password change requested');
                 }}
               >
                 Update Password
@@ -315,14 +318,14 @@ const SettingsPage = () => {
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Security />
-            Security Settings
+            {t('settings.security.title')}
           </Typography>
           
           <List>
             <ListItem>
               <ListItemText
-                primary="Two-Factor Authentication"
-                secondary="Add an extra layer of security to your account"
+                primary={t('settings.security.twoFactor')}
+                secondary={t('settings.security.twoFactorDesc')}
               />
               <ListItemSecondaryAction>
                 <Switch
@@ -333,8 +336,8 @@ const SettingsPage = () => {
             </ListItem>
             <ListItem>
               <ListItemText
-                primary="Login Notifications"
-                secondary="Get notified when someone signs into your account"
+                primary={t('settings.security.loginNotifications')}
+                secondary={t('settings.security.loginNotificationsDesc')}
               />
               <ListItemSecondaryAction>
                 <Switch
@@ -353,14 +356,14 @@ const SettingsPage = () => {
     <Paper sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Notifications />
-        Notification Preferences
+        {t('settings.notifications.title')}
       </Typography>
       
       <List>
         <ListItem>
           <ListItemText
-            primary="Email Notifications"
-            secondary="Receive notifications via email"
+            primary={t('settings.notifications.email')}
+            secondary={t('settings.notifications.emailDesc')}
           />
           <ListItemSecondaryAction>
             <Switch
@@ -372,8 +375,8 @@ const SettingsPage = () => {
         <Divider />
         <ListItem>
           <ListItemText
-            primary="Analysis Complete"
-            secondary="Notify when stock analysis is finished"
+            primary={t('settings.notifications.analysisComplete')}
+            secondary={t('settings.notifications.analysisCompleteDesc')}
           />
           <ListItemSecondaryAction>
             <Switch
@@ -385,8 +388,8 @@ const SettingsPage = () => {
         </ListItem>
         <ListItem>
           <ListItemText
-            primary="Weekly Report"
-            secondary="Get a summary of your activity"
+            primary={t('settings.notifications.weeklyReport')}
+            secondary={t('settings.notifications.weeklyReportDesc')}
           />
           <ListItemSecondaryAction>
             <Switch
@@ -398,8 +401,8 @@ const SettingsPage = () => {
         </ListItem>
         <ListItem>
           <ListItemText
-            primary="Market Alerts"
-            secondary="Important market news and updates"
+            primary={t('settings.notifications.marketAlerts')}
+            secondary={t('settings.notifications.marketAlertsDesc')}
           />
           <ListItemSecondaryAction>
             <Switch
@@ -411,8 +414,8 @@ const SettingsPage = () => {
         </ListItem>
         <ListItem>
           <ListItemText
-            primary="Low Credit Alert"
-            secondary="Notify when your credits are running low"
+            primary={t('settings.notifications.creditLowAlert')}
+            secondary={t('settings.notifications.creditLowAlertDesc')}
           />
           <ListItemSecondaryAction>
             <Switch
@@ -425,8 +428,8 @@ const SettingsPage = () => {
         <Divider />
         <ListItem>
           <ListItemText
-            primary="Promotional Emails"
-            secondary="Special offers and product updates"
+            primary={t('settings.notifications.promotionalEmails')}
+            secondary={t('settings.notifications.promotionalEmailsDesc')}
           />
           <ListItemSecondaryAction>
             <Switch
@@ -444,65 +447,64 @@ const SettingsPage = () => {
     <Paper sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Palette />
-        Application Preferences
+        {t('settings.preferences.title')}
       </Typography>
       
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6}>
           <FormControl fullWidth>
-            <InputLabel>Theme</InputLabel>
+            <InputLabel>{t('settings.preferences.theme')}</InputLabel>
             <Select
               value={preferenceData.theme}
               onChange={handlePreferenceChange('theme')}
-              label="Theme"
+              label={t('settings.preferences.theme')}
             >
-              <MenuItem value="light">Light</MenuItem>
-              <MenuItem value="dark">Dark</MenuItem>
-              <MenuItem value="auto">Auto</MenuItem>
+              <MenuItem value="light">{t('settings.preferences.themeLight')}</MenuItem>
+              <MenuItem value="dark">{t('settings.preferences.themeDark')}</MenuItem>
+              <MenuItem value="auto">{t('settings.preferences.themeAuto')}</MenuItem>
             </Select>
           </FormControl>
         </Grid>
         <Grid item xs={12} sm={6}>
           <FormControl fullWidth>
-            <InputLabel>Language</InputLabel>
+            <InputLabel>{t('settings.preferences.language')}</InputLabel>
             <Select
               value={preferenceData.language}
               onChange={handlePreferenceChange('language')}
-              label="Language"
+              label={t('settings.preferences.language')}
             >
-              <MenuItem value="en">English</MenuItem>
-              <MenuItem value="es">Spanish</MenuItem>
-              <MenuItem value="fr">French</MenuItem>
-              <MenuItem value="de">German</MenuItem>
+              <MenuItem value="en">{t('languages.en')}</MenuItem>
+              <MenuItem value="fr">{t('languages.fr')}</MenuItem>
+              <MenuItem value="es">{t('languages.es')}</MenuItem>
             </Select>
           </FormControl>
         </Grid>
         <Grid item xs={12} sm={6}>
           <FormControl fullWidth>
-            <InputLabel>Timezone</InputLabel>
+            <InputLabel>{t('settings.preferences.timezone')}</InputLabel>
             <Select
               value={preferenceData.timezone}
               onChange={handlePreferenceChange('timezone')}
-              label="Timezone"
+              label={t('settings.preferences.timezone')}
             >
-              <MenuItem value="America/New_York">Eastern Time</MenuItem>
-              <MenuItem value="America/Chicago">Central Time</MenuItem>
-              <MenuItem value="America/Denver">Mountain Time</MenuItem>
-              <MenuItem value="America/Los_Angeles">Pacific Time</MenuItem>
+              <MenuItem value="America/New_York">{t('settings.preferences.timezoneEastern')}</MenuItem>
+              <MenuItem value="America/Chicago">{t('settings.preferences.timezoneCentral')}</MenuItem>
+              <MenuItem value="America/Denver">{t('settings.preferences.timezoneMountain')}</MenuItem>
+              <MenuItem value="America/Los_Angeles">{t('settings.preferences.timezonePacific')}</MenuItem>
             </Select>
           </FormControl>
         </Grid>
         <Grid item xs={12} sm={6}>
           <FormControl fullWidth>
-            <InputLabel>Default Analysis View</InputLabel>
+            <InputLabel>{t('settings.preferences.defaultAnalysisView')}</InputLabel>
             <Select
               value={preferenceData.defaultAnalysisView}
               onChange={handlePreferenceChange('defaultAnalysisView')}
-              label="Default Analysis View"
+              label={t('settings.preferences.defaultAnalysisView')}
             >
-              <MenuItem value="summary">Summary</MenuItem>
-              <MenuItem value="detailed">Detailed</MenuItem>
-              <MenuItem value="charts">Charts</MenuItem>
+              <MenuItem value="summary">{t('settings.preferences.viewSummary')}</MenuItem>
+              <MenuItem value="detailed">{t('settings.preferences.viewDetailed')}</MenuItem>
+              <MenuItem value="charts">{t('settings.preferences.viewCharts')}</MenuItem>
             </Select>
           </FormControl>
         </Grid>
@@ -510,8 +512,8 @@ const SettingsPage = () => {
           <List>
             <ListItem>
               <ListItemText
-                primary="Auto Refresh Data"
-                secondary="Automatically refresh market data"
+                primary={t('settings.preferences.autoRefresh')}
+                secondary={t('settings.preferences.autoRefreshDesc')}
               />
               <ListItemSecondaryAction>
                 <Switch
@@ -522,8 +524,8 @@ const SettingsPage = () => {
             </ListItem>
             <ListItem>
               <ListItemText
-                primary="Sound Effects"
-                secondary="Play sounds for notifications and alerts"
+                primary={t('settings.preferences.soundEffects')}
+                secondary={t('settings.preferences.soundEffectsDesc')}
               />
               <ListItemSecondaryAction>
                 <Switch
@@ -565,10 +567,10 @@ const SettingsPage = () => {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
-          Settings
+          {t('settings.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Manage your account preferences and security settings
+          {t('settings.subtitle')}
         </Typography>
       </Box>
 
@@ -580,10 +582,10 @@ const SettingsPage = () => {
           variant="scrollable"
           scrollButtons="auto"
         >
-          <Tab label="Profile" />
-          <Tab label="Security" />
-          <Tab label="Notifications" />
-          <Tab label="Preferences" />
+          <Tab label={t('settings.tabs.profile')} />
+          <Tab label={t('settings.tabs.security')} />
+          <Tab label={t('settings.tabs.notifications')} />
+          <Tab label={t('settings.tabs.appearance')} />
         </Tabs>
       </Paper>
 
@@ -604,7 +606,7 @@ const SettingsPage = () => {
           onClick={handleSaveSettings}
           disabled={loading}
         >
-          {loading ? 'Saving...' : 'Save Changes'}
+          {loading ? t('settings.profile.updating') : t('settings.profile.saveChanges')}
         </Button>
       </Box>
 

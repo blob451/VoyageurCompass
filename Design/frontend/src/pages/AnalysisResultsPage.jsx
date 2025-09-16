@@ -1,5 +1,6 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Container,
   Paper,
@@ -37,6 +38,7 @@ import TechnicalExplanation from '../components/TechnicalExplanation';
 const AnalysisResultsPage = () => {
   const { analysisId } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
   
   const {
     data: analysisData,
@@ -56,10 +58,10 @@ const AnalysisResultsPage = () => {
   };
 
   const getScoreLabel = (score) => {
-    if (score >= 8) return 'Strong Buy';
-    if (score >= 6) return 'Buy';
-    if (score >= 4) return 'Hold';
-    return 'Sell';
+    if (score >= 8) return t('recommendations.buy');
+    if (score >= 6) return t('recommendations.buy');
+    if (score >= 4) return t('recommendations.hold');
+    return t('recommendations.sell');
   };
 
   // Sentiment helper functions
@@ -104,7 +106,7 @@ const AnalysisResultsPage = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
           <Box sx={{ textAlign: 'center' }}>
             <CircularProgress size={60} sx={{ mb: 2 }} />
-            <Typography variant="h6">Loading analysis results...</Typography>
+            <Typography variant="h6">{t('analysis.loading')}</Typography>
           </Box>
         </Box>
       </Container>
@@ -120,11 +122,11 @@ const AnalysisResultsPage = () => {
             onClick={() => navigate('/dashboard')}
             sx={{ mb: 2 }}
           >
-            Back to Dashboard
+            {t('analysis.backToDashboard')}
           </Button>
         </Box>
         <Alert severity="error">
-          {error.data?.error || 'Failed to load analysis results'}
+          {error.data?.error || t('analysis.failedToLoad')}
         </Alert>
       </Container>
     );
@@ -139,11 +141,11 @@ const AnalysisResultsPage = () => {
             onClick={() => navigate('/dashboard')}
             sx={{ mb: 2 }}
           >
-            Back to Dashboard
+            {t('analysis.backToDashboard')}
           </Button>
         </Box>
         <Alert severity="warning">
-          Analysis not found
+          {t('analysis.analysisNotFound')}
         </Alert>
       </Container>
     );
@@ -157,7 +159,7 @@ const AnalysisResultsPage = () => {
           startIcon={<ArrowBack />}
           onClick={() => navigate('/dashboard')}
         >
-          Back to Dashboard
+          {t('analysis.backToDashboard')}
         </Button>
         <Button
           variant="outlined"
@@ -166,7 +168,7 @@ const AnalysisResultsPage = () => {
             state: { searchTicker: analysisData.symbol, autoAnalyze: true } 
           })}
         >
-          Run New Analysis
+          {t('analysis.runNewAnalysis')}
         </Button>
       </Box>
 
@@ -182,7 +184,7 @@ const AnalysisResultsPage = () => {
               <Chip label={analysisData.industry} variant="outlined" />
             </Box>
             <Typography variant="body2" color="text.secondary">
-              Analysis Date: {new Date(analysisData.analysis_date).toLocaleString()}
+              {t('analysis.analysisDate')}: {new Date(analysisData.analysis_date).toLocaleString()}
             </Typography>
           </Box>
           <Box sx={{ textAlign: 'right' }}>
@@ -198,15 +200,15 @@ const AnalysisResultsPage = () => {
         </Box>
 
         <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-          Technical Indicators
+          {t('analysis.technicalIndicators')}
         </Typography>
         <TableContainer>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Indicator</TableCell>
-                <TableCell>Score</TableCell>
-                <TableCell>Description</TableCell>
+                <TableCell>{t('analysis.indicator')}</TableCell>
+                <TableCell>{t('dashboard.averageScore')}</TableCell>
+                <TableCell>{t('analysis.description')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -222,17 +224,17 @@ const AnalysisResultsPage = () => {
                 const isValidScore = !isNaN(displayScore) && isFinite(displayScore);
                 const isSentiment = key.toLowerCase() === 'sentiment';
                 
-                // Special handling for sentiment indicator
-                let indicatorName = key.toUpperCase();
-                let description = indicator.description || indicator.desc || 'Technical indicator';
+                // Get translated indicator name and description
+                let indicatorName = t(`indicators.${key}`, key.toUpperCase());
+                let description = t(`indicators.descriptions.${key}`, indicator.description || indicator.desc || 'Technical indicator');
                 let sentimentIcon = null;
                 
                 if (isSentiment) {
                   const sentimentLabel = indicator.raw?.label;
                   const newsCount = indicator.raw?.newsCount;
                   sentimentIcon = getSentimentIcon(sentimentLabel);
-                  indicatorName = 'NEWS SENTIMENT';
-                  description = `${sentimentLabel?.toUpperCase() || 'NEUTRAL'} sentiment from ${newsCount || 0} news articles`;
+                  indicatorName = t('analysis.newsSentiment');
+                  description = t('analysis.sentimentFromNews', { sentiment: sentimentLabel?.toUpperCase() || t('dashboard.neutral').toUpperCase(), count: newsCount || 0 });
                 }
                 
                 return (
@@ -269,7 +271,7 @@ const AnalysisResultsPage = () => {
                         {description}
                         {isSentiment && indicator.raw?.confidence && (
                           <Typography component="span" variant="caption" display="block" color="text.secondary">
-                            Confidence: {(indicator.raw.confidence * 100).toFixed(1)}%
+                            {t('analysis.confidence')}: {(indicator.raw.confidence * 100).toFixed(1)}%
                           </Typography>
                         )}
                       </Typography>
@@ -281,86 +283,12 @@ const AnalysisResultsPage = () => {
           </Table>
         </TableContainer>
 
-        {/* Weighted Scores Section */}
-        {analysisData.weighted_scores && (
-          <>
-            <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-              Component Contribution Analysis
-            </Typography>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Component</TableCell>
-                    <TableCell align="center">Weighted Score</TableCell>
-                    <TableCell align="center">Contribution</TableCell>
-                    <TableCell align="center">Impact</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {Object.entries(analysisData.weighted_scores)
-                    .filter(([, value]) => value !== null && value !== undefined)
-                    .sort(([,a], [,b]) => parseFloat(b) - parseFloat(a))
-                    .map(([key, value]) => {
-                      const displayValue = parseFloat(value);
-                      const percentage = (displayValue / (analysisData.composite_raw || 1) * 100);
-                      const componentName = key.replace('w_', '').toUpperCase();
-                      
-                      // Enhanced score display (scale up for better readability)
-                      const scaledScore = (displayValue * 100).toFixed(1);
-                      
-                      return (
-                        <TableRow key={key}>
-                          <TableCell sx={{ fontWeight: 500 }}>
-                            {componentName}
-                          </TableCell>
-                          <TableCell align="center">
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={Math.max(0, Math.min(100, percentage))}
-                                sx={{ width: 50, height: 6, borderRadius: 3 }}
-                                color={percentage >= 15 ? 'success' : percentage >= 8 ? 'warning' : 'error'}
-                              />
-                              <Typography variant="body2" sx={{ minWidth: 45 }}>
-                                {scaledScore}
-                              </Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip 
-                              label={`${percentage.toFixed(1)}%`}
-                              size="small"
-                              color={percentage >= 15 ? 'success' : percentage >= 8 ? 'warning' : 'default'}
-                              variant={percentage >= 10 ? 'filled' : 'outlined'}
-                            />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2" color="text.secondary">
-                              {percentage >= 15 ? 'High' : percentage >= 8 ? 'Medium' : 'Low'}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <Box sx={{ mt: 2, p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Note:</strong> Weighted scores are scaled (×100) for readability. 
-                Contribution percentages show each component's relative impact on the final analysis.
-                Components are sorted by contribution from highest to lowest.
-              </Typography>
-            </Box>
-          </>
-        )}
 
         {/* Sentiment Analysis Section */}
         {analysisData.indicators?.sentiment && (
           <>
             <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-              News Sentiment Analysis
+              {t('analysis.newsSentimentAnalysis')}
             </Typography>
             <Grid container spacing={3} sx={{ mb: 3 }}>
               {/* Sentiment Overview Card */}
@@ -370,23 +298,23 @@ const AnalysisResultsPage = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                       {getSentimentIcon(analysisData.indicators.sentiment.raw?.label)}
                       <Typography variant="h6">
-                        Overall Sentiment
+                        {t('analysis.overallSentiment')}
                       </Typography>
                     </Box>
                     <Typography variant="h4" color={`${getSentimentColor(analysisData.indicators.sentiment.raw?.label)}.main`} gutterBottom>
                       {analysisData.indicators.sentiment.raw?.label?.toUpperCase() || 'NEUTRAL'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Score: {formatSentimentScore(analysisData.indicators.sentiment.raw?.sentiment)}
+                      {t('analysis.sentimentScore')}: {formatSentimentScore(analysisData.indicators.sentiment.raw?.sentiment)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Confidence: {analysisData.indicators.sentiment.raw?.confidence ? 
+                      {t('analysis.confidence')}: {analysisData.indicators.sentiment.raw?.confidence ?
                         `${(analysisData.indicators.sentiment.raw.confidence * 100).toFixed(1)}%` : 'N/A'}
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
                       <NewspaperOutlined fontSize="small" color="action" />
                       <Typography variant="body2" color="text.secondary">
-                        Based on {analysisData.indicators.sentiment.raw?.newsCount || 0} news articles
+                        {t('analysis.basedOnNews', { count: analysisData.indicators.sentiment.raw?.newsCount || 0 })}
                       </Typography>
                     </Box>
                   </CardContent>
@@ -398,11 +326,11 @@ const AnalysisResultsPage = () => {
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
-                      Impact on Analysis
+                      {t('analysis.impactOnAnalysis')}
                     </Typography>
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="body2" color="text.secondary" gutterBottom>
-                        Contribution to Final Score
+                        {t('analysis.contributionToScore')}
                       </Typography>
                       <LinearProgress
                         variant="determinate"
@@ -411,13 +339,12 @@ const AnalysisResultsPage = () => {
                         color={getSentimentColor(analysisData.indicators.sentiment.raw?.label)}
                       />
                       <Typography variant="body2">
-                        10% Weight in Composite Score
+                        {t('analysis.weightInScore')}
                       </Typography>
                     </Box>
                     <Divider sx={{ my: 2 }} />
                     <Typography variant="body2" color="text.secondary">
-                      Sentiment analysis uses FinBERT to evaluate financial news and incorporate 
-                      market sentiment into the technical analysis framework.
+                      {t('analysis.sentimentDescription')}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -430,16 +357,16 @@ const AnalysisResultsPage = () => {
                   <Card>
                     <CardContent>
                       <Typography variant="h6" gutterBottom>
-                        News Sources Analysis
+                        {t('analysis.newsSourcesAnalysis')}
                       </Typography>
                       <TableContainer>
                         <Table size="small">
                           <TableHead>
                             <TableRow>
-                              <TableCell>Source</TableCell>
-                              <TableCell align="center">Articles</TableCell>
-                              <TableCell align="center">Average Sentiment</TableCell>
-                              <TableCell align="center">Impact</TableCell>
+                              <TableCell>{t('analysis.source')}</TableCell>
+                              <TableCell align="center">{t('analysis.articles')}</TableCell>
+                              <TableCell align="center">{t('analysis.averageSentiment')}</TableCell>
+                              <TableCell align="center">{t('analysis.impact')}</TableCell>
                             </TableRow>
                           </TableHead>
                           <TableBody>
@@ -494,22 +421,21 @@ const AnalysisResultsPage = () => {
         {/* Analysis Summary */}
         <Box sx={{ mt: 4, p: 2, backgroundColor: 'background.default', borderRadius: 1 }}>
           <Typography variant="h6" gutterBottom>
-            Analysis Summary
+            {t('analysis.analysisSummary')}
           </Typography>
           <Typography variant="body2" paragraph>
-            <strong>Composite Score:</strong> {analysisData.score}/10 ({getScoreLabel(analysisData.score)})
+            <strong>{t('analysis.compositeScore')}:</strong> {analysisData.score}/10 ({getScoreLabel(analysisData.score)})
           </Typography>
           <Typography variant="body2" paragraph>
-            <strong>Analysis Horizon:</strong> {analysisData.horizon || 'Standard'}
+            <strong>{t('analysis.analysisHorizon')}:</strong> {analysisData.horizon || t('analysis.standard')}
           </Typography>
           {analysisData.composite_raw && (
             <Typography variant="body2" paragraph>
-              <strong>Raw Score:</strong> {analysisData.composite_raw.toFixed(4)}
+              <strong>{t('analysis.rawScore')}:</strong> {analysisData.composite_raw.toFixed(4)}
             </Typography>
           )}
           <Typography variant="body2" color="text.secondary">
-            This analysis was performed on {new Date(analysisData.analysis_date).toLocaleDateString()} 
-            using 12 technical indicators with weighted scoring methodology.
+            {t('analysis.analysisPerformed', { date: new Date(analysisData.analysis_date).toLocaleDateString() })}
           </Typography>
         </Box>
       </Paper>
@@ -520,7 +446,7 @@ const AnalysisResultsPage = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Psychology color="primary" />
             <Typography variant="h5">
-              AI-Powered Analysis Explanations
+              {t('analysis.aiExplanations')}
             </Typography>
           </Box>
           
@@ -528,21 +454,21 @@ const AnalysisResultsPage = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {explanationStatus?.status?.llm_available ? (
               <Chip 
-                label="Multi-Model AI Active" 
+                label={t('analysis.multiModelActive')} 
                 color="success" 
                 size="small"
                 variant="outlined"
               />
             ) : statusError ? (
               <Chip 
-                label="Service Unavailable" 
+                label={t('analysis.serviceUnavailable')} 
                 color="error" 
                 size="small"
                 variant="outlined"
               />
             ) : (
               <Chip 
-                label="Template Mode" 
+                label={t('analysis.templateMode')} 
                 color="warning" 
                 size="small"
                 variant="outlined"
@@ -552,10 +478,10 @@ const AnalysisResultsPage = () => {
         </Box>
         
         <Typography variant="body2" color="text.secondary" paragraph>
-          Get natural language explanations powered by our multi-model AI system optimized for financial analysis.
+          {t('analysis.explanationDescription')}
           {!explanationStatus?.status?.llm_available && (
             <Typography component="span" color="warning.main" sx={{ ml: 1 }}>
-              LLM service unavailable - using template explanations.
+              {t('analysis.llmUnavailable')}
             </Typography>
           )}
         </Typography>
@@ -580,11 +506,11 @@ const AnalysisResultsPage = () => {
                   variant="filled"
                 />
                 <Typography variant="subtitle2" color="primary">
-                  Quick Analysis
+                  {t('analysis.quickAnalysis')}
                 </Typography>
               </Box>
               <Typography variant="body2" color="text.secondary">
-                Fast summaries and standard explanations with optimized performance for real-time analysis.
+                {t('analysis.phi3Description')}
               </Typography>
             </Paper>
 
@@ -605,11 +531,11 @@ const AnalysisResultsPage = () => {
                   variant="filled"
                 />
                 <Typography variant="subtitle2" color="warning.dark">
-                  Detailed Analysis
+                  {t('analysis.detailedAnalysis')}
                 </Typography>
               </Box>
               <Typography variant="body2" color="text.secondary">
-                In-depth explanations with comprehensive market context and technical reasoning.
+                {t('analysis.llamaDescription')}
               </Typography>
             </Paper>
           </Box>

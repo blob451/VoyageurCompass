@@ -10,10 +10,12 @@ import {
   Button,
 } from '@mui/material';
 import { CheckCircle, LogoutOutlined } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 
 const LogoutPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const [countdown, setCountdown] = useState(10);
   const [redirectCancelled, setRedirectCancelled] = useState(false);
 
@@ -54,21 +56,21 @@ const LogoutPage = () => {
     switch (logoutReason) {
       case 'timeout':
         return {
-          title: 'Session Expired',
-          message: 'Your session has expired due to inactivity for security reasons.',
+          title: t('logout.sessionExpired.title'),
+          message: t('logout.sessionExpired.message'),
           icon: <LogoutOutlined sx={{ fontSize: 60, color: 'warning.main' }} />
         };
       case 'expired':
         return {
-          title: 'Session Ended',
-          message: 'Your session has ended. Please log in again to continue.',
+          title: t('logout.sessionEnded.title'),
+          message: t('logout.sessionEnded.message'),
           icon: <LogoutOutlined sx={{ fontSize: 60, color: 'warning.main' }} />
         };
       case 'manual':
       default:
         return {
-          title: 'Logged Out Successfully',
-          message: 'You have been successfully logged out. Thank you for using VoyageurCompass.',
+          title: t('logout.manual.title'),
+          message: t('logout.manual.message'),
           icon: <CheckCircle sx={{ fontSize: 60, color: 'success.main' }} />
         };
     }
@@ -117,8 +119,7 @@ const LogoutPage = () => {
           {sessionExpired && (
             <Alert severity="warning" sx={{ mb: 3, textAlign: 'left' }}>
               <Typography variant="body2">
-                For your security, we automatically log you out after 15 minutes of inactivity. 
-                Your data is safe and you can log back in at any time.
+                {t('logout.securityNotice')}
               </Typography>
             </Alert>
           )}
@@ -127,7 +128,7 @@ const LogoutPage = () => {
           {!redirectCancelled && (
             <Box sx={{ mb: 3 }}>
               <Typography variant="body2" color="textSecondary" gutterBottom>
-                Redirecting to homepage in {countdown} seconds...
+                {t('logout.redirectingIn', { count: countdown })}
               </Typography>
               <LinearProgress 
                 variant="determinate" 
@@ -153,14 +154,14 @@ const LogoutPage = () => {
                   onClick={handleStayOnPage}
                   sx={{ minWidth: 120 }}
                 >
-                  Stay Here
+                  {t('logout.stayHere')}
                 </Button>
                 <Button
                   variant="contained"
                   onClick={handleGoHome}
                   sx={{ minWidth: 120 }}
                 >
-                  Go to Homepage
+                  {t('logout.goToHomepage')}
                 </Button>
               </>
             ) : (
@@ -170,14 +171,14 @@ const LogoutPage = () => {
                   onClick={handleGoHome}
                   sx={{ minWidth: 120 }}
                 >
-                  Homepage
+                  {t('logout.homepage')}
                 </Button>
                 <Button
                   variant="contained"
                   onClick={handleGoLogin}
                   sx={{ minWidth: 120 }}
                 >
-                  Login Again
+                  {t('logout.loginAgain')}
                 </Button>
               </>
             )}
@@ -186,10 +187,10 @@ const LogoutPage = () => {
           {/* Additional info */}
           <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid #e0e0e0' }}>
             <Typography variant="caption" color="textSecondary" display="block">
-              VoyageurCompass - Your Financial Navigation Partner
+              {t('logout.tagline')}
             </Typography>
             <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>
-              Questions? Visit our Help section or contact support.
+              {t('logout.supportText')}
             </Typography>
           </Box>
         </Paper>

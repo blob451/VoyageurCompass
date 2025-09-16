@@ -15,6 +15,7 @@ from Analytics.explanation_views import (
     explanation_service_status,
     generate_explanation,
     get_explanation,
+    multilingual_pipeline_status,
 )
 from Analytics.finetuning_views import (
     export_dataset,
@@ -82,6 +83,8 @@ urlpatterns = [
     path("explain/status/", explanation_service_status, name="explain_status"),
     path("explanation/<int:analysis_id>/", get_explanation, name="get_explanation"),
     path("explanation-status/", explanation_service_status, name="explanation_status"),
+    # Multilingual pipeline endpoints
+    path("multilingual/status/", multilingual_pipeline_status, name="multilingual_pipeline_status"),
     # Enhanced LLM endpoints
     path("llm/explain/", generate_explanation, name="llm_explain"),
     path("llm/status/", explanation_service_status, name="llm_status"),

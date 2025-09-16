@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Container,
@@ -47,6 +48,7 @@ import {
 } from '@mui/icons-material';
 
 const HelpPage = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState(0);
   const [expandedFaq, setExpandedFaq] = useState(false);
   const [contactForm, setContactForm] = useState({
@@ -74,130 +76,44 @@ const HelpPage = () => {
   const handleContactSubmit = (event) => {
     event.preventDefault();
     // Mock form submission
-    console.log('Contact form submitted:', contactForm);
-    alert('Thank you for your message! We\'ll get back to you soon.');
+    alert(t('help.contactForm.success'));
     setContactForm({ name: '', email: '', subject: '', message: '' });
   };
 
   const features = [
     {
       icon: <Analytics color="primary" />,
-      title: 'Technical Analysis',
-      description: '12 comprehensive indicators providing detailed stock analysis',
-      details: [
-        'SMA50 vs SMA200 trend analysis',
-        'Price vs 50-day moving average',
-        'RSI (14-period) momentum indicator',
-        'MACD signal and histogram',
-        'Bollinger Bands position and width',
-        'Volume surge detection',
-        'On-Balance Volume trend',
-        'Relative strength vs sector/market',
-        'Candlestick pattern recognition',
-        'Support/resistance context'
-      ]
+      title: t('help.features.technicalAnalysis.title'),
+      description: t('help.features.technicalAnalysis.description'),
+      details: t('help.features.technicalAnalysis.details', { returnObjects: true })
     },
     {
       icon: <Compare color="primary" />,
-      title: 'Stock Comparison',
-      description: 'Side-by-side analysis of multiple stocks',
-      details: [
-        'Compare up to 5 stocks simultaneously',
-        'Visual metric comparison tables',
-        'Export results to CSV',
-        'Performance ranking',
-        'Sector-specific comparisons'
-      ]
+      title: t('help.features.stockComparison.title'),
+      description: t('help.features.stockComparison.description'),
+      details: t('help.features.stockComparison.details', { returnObjects: true })
     },
     {
       icon: <AccountBalance color="primary" />,
-      title: 'Sector Analysis',
-      description: 'Market sector performance and trends',
-      details: [
-        'Industry performance tracking',
-        'Sector momentum analysis',
-        'Market cap and volume metrics',
-        'Top performing stocks by sector',
-        'Trend identification'
-      ]
+      title: t('help.features.sectorAnalysis.title'),
+      description: t('help.features.sectorAnalysis.description'),
+      details: t('help.features.sectorAnalysis.details', { returnObjects: true })
     },
     {
       icon: <CreditCard color="primary" />,
-      title: 'Credit System',
-      description: 'Pay-per-analysis affordable pricing',
-      details: [
-        '1 Credit = $1 = 1 Stock Analysis',
-        'No monthly subscriptions',
-        'Credits never expire',
-        'Student-friendly pricing',
-        'Bulk purchase discounts'
-      ]
+      title: t('help.features.creditSystem.title'),
+      description: t('help.features.creditSystem.description'),
+      details: t('help.features.creditSystem.details', { returnObjects: true })
     }
   ];
 
-  const technicalIndicators = [
-    { name: 'SMA50 vs SMA200', description: 'Trend direction based on moving average crossover', range: '0-10' },
-    { name: 'Price vs 50MA', description: 'Current price relative to 50-day moving average', range: '0-10' },
-    { name: 'RSI (14)', description: 'Relative Strength Index momentum oscillator', range: '0-100' },
-    { name: 'MACD', description: 'Moving Average Convergence Divergence', range: 'Signal/Histogram' },
-    { name: 'Bollinger Position', description: 'Position within Bollinger Bands', range: '0-10' },
-    { name: 'Volume Surge', description: 'Trading volume compared to average', range: '0-10' },
-    { name: 'OBV Trend', description: 'On-Balance Volume trend analysis', range: '0-10' },
-    { name: 'Relative 1Y/2Y', description: 'Performance vs sector benchmark', range: 'Percentage' }
-  ];
+  const technicalIndicators = t('help.technicalGuide.indicators', { returnObjects: true });
 
-  const faqs = [
-    {
-      id: 'what-is-voyageur',
-      question: 'What is VoyageurCompass?',
-      answer: 'VoyageurCompass is a comprehensive financial analytics platform that provides professional-grade stock analysis using 12 technical indicators. Built for students and professionals, it offers affordable pay-per-analysis pricing without monthly subscriptions.'
-    },
-    {
-      id: 'how-credits-work',
-      question: 'How does the credit system work?',
-      answer: 'Our credit system is simple: 1 Credit = $1 = 1 Stock Analysis. You only pay for what you use. Credits never expire, and you can purchase them in various packages with bulk discounts. No monthly fees or subscriptions required.'
-    },
-    {
-      id: 'technical-indicators',
-      question: 'What technical indicators do you provide?',
-      answer: 'We provide 12 comprehensive technical indicators including SMA trends, RSI, MACD, Bollinger Bands, volume analysis, OBV, relative performance, and candlestick patterns. Each analysis receives a score from 0-10 based on these indicators.'
-    },
-    {
-      id: 'data-sources',
-      question: 'Where do you get your data?',
-      answer: 'We use Yahoo Finance API for real-time and historical stock data. Our data is updated regularly and stored in a secure PostgreSQL database with Redis caching for fast access.'
-    },
-    {
-      id: 'comparison-tool',
-      question: 'How does stock comparison work?',
-      answer: 'You can compare 2-5 stocks side-by-side with detailed metrics. Each stock in the comparison costs 1 credit. Results include visual charts, performance rankings, and exportable CSV reports.'
-    },
-    {
-      id: 'sector-analysis',
-      question: 'What is sector analysis?',
-      answer: 'Sector analysis compares different market sectors (Technology, Healthcare, Finance, etc.) showing performance trends, momentum, volatility, and top performers. You can analyze 2+ sectors for credits (2 sectors = 1 credit).'
-    },
-    {
-      id: 'school-project',
-      question: 'Is this a real trading platform?',
-      answer: 'VoyageurCompass is an educational project built for a university course. While it uses real market data and professional analysis techniques, it\'s designed for learning and demonstration purposes.'
-    },
-    {
-      id: 'supported-stocks',
-      question: 'Which stocks can I analyze?',
-      answer: 'You can analyze any publicly traded stock with a valid ticker symbol. Our system supports major exchanges including NYSE, NASDAQ, and others through Yahoo Finance integration.'
-    },
-    {
-      id: 'analysis-time',
-      question: 'How long does analysis take?',
-      answer: 'Stock analysis typically takes 2-5 seconds. The system fetches real-time data, runs 12 technical indicators, and calculates a comprehensive score. Results are displayed immediately.'
-    },
-    {
-      id: 'mobile-access',
-      question: 'Can I use this on mobile devices?',
-      answer: 'Yes! VoyageurCompass is built with responsive design using Material-UI, making it fully functional on desktop, tablet, and mobile devices.'
-    }
-  ];
+  const faqs = t('help.faq.items', { returnObjects: true }).map((faq, index) => ({
+    id: `faq-${index}`,
+    question: faq.question,
+    answer: faq.answer
+  }));
 
   const renderUserGuide = () => (
     <Grid container spacing={3}>
@@ -238,8 +154,7 @@ const HelpPage = () => {
     <Box>
       <Alert severity="info" sx={{ mb: 3 }}>
         <Typography variant="body2">
-          Our technical analysis engine uses 12 professional indicators to generate a comprehensive score (0-10) for each stock.
-          Higher scores indicate stronger technical performance.
+          {t('help.technicalGuide.description')}
         </Typography>
       </Alert>
 
@@ -247,9 +162,9 @@ const HelpPage = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600 }}>Indicator</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Range/Scale</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t('help.technicalGuide.tableHeaders.indicator')}</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t('help.technicalGuide.tableHeaders.description')}</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t('help.technicalGuide.tableHeaders.range')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -272,31 +187,31 @@ const HelpPage = () => {
 
       <Paper sx={{ p: 3, mt: 3 }}>
         <Typography variant="h6" gutterBottom>
-          Score Interpretation
+{t('help.technicalGuide.scoreInterpretation.title')}
         </Typography>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6} md={3}>
             <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'success.main', borderRadius: 2 }}>
               <Typography variant="h5" color="success.main">8-10</Typography>
-              <Typography variant="body2">Strong Buy</Typography>
+              <Typography variant="body2">{t('recommendations.strongBuy')}</Typography>
             </Box>
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'success.light', borderRadius: 2 }}>
               <Typography variant="h5" color="success.light">6-7</Typography>
-              <Typography variant="body2">Buy</Typography>
+              <Typography variant="body2">{t('recommendations.buy')}</Typography>
             </Box>
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'warning.main', borderRadius: 2 }}>
               <Typography variant="h5" color="warning.main">4-5</Typography>
-              <Typography variant="body2">Hold</Typography>
+              <Typography variant="body2">{t('recommendations.hold')}</Typography>
             </Box>
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'error.main', borderRadius: 2 }}>
               <Typography variant="h5" color="error.main">0-3</Typography>
-              <Typography variant="body2">Sell</Typography>
+              <Typography variant="body2">{t('recommendations.sell')}</Typography>
             </Box>
           </Grid>
         </Grid>
@@ -332,7 +247,7 @@ const HelpPage = () => {
       <Grid item xs={12} md={6}>
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom>
-            Contact Information
+{t('help.contactForm.contactInfo')}
           </Typography>
           
           <List>
@@ -440,10 +355,10 @@ const HelpPage = () => {
       {/* Header */}
       <Box sx={{ mb: 4, textAlign: 'center' }}>
         <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
-          Help & Documentation
+          {t('help.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Everything you need to know about using VoyageurCompass
+          {t('help.subtitle')}
         </Typography>
       </Box>
 
@@ -453,9 +368,9 @@ const HelpPage = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Analytics sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-              <Typography variant="h6">12 Indicators</Typography>
+              <Typography variant="h6">{t('help.stats.indicators.title')}</Typography>
               <Typography variant="body2" color="text.secondary">
-                Professional analysis
+                {t('help.stats.indicators.subtitle')}
               </Typography>
             </CardContent>
           </Card>
@@ -464,9 +379,9 @@ const HelpPage = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Speed sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
-              <Typography variant="h6">2-5 Seconds</Typography>
+              <Typography variant="h6">{t('help.stats.analysisTime.title')}</Typography>
               <Typography variant="body2" color="text.secondary">
-                Analysis time
+                {t('help.stats.analysisTime.subtitle')}
               </Typography>
             </CardContent>
           </Card>
@@ -475,9 +390,9 @@ const HelpPage = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <CreditCard sx={{ fontSize: 40, color: 'info.main', mb: 1 }} />
-              <Typography variant="h6">$1 = 1 Analysis</Typography>
+              <Typography variant="h6">{t('help.stats.pricing.title')}</Typography>
               <Typography variant="body2" color="text.secondary">
-                Affordable pricing
+                {t('help.stats.pricing.subtitle')}
               </Typography>
             </CardContent>
           </Card>
@@ -503,10 +418,10 @@ const HelpPage = () => {
           variant="scrollable"
           scrollButtons="auto"
         >
-          <Tab label="User Guide" icon={<Help />} />
-          <Tab label="Technical Indicators" icon={<Analytics />} />
-          <Tab label="FAQ" icon={<QuestionAnswer />} />
-          <Tab label="Contact" icon={<Email />} />
+          <Tab label={t('help.tabs.userGuide')} icon={<Help />} />
+          <Tab label={t('help.tabs.technical')} icon={<Analytics />} />
+          <Tab label={t('help.tabs.faq')} icon={<QuestionAnswer />} />
+          <Tab label={t('help.tabs.contact')} icon={<Email />} />
         </Tabs>
       </Paper>
 
@@ -521,10 +436,7 @@ const HelpPage = () => {
       {/* Footer Note */}
       <Paper sx={{ p: 3, mt: 4, backgroundColor: 'grey.50' }}>
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-          <strong>Educational Disclaimer:</strong> VoyageurCompass is a university project created for 
-          educational purposes. This platform demonstrates technical analysis concepts and should not 
-          be used for actual trading decisions. Always consult with qualified financial advisors 
-          for investment guidance.
+          <strong>{t('help.disclaimer.title')}</strong> {t('help.disclaimer.content')}
         </Typography>
       </Paper>
     </Container>

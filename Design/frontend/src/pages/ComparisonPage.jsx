@@ -37,18 +37,21 @@ import {
   Analytics,
   FileDownload,
   Refresh,
-  // Clear // Not used currently
 } from '@mui/icons-material';
-// import { useSelector } from 'react-redux'; // Not used currently
+import { useTranslation } from 'react-i18next';
+import { useSelector } from 'react-redux';
 
 const ComparisonPage = () => {
-  // const { user } = useSelector((state) => state.auth); // Not used currently
-  const [selectedStocks, setSelectedStocks] = useState(['AAPL', 'MSFT']);
+  const { t } = useTranslation();
+  const { user } = useSelector((state) => state.auth);
+  const [selectedStocks, setSelectedStocks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [comparisonData, setComparisonData] = useState(null);
   const [error, setError] = useState('');
   const [confirmDialog, setConfirmDialog] = useState(false);
-  const [userCredits] = useState(25); // Mock credit balance
+
+  // Get user credits from Redux store or default to 0
+  const userCredits = user?.credits || 0;
 
   // Mock stock suggestions
   const stockSuggestions = [
@@ -98,7 +101,7 @@ const ComparisonPage = () => {
     
     const creditsNeeded = selectedStocks.length;
     if (userCredits < creditsNeeded) {
-      setError(`Insufficient credits. Need ${creditsNeeded} credits for this comparison.`);
+      setError(t('comparison.insufficientCredits', { needed: creditsNeeded }));
       return;
     }
 
@@ -143,9 +146,8 @@ const ComparisonPage = () => {
 
       setComparisonData(mockData);
 
-    } catch (err) {
+    } catch {
       setError('Comparison failed. Please try again.');
-      console.error('Comparison error:', err);
     } finally {
       setLoading(false);
     }
@@ -218,10 +220,10 @@ const ComparisonPage = () => {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
-          Stock Comparison
+          {t('comparison.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Compare multiple stocks side-by-side with comprehensive technical analysis
+          {t('comparison.subtitle')}
         </Typography>
       </Box>
 
@@ -229,12 +231,12 @@ const ComparisonPage = () => {
       <Card sx={{ mb: 4, backgroundColor: 'primary.main', color: 'white' }}>
         <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="h6">Available Credits</Typography>
+            <Typography variant="h6">{t('comparison.availableCredits')}</Typography>
             <Typography variant="h4">{userCredits}</Typography>
           </Box>
           <Box sx={{ textAlign: 'right' }}>
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
-              Cost: {selectedStocks.length} Credits ({selectedStocks.length} stocks)
+              {t('comparison.cost', { credits: selectedStocks.length, stocks: selectedStocks.length })}
             </Typography>
             <Button 
               variant="outlined" 
@@ -246,7 +248,7 @@ const ComparisonPage = () => {
                 '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
               }}
             >
-              Buy More Credits
+              {t('comparison.buyMoreCredits')}
             </Button>
           </Box>
         </CardContent>
@@ -255,7 +257,7 @@ const ComparisonPage = () => {
       {/* Stock Selection */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>
-          Select Stocks to Compare
+          {t('comparison.selectStocks')}
         </Typography>
         
         <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
@@ -265,8 +267,8 @@ const ComparisonPage = () => {
               renderInput={(params) => (
                 <TextField 
                   {...params} 
-                  label="Add Stock Symbol" 
-                  placeholder="Type to search..."
+                  label={t('comparison.addStockSymbol')} 
+                  placeholder={t('comparison.typeToSearch')}
                 />
               )}
               onChange={(event, value) => {
@@ -286,7 +288,7 @@ const ComparisonPage = () => {
               startIcon={loading ? <CircularProgress size={20} /> : <Compare />}
               fullWidth
             >
-              {loading ? 'Comparing...' : 'Compare Stocks'}
+              {loading ? t('comparison.comparing') : t('comparison.compareStocks')}
             </Button>
           </Grid>
         </Grid>
@@ -312,7 +314,7 @@ const ComparisonPage = () => {
         )}
 
         <Typography variant="body2" color="text.secondary">
-          Select 2-5 stocks for comparison. Each stock costs 1 credit to analyze.
+          {t('comparison.instructions')}
         </Typography>
       </Paper>
 
@@ -322,10 +324,10 @@ const ComparisonPage = () => {
           <Box sx={{ textAlign: 'center' }}>
             <CircularProgress size={60} sx={{ mb: 2 }} />
             <Typography variant="h6" gutterBottom>
-              Comparing {selectedStocks.length} stocks...
+              {t('comparison.comparingStocks', { count: selectedStocks.length })}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Running technical analysis for each stock
+              {t('comparison.runningAnalysis')}
             </Typography>
             <LinearProgress sx={{ mt: 2 }} />
           </Box>
@@ -370,7 +372,7 @@ const ComparisonPage = () => {
                         {stock.metrics.overallScore}/10
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Technical Score
+                        {t('comparison.technicalScore')}
                       </Typography>
                     </Box>
                   </CardContent>
@@ -383,7 +385,7 @@ const ComparisonPage = () => {
           <Paper sx={{ p: 3, mb: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Typography variant="h6">
-                Detailed Comparison
+                {t('comparison.detailedComparison')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button
@@ -392,7 +394,7 @@ const ComparisonPage = () => {
                   variant="outlined"
                   size="small"
                 >
-                  Export CSV
+                  {t('comparison.exportCSV')}
                 </Button>
                 <Button
                   startIcon={<Refresh />}
@@ -400,7 +402,7 @@ const ComparisonPage = () => {
                   variant="outlined"
                   size="small"
                 >
-                  Refresh
+                  {t('common.refresh')}
                 </Button>
               </Box>
             </Box>
@@ -409,7 +411,7 @@ const ComparisonPage = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>Metric</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>{t('comparison.metric')}</TableCell>
                     {comparisonData.stocks.map((stock) => (
                       <TableCell key={stock.symbol} align="center" sx={{ fontWeight: 600 }}>
                         {stock.symbol}
@@ -493,12 +495,12 @@ const ComparisonPage = () => {
           {/* Analysis Summary */}
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Comparison Summary
+              {t('comparison.summary')}
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
                 <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 500 }}>
-                  Best Performers
+                  {t('comparison.bestPerformers')}
                 </Typography>
                 {[...comparisonData.stocks]
                   .sort((a, b) => b.metrics.overallScore - a.metrics.overallScore)
@@ -519,16 +521,16 @@ const ComparisonPage = () => {
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 500 }}>
-                  Analysis Details
+                  {t('comparison.analysisDetails')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • Analyzed {comparisonData.stocks.length} stocks
+                  • {t('comparison.analyzedStocks', { count: comparisonData.stocks.length })}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • Used {comparisonData.creditsUsed} credits
+                  • {t('comparison.creditsUsed', { used: comparisonData.creditsUsed })}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • Analysis completed at {new Date(comparisonData.timestamp).toLocaleString()}
+                  • {t('comparison.analysisCompleted', { time: new Date(comparisonData.timestamp).toLocaleString() })}
                 </Typography>
               </Grid>
             </Grid>
@@ -538,19 +540,19 @@ const ComparisonPage = () => {
 
       {/* Confirmation Dialog */}
       <Dialog open={confirmDialog} onClose={() => setConfirmDialog(false)}>
-        <DialogTitle>Confirm Stock Comparison</DialogTitle>
+        <DialogTitle>{t('comparison.confirmComparison')}</DialogTitle>
         <DialogContent>
           <Typography gutterBottom>
-            Compare <strong>{selectedStocks.join(', ')}</strong> for {selectedStocks.length} credits?
+            {t('comparison.confirmMessage', { stocks: selectedStocks.join(', '), credits: selectedStocks.length })}
           </Typography>
           <Alert severity="info" sx={{ mt: 2 }}>
-            This will use {selectedStocks.length} credits from your balance ({userCredits} remaining)
+            {t('comparison.creditUsage', { used: selectedStocks.length, remaining: userCredits })}
           </Alert>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDialog(false)}>Cancel</Button>
+          <Button onClick={() => setConfirmDialog(false)}>{t('common.cancel')}</Button>
           <Button onClick={handleConfirmComparison} variant="contained">
-            Confirm Comparison
+            {t('comparison.confirmButton')}
           </Button>
         </DialogActions>
       </Dialog>

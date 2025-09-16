@@ -6,6 +6,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import SessionProvider from './components/SessionProvider';
 import AuthInitializer from './components/AuthInitializer';
 import { ThemeModeProvider } from './theme/ThemeModeContext.jsx';
+import { useTranslation } from 'react-i18next';
+import './i18n'; // Initialize i18n
 
 // Lazy-loaded page components for code splitting optimisation
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -23,58 +25,66 @@ const AnalysisResultsPage = lazy(() => import('./pages/AnalysisResultsPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 
 // Accessible loading component for page transitions
-const PageLoader = () => (
-  <Box
-    role="status"
-    aria-live="polite"
-    sx={{
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '100vh',
-      backgroundColor: '#f5f5f5',
-    }}
-  >
-    <CircularProgress 
-      size={60} 
-      thickness={4} 
-      aria-label="Loading page"
-    />
-    <Typography 
-      variant="srOnly" 
-      component="span"
-      sx={{ position: 'absolute', left: '-9999px' }}
+const PageLoader = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Box
+      role="status"
+      aria-live="polite"
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        backgroundColor: '#f5f5f5',
+      }}
     >
-      Loading page content...
-    </Typography>
-  </Box>
-);
+      <CircularProgress
+        size={60}
+        thickness={4}
+        aria-label="Loading page"
+      />
+      <Typography
+        variant="srOnly"
+        component="span"
+        sx={{ position: 'absolute', left: '-9999px' }}
+      >
+        {t('common.loadingPage')}
+      </Typography>
+    </Box>
+  );
+};
 
 // HTTP 404 error page component
-const NotFound = () => (
-  <Box
-    sx={{
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '100vh',
-      backgroundColor: '#f5f5f5',
-    }}
-  >
-    <Typography variant="h1" component="h1" gutterBottom>
-      404
-    </Typography>
-    <Typography variant="h5" component="h2" gutterBottom>
-      Page Not Found
-    </Typography>
-    <Typography variant="body1" color="text.secondary" paragraph>
-      The page you are looking for doesn't exist.
-    </Typography>
-    <Navigate to="/dashboard" replace />
-  </Box>
-);
+const NotFound = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        backgroundColor: '#f5f5f5',
+      }}
+    >
+      <Typography variant="h1" component="h1" gutterBottom>
+        404
+      </Typography>
+      <Typography variant="h5" component="h2" gutterBottom>
+        {t('errors.pageNotFound')}
+      </Typography>
+      <Typography variant="body1" color="text.secondary" paragraph>
+        {t('errors.pageNotFoundDescription')}
+      </Typography>
+      <Navigate to="/dashboard" replace />
+    </Box>
+  );
+};
 
 function App() {
   return (

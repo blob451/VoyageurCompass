@@ -32,9 +32,11 @@ import {
   FilterList,
   Sort
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { useGetUserAnalysisHistoryQuery } from '../features/api/apiSlice';
 
 const ReportsPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -95,10 +97,10 @@ const ReportsPage = () => {
 
   const getScoreLabel = (score) => {
     const numScore = typeof score === 'number' ? score : 0;
-    if (numScore >= 8) return 'Strong Buy';
-    if (numScore >= 6) return 'Buy';
-    if (numScore >= 4) return 'Hold';
-    return 'Sell';
+    if (numScore >= 8) return t('recommendations.strongBuy');
+    if (numScore >= 6) return t('recommendations.buy');
+    if (numScore >= 4) return t('recommendations.hold');
+    return t('recommendations.sell');
   };
 
   // Safe navigation handlers
@@ -136,7 +138,7 @@ const ReportsPage = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
           <Box sx={{ textAlign: 'center' }}>
             <CircularProgress size={60} sx={{ mb: 2 }} />
-            <Typography variant="h6">Loading your reports...</Typography>
+            <Typography variant="h6">{t('reports.loadingReports')}</Typography>
           </Box>
         </Box>
       </Container>
@@ -147,7 +149,7 @@ const ReportsPage = () => {
     return (
       <Container maxWidth="xl" sx={{ py: 4 }}>
         <Alert severity="error">
-          Failed to load reports: {error.data?.error || 'Please try again later'}
+          {t('reports.failedToLoad')}: {error.data?.error || t('reports.tryAgainLater')}
         </Alert>
       </Container>
     );
@@ -159,10 +161,10 @@ const ReportsPage = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
           <Typography variant="h4" gutterBottom>
-            Analysis Reports
+            {t('reports.title')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Browse and manage all your stock analysis reports
+            {t('reports.subtitle')}
           </Typography>
         </Box>
         <Button
@@ -171,7 +173,7 @@ const ReportsPage = () => {
           onClick={() => navigate('/stocks')}
           sx={{ minWidth: 180 }}
         >
-          Create New Report
+          {t('reports.createNewReport')}
         </Button>
       </Box>
 
@@ -179,7 +181,7 @@ const ReportsPage = () => {
         {/* Search and Filter Controls - Temporarily disabled for server-side pagination */}
         <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
           <TextField
-            placeholder="Search by symbol, company, sector... (Coming soon with server-side search)"
+            placeholder={t('reports.searchPlaceholder')}
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             disabled
@@ -194,28 +196,28 @@ const ReportsPage = () => {
           />
           
           <FormControl sx={{ minWidth: 150 }} disabled>
-            <InputLabel>Sort By</InputLabel>
+            <InputLabel>{t('reports.sortBy')}</InputLabel>
             <Select
               value={sortBy}
-              label="Sort By"
+              label={t('reports.sortBy')}
               onChange={(e) => setSortBy(e.target.value)}
             >
-              <MenuItem value="date">Date</MenuItem>
-              <MenuItem value="symbol">Symbol</MenuItem>
-              <MenuItem value="score">Score</MenuItem>
-              <MenuItem value="sector">Sector</MenuItem>
+              <MenuItem value="date">{t('reports.sortOptions.date')}</MenuItem>
+              <MenuItem value="symbol">{t('reports.sortOptions.symbol')}</MenuItem>
+              <MenuItem value="score">{t('reports.sortOptions.score')}</MenuItem>
+              <MenuItem value="sector">{t('reports.sortOptions.sector')}</MenuItem>
             </Select>
           </FormControl>
 
           <FormControl sx={{ minWidth: 120 }} disabled>
-            <InputLabel>Order</InputLabel>
+            <InputLabel>{t('reports.order')}</InputLabel>
             <Select
               value={sortOrder}
-              label="Order"
+              label={t('reports.order')}
               onChange={(e) => setSortOrder(e.target.value)}
             >
-              <MenuItem value="desc">Descending</MenuItem>
-              <MenuItem value="asc">Ascending</MenuItem>
+              <MenuItem value="desc">{t('reports.orderOptions.descending')}</MenuItem>
+              <MenuItem value="asc">{t('reports.orderOptions.ascending')}</MenuItem>
             </Select>
           </FormControl>
         </Box>
@@ -223,14 +225,14 @@ const ReportsPage = () => {
         {/* Statistics */}
         <Box sx={{ mb: 3, p: 2, backgroundColor: 'background.default', borderRadius: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            <strong>{pagination.total_count || 0}</strong> reports total
-            {reports.length > 0 && ` • Showing ${pagination.count || 0} on this page`}
+            {t('reports.reportsTotal', { count: pagination.total_count || 0 })}
+            {reports.length > 0 && t('reports.showingOnPage', { count: pagination.count || 0 })}
           </Typography>
           {isFetching && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <CircularProgress size={16} />
               <Typography variant="caption" color="text.secondary">
-                Loading...
+                {t('reports.loading')}
               </Typography>
             </Box>
           )}
@@ -243,13 +245,13 @@ const ReportsPage = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Stock</TableCell>
-                    <TableCell>Company</TableCell>
-                    <TableCell>Sector</TableCell>
-                    <TableCell align="center">Score</TableCell>
-                    <TableCell align="center">Recommendation</TableCell>
-                    <TableCell>Analysis Date</TableCell>
-                    <TableCell align="center">Actions</TableCell>
+                    <TableCell>{t('reports.table.stock')}</TableCell>
+                    <TableCell>{t('reports.table.company')}</TableCell>
+                    <TableCell>{t('reports.table.sector')}</TableCell>
+                    <TableCell align="center">{t('reports.table.score')}</TableCell>
+                    <TableCell align="center">{t('reports.table.recommendation')}</TableCell>
+                    <TableCell>{t('reports.table.analysisDate')}</TableCell>
+                    <TableCell align="center">{t('reports.table.actions')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -257,13 +259,13 @@ const ReportsPage = () => {
                     if (!report || !report.id) return null;
                     
                     // Safe data extraction with fallbacks
-                    const symbol = report.symbol || 'N/A';
-                    const name = report.name || 'N/A';
-                    const sector = report.sector || 'Unknown';
+                    const symbol = report.symbol || t('common.notAvailable');
+                    const name = report.name || t('common.notAvailable');
+                    const sector = report.sector || t('common.unknown');
                     const score = typeof report.score === 'number' ? report.score : 0;
                     
                     // Safe date handling
-                    let formattedDate = 'N/A';
+                    let formattedDate = t('common.notAvailable');
                     let formattedTime = '';
                     
                     try {
@@ -323,14 +325,14 @@ const ReportsPage = () => {
                           <IconButton
                             onClick={() => handleViewAnalysis(report.id)}
                             color="primary"
-                            title="View Analysis Results"
+                            title={t('reports.actions.viewResults')}
                           >
                             <Visibility />
                           </IconButton>
                           <IconButton
                             onClick={() => handleRunNewAnalysis(symbol)}
                             color="secondary"
-                            title="Run New Analysis"
+                            title={t('reports.actions.runNewAnalysis')}
                           >
                             <TrendingUp />
                           </IconButton>
@@ -355,12 +357,12 @@ const ReportsPage = () => {
         ) : (
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <Typography variant="h6" gutterBottom>
-              {searchFilter ? 'No reports match your search' : 'No reports found'}
+              {searchFilter ? t('reports.noMatchingReports') : t('reports.noReportsFound')}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              {searchFilter 
-                ? 'Try adjusting your search terms or filters'
-                : 'Get started by creating your first analysis report'
+              {searchFilter
+                ? t('reports.tryAdjustingSearch')
+                : t('reports.getStartedMessage')
               }
             </Typography>
             {!searchFilter && (
@@ -369,7 +371,7 @@ const ReportsPage = () => {
                 startIcon={<Add />}
                 onClick={() => navigate('/stocks')}
               >
-                Create Your First Report
+                {t('reports.createFirstReport')}
               </Button>
             )}
           </Box>
