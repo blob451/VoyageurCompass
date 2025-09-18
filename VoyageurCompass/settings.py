@@ -201,42 +201,32 @@ if "test" in sys.argv or "pytest" in sys.modules:
     }
 
 # Redis Cache Configuration
-REDIS_HOST = env("REDIS_HOST", default="redis")
+REDIS_HOST = env("REDIS_HOST", default="localhost")
 REDIS_PORT = env("REDIS_PORT", default="6379")
 REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
 # Production Redis cache configuration with connection pooling and optimization
+# Compatible with redis>=5.0.0 and django-redis>=6.0.0
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": REDIS_URL,
         "TIMEOUT": 300,
         "OPTIONS": {
-            "CONNECTION_POOL_KWARGS": {
-                "max_connections": 50,
-                "retry_on_timeout": True,
-                "socket_keepalive": True,
-                "socket_keepalive_options": {},
-                "health_check_interval": 30,
-            },
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
             "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
         "KEY_PREFIX": "voyageur",
         "VERSION": 1,
     },
     # L2 cache for longer-term storage (explanations, translations)
     "l2_cache": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
         "TIMEOUT": 3600,
         "OPTIONS": {
-            "CONNECTION_POOL_KWARGS": {
-                "max_connections": 30,
-                "retry_on_timeout": True,
-                "socket_keepalive": True,
-            },
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
             "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
         },
@@ -245,15 +235,11 @@ CACHES = {
     },
     # Session cache optimised for user sessions
     "sessions": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/2",
         "TIMEOUT": 86400,
         "OPTIONS": {
-            "CONNECTION_POOL_KWARGS": {
-                "max_connections": 20,
-                "retry_on_timeout": True,
-                "socket_keepalive": True,
-            },
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
         },
         "KEY_PREFIX": "voyageur_session",
@@ -801,10 +787,10 @@ OLLAMA_MODEL = env("OLLAMA_MODEL", default="llama3.1:70b")
 
 # Multi-Model LLM Configuration
 # Model assignments for different detail levels and use cases
-OLLAMA_SUMMARY_MODEL = env("OLLAMA_SUMMARY_MODEL", default="phi3:3.8b")
-OLLAMA_STANDARD_MODEL = env("OLLAMA_STANDARD_MODEL", default="phi3:3.8b") 
+OLLAMA_SUMMARY_MODEL = env("OLLAMA_SUMMARY_MODEL", default="llama3.1:8b")
+OLLAMA_STANDARD_MODEL = env("OLLAMA_STANDARD_MODEL", default="llama3.1:8b") 
 OLLAMA_DETAILED_MODEL = env("OLLAMA_DETAILED_MODEL", default="llama3.1:8b")
-OLLAMA_TRANSLATION_MODEL = env("OLLAMA_TRANSLATION_MODEL", default="qwen2:3b")
+OLLAMA_TRANSLATION_MODEL = env("OLLAMA_TRANSLATION_MODEL", default="qwen2:latest")
 
 # Legacy model configuration for backward compatibility
 OLLAMA_PRIMARY_MODEL = env("OLLAMA_PRIMARY_MODEL", default="llama3.1:8b")
@@ -828,14 +814,14 @@ MULTILINGUAL_LLM_ENABLED = env.bool("MULTILINGUAL_LLM_ENABLED", default=True)
 # Language-specific model assignments
 LLM_MODELS_BY_LANGUAGE = {
     'en': env("LLM_MODEL_EN", default="llama3.1:8b"),
-    'fr': env("LLM_MODEL_FR", default="qwen2:3b"),
-    'es': env("LLM_MODEL_ES", default="qwen2:3b"),
+    'fr': env("LLM_MODEL_FR", default="qwen2:latest"),
+    'es': env("LLM_MODEL_ES", default="qwen2:latest"),
 }
 
 # Translation service configuration
 TRANSLATION_SERVICE_ENABLED = env.bool("TRANSLATION_SERVICE_ENABLED", default=True)
 TRANSLATION_CACHE_TTL = int(env("TRANSLATION_CACHE_TTL", default=86400))  # 24 hours
-TRANSLATION_TIMEOUT = int(env("TRANSLATION_TIMEOUT", default=30))
+TRANSLATION_TIMEOUT = int(env("TRANSLATION_TIMEOUT", default=60))
 TRANSLATION_MAX_RETRIES = int(env("TRANSLATION_MAX_RETRIES", default=2))
 
 # Quality thresholds for multilingual content
@@ -904,6 +890,11 @@ MAX_COMPARISON_SYMBOLS = int(env("MAX_COMPARISON_SYMBOLS", default=10))
 STOCK_ITERATOR_CHUNK_SIZE = int(env("STOCK_ITERATOR_CHUNK_SIZE", default=50))
 MARKET_DATA_BATCH_SIZE = int(env("MARKET_DATA_BATCH_SIZE", default=100))
 CACHE_TIMEOUT_MINUTES = int(env("CACHE_TIMEOUT_MINUTES", default=10))
+
+# Multilingual LLM Configuration
+MULTILINGUAL_TIMEOUT = int(env("MULTILINGUAL_TIMEOUT", default=60))
+TEMPLATE_CACHE_MAX_SIZE = int(env("TEMPLATE_CACHE_MAX_SIZE", default=100))
+RECENT_GENERATIONS_LIMIT = int(env("RECENT_GENERATIONS_LIMIT", default=10))
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5 MB

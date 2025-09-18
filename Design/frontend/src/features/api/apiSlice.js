@@ -190,13 +190,14 @@ export const apiSlice = createApi({
       providesTags: (result, error, symbol) => [{ type: 'Stock', id: symbol }],
     }),
     analyzeStock: builder.mutation({
-      query: ({ symbol, months = 6, includeExplanation = false, explanationDetail = 'standard' }) => ({
+      query: ({ symbol, months = 6, includeExplanation = false, explanationDetail = 'standard', language = 'en' }) => ({
         url: `/analytics/analyze/${symbol}/`,
         method: 'GET',
-        params: { 
+        params: {
           months,
           include_explanation: includeExplanation,
-          explanation_detail: explanationDetail
+          explanation_detail: explanationDetail,
+          language: language
         },
       }),
       invalidatesTags: ['Analysis'],

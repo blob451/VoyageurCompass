@@ -16,6 +16,16 @@ from Analytics.explanation_views import (
     generate_explanation,
     get_explanation,
     multilingual_pipeline_status,
+    generate_bulk_multilingual_explanations,
+    generate_parallel_multilingual_explanation,
+    get_multilingual_metrics_dashboard,
+    warm_multilingual_cache,
+)
+from Analytics.health_views import (
+    feature_flags_status,
+    health_ping,
+    multilingual_health,
+    multilingual_metrics,
 )
 from Analytics.finetuning_views import (
     export_dataset,
@@ -32,6 +42,11 @@ from Analytics.finetuning_views import (
 from Analytics.monitoring_views import (
     health_metrics,
     metrics_endpoint,
+    production_monitoring_status,
+    production_alerts,
+    force_health_check,
+    start_monitoring,
+    stop_monitoring,
 )
 from Analytics.quality_views import (
     analyze_file,
@@ -85,6 +100,10 @@ urlpatterns = [
     path("explanation-status/", explanation_service_status, name="explanation_status"),
     # Multilingual pipeline endpoints
     path("multilingual/status/", multilingual_pipeline_status, name="multilingual_pipeline_status"),
+    path("multilingual/bulk/", generate_bulk_multilingual_explanations, name="generate_bulk_multilingual"),
+    path("multilingual/parallel/<int:analysis_id>/", generate_parallel_multilingual_explanation, name="generate_parallel_multilingual"),
+    path("multilingual/metrics/", get_multilingual_metrics_dashboard, name="multilingual_metrics_dashboard"),
+    path("multilingual/warm-cache/", warm_multilingual_cache, name="warm_multilingual_cache"),
     # Enhanced LLM endpoints
     path("llm/explain/", generate_explanation, name="llm_explain"),
     path("llm/status/", explanation_service_status, name="llm_status"),
@@ -117,4 +136,15 @@ urlpatterns = [
     # Prometheus metrics endpoints
     path("metrics/", metrics_endpoint, name="prometheus_metrics"),
     path("health/metrics/", health_metrics, name="health_metrics"),
+    # Health check endpoints
+    path("health/multilingual/", multilingual_health, name="multilingual_health"),
+    path("health/ping/", health_ping, name="health_ping"),
+    path("health/multilingual-metrics/", multilingual_metrics, name="multilingual_metrics_health"),
+    path("health/feature-flags/", feature_flags_status, name="feature_flags_status"),
+    # Production monitoring endpoints
+    path("monitoring/status/", production_monitoring_status, name="production_monitoring_status"),
+    path("monitoring/alerts/", production_alerts, name="production_alerts"),
+    path("monitoring/health-check/", force_health_check, name="force_health_check"),
+    path("monitoring/start/", start_monitoring, name="start_monitoring"),
+    path("monitoring/stop/", stop_monitoring, name="stop_monitoring"),
 ]

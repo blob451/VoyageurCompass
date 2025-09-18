@@ -1,0 +1,147 @@
+{
+  "timestamp": "2025-09-16T20:24:31.011900",
+  "test_config": {
+    "languages": [
+      "en",
+      "fr",
+      "es"
+    ],
+    "iterations": 5
+  },
+  "baselines": {
+    "language_detection": {
+      "en": {
+        "avg_time_ms": 0.113,
+        "median_time_ms": 0.106,
+        "min_time_ms": 0.084,
+        "max_time_ms": 0.215,
+        "std_dev_ms": 0.03,
+        "samples": 15
+      },
+      "fr": {
+        "avg_time_ms": 0.1,
+        "median_time_ms": 0.1,
+        "min_time_ms": 0.09,
+        "max_time_ms": 0.111,
+        "std_dev_ms": 0.006,
+        "samples": 15
+      },
+      "es": {
+        "avg_time_ms": 0.096,
+        "median_time_ms": 0.094,
+        "min_time_ms": 0.088,
+        "max_time_ms": 0.106,
+        "std_dev_ms": 0.005,
+        "samples": 15
+      }
+    },
+    "cache_performance": {
+      "en": {
+        "hit_rate_percent": 50.0,
+        "total_requests": 6,
+        "hits": 3,
+        "misses": 3,
+        "avg_hit_time_ms": 1.5,
+        "avg_miss_time_ms": 159.65
+      },
+      "fr": {
+        "hit_rate_percent": 50.0,
+        "total_requests": 6,
+        "hits": 3,
+        "misses": 3,
+        "avg_hit_time_ms": 1.617,
+        "avg_miss_time_ms": 1.537
+      },
+      "es": {
+        "hit_rate_percent": 50.0,
+        "total_requests": 6,
+        "hits": 3,
+        "misses": 3,
+        "avg_hit_time_ms": 1.467,
+        "avg_miss_time_ms": 1.626
+      }
+    },
+    "llm_generation": {
+      "en": {
+        "summary": {
+          "avg_prep_time_ms": 0.603,
+          "median_prep_time_ms": 0.54,
+          "estimated_total_time_s": 2.5,
+          "samples": 5
+        },
+        "standard": {
+          "avg_prep_time_ms": 0.582,
+          "median_prep_time_ms": 0.567,
+          "estimated_total_time_s": 2.5,
+          "samples": 5
+        },
+        "detailed": {
+          "avg_prep_time_ms": 0.577,
+          "median_prep_time_ms": 0.58,
+          "estimated_total_time_s": 2.5,
+          "samples": 5
+        }
+      },
+      "fr": {
+        "summary": {
+          "avg_prep_time_ms": 0.011,
+          "median_prep_time_ms": 0.008,
+          "estimated_total_time_s": 2.5,
+          "samples": 5
+        },
+        "standard": {
+          "avg_prep_time_ms": 0.007,
+          "median_prep_time_ms": 0.006,
+          "estimated_total_time_s": 2.5,
+          "samples": 5
+        },
+        "detailed": {
+          "avg_prep_time_ms": 0.012,
+          "median_prep_time_ms": 0.01,
+          "estimated_total_time_s": 2.5,
+          "samples": 5
+        }
+      },
+      "es": {
+        "summary": {
+          "avg_prep_time_ms": 0.009,
+          "median_prep_time_ms": 0.006,
+          "estimated_total_time_s": 2.5,
+          "samples": 5
+        },
+        "standard": {
+          "avg_prep_time_ms": 0.007,
+          "median_prep_time_ms": 0.006,
+          "estimated_total_time_s": 2.5,
+          "samples": 5
+        },
+        "detailed": {
+          "avg_prep_time_ms": 0.008,
+          "median_prep_time_ms": 0.008,
+          "estimated_total_time_s": 2.5,
+          "samples": 5
+        }
+      }
+    },
+    "cultural_context": {
+      "en": {
+        "avg_time_ms": 0.0031,
+        "median_time_ms": 0.0019,
+        "overhead_percent": 0.03,
+        "samples": 15
+      },
+      "fr": {
+        "avg_time_ms": 0.0019,
+        "median_time_ms": 0.0018,
+        "overhead_percent": 0.02,
+        "samples": 15
+      },
+      "es": {
+        "avg_time_ms": 0.0019,
+        "median_time_ms": 0.0019,
+        "overhead_percent": 0.02,
+        "samples": 15
+      }
+    }
+  }
+}

@@ -13,6 +13,7 @@ from django.core.cache import cache
 
 from Analytics.services.local_llm_service import get_local_llm_service
 from Analytics.services.security_validator import get_security_validator, sanitize_financial_input, validate_financial_output
+from Analytics.services.translation_service import get_translation_service
 from Data.models import AnalyticsResults
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ class ExplanationService:
     def __init__(self):
         self._llm_service = None
         self._security_validator = None
+        self._translation_service = None
         self.enabled = getattr(settings, "EXPLAINABILITY_ENABLED", True)
         self.cache_ttl = getattr(settings, "EXPLANATION_CACHE_TTL", 300)
         self.security_enabled = getattr(settings, "EXPLANATION_SECURITY_ENABLED", True)
@@ -59,6 +61,14 @@ class ExplanationService:
             self._security_validator = get_security_validator()
         return self._security_validator
 
+    @property
+    def translation_service(self):
+        """Lazy-loaded translation service."""
+        if self._translation_service is None:
+            logger.info("Initializing translation service for multilingual explanations")
+            self._translation_service = get_translation_service()
+        return self._translation_service
+
     def is_enabled(self) -> bool:
         """Verify explanation service availability status."""
         return self.enabled and self.llm_service.is_available()
@@ -68,7 +78,7 @@ class ExplanationService:
         return self.enabled  # Always true if feature enabled, regardless of LLM availability
 
     def explain_prediction_single(
-        self, analysis_result: Union[Dict[str, Any], AnalyticsResults], detail_level: str = "standard", user=None, force_regenerate: bool = False
+        self, analysis_result: Union[Dict[str, Any], AnalyticsResults], detail_level: str = "standard", language: str = "en", user=None, force_regenerate: bool = False
     ) -> Optional[Dict[str, Any]]:
         """Generate detailed explanation for individual stock analysis result."""
         if not self.enabled:
@@ -77,7 +87,7 @@ class ExplanationService:
 
         try:
             analysis_data = self._prepare_analysis_data(analysis_result)
-            cache_key = self._create_cache_key(analysis_data, detail_level, user)
+            cache_key = self._create_cache_key(analysis_data, detail_level, language, user)
             
             # Skip cache check if force regeneration is requested
             if not force_regenerate:
@@ -94,8 +104,8 @@ class ExplanationService:
 
             # Always try to generate something - LLM preferred, template as fallback
             if self.llm_service.is_available():
-                logger.info(f"Using LLM for {analysis_data.get('symbol', 'unknown')} ({detail_level})")
-                explanation = self._generate_llm_explanation(analysis_data, detail_level)
+                logger.info(f"Using LLM for {analysis_data.get('symbol', 'unknown')} ({detail_level}, {language})")
+                explanation = self._generate_multilingual_explanation(analysis_data, detail_level, language)
             else:
                 logger.warning(
                     f"LLM unavailable, using template for {analysis_data.get('symbol', 'unknown')} ({detail_level})"
@@ -311,11 +321,11 @@ class ExplanationService:
             logger.error(f"Error preparing analysis data: {str(e)}")
             return {"error": "Failed to prepare analysis data"}
 
-    def _generate_llm_explanation(self, analysis_data: Dict[str, Any], detail_level: str) -> Optional[Dict[str, Any]]:
+    def _generate_llm_explanation(self, analysis_data: Dict[str, Any], detail_level: str, language: str = "en") -> Optional[Dict[str, Any]]:
         """Generate explanation using local LLaMA model."""
         try:
             llm_result = self.llm_service.generate_explanation(
-                analysis_data=analysis_data, detail_level=detail_level, explanation_type="technical_analysis"
+                analysis_data=analysis_data, detail_level=detail_level, explanation_type="technical_analysis", language=language
             )
 
             if llm_result and "content" in llm_result:
@@ -333,6 +343,68 @@ class ExplanationService:
             logger.error(f"Error generating LLM explanation: {str(e)}")
 
         return None
+
+    def _generate_multilingual_explanation(
+        self, analysis_data: Dict[str, Any], detail_level: str, language: str = "en"
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate multilingual explanation using translation pipeline for standard/summary modes.
+
+        For detailed mode, uses direct LLM generation.
+        For standard/summary modes, generates in English then translates.
+        """
+        try:
+            # For detailed mode, use direct LLM generation (Phase 2 implementation)
+            if detail_level == "detailed":
+                return self._generate_llm_explanation(analysis_data, detail_level, language)
+
+            # For standard/summary modes, use translation pipeline (Phase 3 implementation)
+            if language != "en":
+                # Generate English explanation first
+                english_explanation = self._generate_llm_explanation(analysis_data, detail_level, "en")
+
+                if not english_explanation or not english_explanation.get("content"):
+                    logger.warning(f"Failed to generate English explanation for translation to {language}")
+                    return None
+
+                # Translate the content using lazy-loaded translation service
+                translated_content = self.translation_service.translate_explanation(
+                    english_text=english_explanation["content"],
+                    target_language=language,
+                    context={
+                        "symbol": analysis_data.get("symbol", ""),
+                        "score": analysis_data.get("score_0_10", 0),
+                        "recommendation": english_explanation.get("recommendation", "HOLD")
+                    }
+                )
+
+                if translated_content and translated_content.get("translated_text"):
+                    # Return translated explanation with enhanced metadata
+                    return {
+                        "content": translated_content["translated_text"],
+                        "confidence_score": english_explanation.get("confidence_score", 0.8),
+                        "word_count": len(translated_content["translated_text"].split()),
+                        "model_used": english_explanation.get("model_used", "llama3.1:70b"),
+                        "indicators_explained": english_explanation.get("indicators_explained", []),
+                        "risk_factors": english_explanation.get("risk_factors", []),
+                        "recommendation": english_explanation.get("recommendation", "HOLD"),
+                        "translation_quality": translated_content.get("quality_score", 0.0),
+                        "translation_model": translated_content.get("model_used", "qwen2:latest"),
+                        "source_language": "en",
+                        "target_language": language,
+                        "translation_method": "llm_pipeline"
+                    }
+                else:
+                    logger.error(f"Translation failed for {language}, falling back to English")
+                    return english_explanation
+            else:
+                # English language - use direct LLM generation
+                return self._generate_llm_explanation(analysis_data, detail_level, language)
+
+        except Exception as e:
+            logger.error(f"Error in multilingual explanation generation: {str(e)}")
+            # Fallback to standard LLM explanation
+            return self._generate_llm_explanation(analysis_data, detail_level, language)
 
     def _generate_template_explanation(self, analysis_data: Dict[str, Any], detail_level: str) -> Dict[str, Any]:
         """Generate explanation using template fallback."""
@@ -495,8 +567,8 @@ class ExplanationService:
         
         return validation_result
 
-    def _create_cache_key(self, analysis_data: Dict[str, Any], detail_level: str, user=None) -> str:
-        """Create cache key for explanation."""
+    def _create_cache_key(self, analysis_data: Dict[str, Any], detail_level: str, language: str = "en", user=None) -> str:
+        """Create culturally-aware cache key for explanation."""
         symbol = analysis_data.get("symbol", "unknown")
         score = analysis_data.get("score_0_10", 0)
         user_id = user.id if user else "anonymous"
@@ -508,9 +580,58 @@ class ExplanationService:
             if key in weighted_scores:
                 key_scores.append(f"{key}_{weighted_scores[key]:.2f}")
 
-        cache_data = f"{symbol}_{score:.1f}_{detail_level}_{user_id}_{'_'.join(key_scores)}"
+        # Add cultural context to cache key
+        cultural_context = self._get_cultural_context(language, user)
+        cultural_suffix = f"_c{cultural_context.get('culture_hash', 'default')}"
+
+        cache_data = f"{symbol}_{score:.1f}_{detail_level}_{language}_{user_id}_{'_'.join(key_scores)}{cultural_suffix}"
         key = hashlib.blake2b(cache_data.encode(), digest_size=16).hexdigest()
         return f"explanation_{key}"
+
+    def _get_cultural_context(self, language: str, user=None) -> Dict[str, Any]:
+        """Get cultural context for cache key generation."""
+        try:
+            import hashlib
+
+            cultural_factors = []
+
+            # Language-specific cultural context
+            language_contexts = {
+                'fr': ['europe', 'euro_currency', 'cac40_market'],
+                'es': ['europe', 'latam', 'euro_currency', 'ibex35_market'],
+                'en': ['global', 'usd_currency', 'sp500_market'],
+            }
+
+            cultural_factors.extend(language_contexts.get(language, ['global']))
+
+            # User-specific preferences (if available and authenticated)
+            if user and hasattr(user, 'profile'):
+                # Add timezone-based context
+                timezone = getattr(user.profile, 'timezone', None)
+                if timezone:
+                    if 'Europe' in timezone:
+                        cultural_factors.append('europe_timezone')
+                    elif 'America' in timezone:
+                        cultural_factors.append('americas_timezone')
+
+                # Add preferred currency format
+                currency_pref = getattr(user.profile, 'currency_preference', None)
+                if currency_pref:
+                    cultural_factors.append(f'currency_{currency_pref.lower()}')
+
+            # Create hash of cultural factors for cache key
+            cultural_string = '_'.join(sorted(cultural_factors))
+            culture_hash = hashlib.blake2b(cultural_string.encode(), digest_size=4).hexdigest()
+
+            return {
+                'factors': cultural_factors,
+                'culture_hash': culture_hash,
+                'language': language,
+            }
+
+        except Exception as e:
+            logger.error(f"Error generating cultural context: {str(e)}")
+            return {'culture_hash': 'default', 'factors': [], 'language': language}
 
     def get_service_status(self) -> Dict[str, Any]:
         """Get current service status."""

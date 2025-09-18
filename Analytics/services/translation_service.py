@@ -249,7 +249,10 @@ class TranslationService:
     """
     
     def __init__(self):
-        self.translation_model = getattr(settings, "OLLAMA_TRANSLATION_MODEL", "qwen2:3b")
+        # Primary and fallback translation models
+        self.translation_model = getattr(settings, "OLLAMA_TRANSLATION_MODEL", "qwen2:latest")
+        self.fallback_translation_models = getattr(settings, "OLLAMA_TRANSLATION_FALLBACK_MODELS", ["phi3:3.8b", "llama3.1:8b"])
+
         self.cache_ttl = getattr(settings, "EXPLANATION_CACHE_TTL", 1800)  # 30 minutes default
         self.translation_timeout = 45  # Shorter timeout for translation
         self.high_quality_cache_ttl = 7200  # 2 hours for high-quality translations
@@ -272,13 +275,20 @@ class TranslationService:
         # Caching configuration
         self.cache_prefix = "translation:"
         
-        # Performance tracking
+        # Enhanced performance tracking with cache metrics
         self.translation_metrics = {
             "translations_requested": 0,
             "cache_hits": 0,
+            "cache_misses": 0,
+            "cache_hit_rate": 0.0,
             "successful_translations": 0,
             "failed_translations": 0,
             "average_quality_score": 0.0,
+            "model_usage": {},
+            "fallback_usage_count": 0,
+            "average_translation_time": 0.0,
+            "total_cache_entries": 0,
+            "cache_memory_usage_mb": 0.0
         }
         
         self._metrics_lock = threading.Lock()
@@ -312,15 +322,37 @@ class TranslationService:
         with self._metrics_lock:
             self.translation_metrics["translations_requested"] += 1
         
-        # Check cache first
-        cache_key = self._create_translation_cache_key(english_text, target_language, context)
-        cached_result = cache.get(cache_key)
-        
-        if cached_result:
-            logger.info(f"Retrieved translation from cache for {target_language}")
+        # Enhanced cache lookup with optimization (Phase 3)
+        cached_translation = self.optimize_translation_cache(english_text, target_language)
+        if cached_translation:
+            logger.info(f"Retrieved optimized translation from cache for {target_language}")
             with self._metrics_lock:
                 self.translation_metrics["cache_hits"] += 1
+                self._update_cache_hit_rate()
+            return {
+                "translated_text": cached_translation,
+                "quality_score": 0.9,  # Assume good quality for cached content
+                "model_used": "cached",
+                "language": target_language,
+                "translation_time": 0.0,
+                "cache_hit": True
+            }
+
+        # Standard cache lookup fallback
+        cache_key = self._create_translation_cache_key(english_text, target_language, context)
+        cached_result = cache.get(cache_key)
+
+        if cached_result:
+            logger.info(f"Retrieved translation from standard cache for {target_language}")
+            with self._metrics_lock:
+                self.translation_metrics["cache_hits"] += 1
+                self._update_cache_hit_rate()
             return cached_result
+
+        # Record cache miss
+        with self._metrics_lock:
+            self.translation_metrics["cache_misses"] += 1
+            self._update_cache_hit_rate()
         
         try:
             # Get LLM service for translation
@@ -339,14 +371,12 @@ class TranslationService:
 
             # Build translation prompt
             translation_prompt = self._build_translation_prompt(sanitized_text, target_language, context)
-            
-            # Generate translation
+
+            # Generate translation with model fallback
             start_time = time.time()
-            
-            response = llm_service.client.generate(
-                model=self.translation_model,
-                prompt=translation_prompt,
-                options=self._get_translation_options(target_language)
+
+            response, model_used = self._generate_translation_with_fallback(
+                llm_service, translation_prompt, target_language
             )
             
             generation_time = time.time() - start_time
@@ -620,6 +650,593 @@ Provide only the {target_lang_name} translation:"""
             }
         }
 
+
+    def translate_explanations_batch(
+        self,
+        translations: List[Dict[str, Any]]
+    ) -> List[Optional[Dict[str, Any]]]:
+        """
+        Batch translate multiple explanations for improved performance.
+
+        Args:
+            translations: List of translation requests, each containing:
+                - content: Text to translate
+                - target_language: Target language code
+                - financial_context: Optional context dict
+
+        Returns:
+            List of translation results in same order as input
+        """
+        if not translations:
+            return []
+
+        logger.info(f"Starting batch translation of {len(translations)} explanations")
+
+        # Group translations by target language for optimization
+        language_groups = {}
+        for i, trans_req in enumerate(translations):
+            lang = trans_req.get("target_language", "en")
+            if lang not in language_groups:
+                language_groups[lang] = []
+            language_groups[lang].append((i, trans_req))
+
+        # Process results in original order
+        results = [None] * len(translations)
+
+        # Process each language group
+        for target_language, lang_translations in language_groups.items():
+            if target_language == "en":
+                # No translation needed for English
+                for original_index, trans_req in lang_translations:
+                    results[original_index] = {
+                        "translated_text": trans_req.get("content", ""),
+                        "quality_score": 1.0,
+                        "model_used": "passthrough",
+                        "language": "en",
+                        "translation_time": 0.0,
+                        "batch_processed": True
+                    }
+                continue
+
+            # Process non-English translations in batches
+            lang_results = self._process_language_batch(lang_translations, target_language)
+
+            # Map results back to original order
+            for (original_index, _), result in zip(lang_translations, lang_results):
+                results[original_index] = result
+
+        logger.info(f"Completed batch translation with {sum(1 for r in results if r)} successful translations")
+        return results
+
+    def _process_language_batch(
+        self,
+        lang_translations: List[tuple],
+        target_language: str
+    ) -> List[Optional[Dict[str, Any]]]:
+        """Process translations for a specific target language in parallel."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        results = [None] * len(lang_translations)
+
+        # Use ThreadPoolExecutor for parallel translation
+        with ThreadPoolExecutor(max_workers=self.batch_size) as executor:
+            # Submit all translation tasks
+            future_to_index = {}
+            for i, (original_index, trans_req) in enumerate(lang_translations):
+                future = executor.submit(
+                    self.translate_explanation,
+                    trans_req.get("content", ""),
+                    target_language,
+                    trans_req.get("financial_context", {})
+                )
+                future_to_index[future] = i
+
+            # Collect results as they complete
+            for future in as_completed(future_to_index):
+                index = future_to_index[future]
+                try:
+                    result = future.result(timeout=self.translation_timeout)
+                    if result:
+                        result["batch_processed"] = True
+                    results[index] = result
+                except Exception as e:
+                    logger.error(f"Batch translation error for index {index}: {str(e)}")
+                    results[index] = None
+
+        return results
+
+    def optimize_translation_cache(self, content: str, target_language: str) -> Optional[str]:
+        """
+        Optimize cache usage for translation by checking multiple cache keys.
+        Implements cache key normalization and fallback mechanisms.
+        """
+        if target_language == "en":
+            return content
+
+        # Try multiple cache key variations for better hit rates
+        cache_keys = self._generate_cache_key_variations(content, target_language)
+
+        for cache_key in cache_keys:
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                logger.info(f"Cache hit for translation with key variation: {cache_key[:20]}...")
+                return cached_result.get("translated_text")
+
+        return None
+
+    def _generate_cache_key_variations(self, content: str, target_language: str) -> List[str]:
+        """Generate multiple cache key variations to improve cache hit rates."""
+        # Normalize content for better cache hits
+        normalized_content = self._normalize_content_for_cache(content)
+
+        # Generate different cache key variations with enhanced entropy
+        keys = []
+
+        # Cache version for invalidation management
+        cache_version = "v3.1"
+
+        # Original content hash with enhanced entropy
+        content_entropy = f"{len(content)}:{hash(content) % 10000}"
+        original_hash = hashlib.blake2b(f"{content}:{content_entropy}".encode(), digest_size=16).hexdigest()
+        keys.append(f"translation_{cache_version}_{target_language}_{original_hash}")
+
+        # Normalized content hash with version
+        normalized_hash = hashlib.blake2b(f"{normalized_content}:{content_entropy}".encode(), digest_size=16).hexdigest()
+        keys.append(f"translation_{cache_version}_{target_language}_norm_{normalized_hash}")
+
+        # Length-based cache key with improved bucketing
+        length_bucket = (len(content) // 50) * 50  # Smaller buckets for better granularity
+        length_fingerprint = hashlib.blake2b(f"{length_bucket}:{normalized_content[:100]}:{content_entropy}".encode(), digest_size=8).hexdigest()
+        keys.append(f"translation_{cache_version}_{target_language}_len_{length_fingerprint}")
+
+        # Semantic fingerprint (for content with similar meaning but different wording)
+        semantic_features = self._extract_semantic_features(normalized_content)
+        semantic_hash = hashlib.blake2b(f"{semantic_features}:{target_language}".encode(), digest_size=12).hexdigest()
+        keys.append(f"translation_{cache_version}_{target_language}_sem_{semantic_hash}")
+
+        return keys
+
+    def _extract_semantic_features(self, content: str) -> str:
+        """Extract semantic features for cache key generation."""
+        import re
+
+        # Extract key financial terms
+        financial_keywords = re.findall(r'\b(?:buy|sell|hold|bullish|bearish|support|resistance|rsi|macd|sma|ema)\b',
+                                       content.lower())
+
+        # Extract numerical patterns (percentages, ratios, scores)
+        numerical_patterns = re.findall(r'\d+\.?\d*[%]?', content)
+
+        # Create semantic fingerprint
+        semantic_signature = f"kw:{len(financial_keywords)}:num:{len(numerical_patterns)}:len:{len(content.split())}"
+
+        return semantic_signature
+
+    def _normalize_content_for_cache(self, content: str) -> str:
+        """Normalize content to improve cache hit rates across similar content."""
+        import re
+
+        # Remove extra whitespace
+        normalized = re.sub(r'\s+', ' ', content.strip())
+
+        # Normalize numbers (round to reduce precision variations)
+        def normalize_number(match):
+            try:
+                num = float(match.group())
+                # Round to 2 decimal places
+                return f"{num:.2f}"
+            except:
+                return match.group()
+
+        normalized = re.sub(r'\d+\.\d+', normalize_number, normalized)
+
+        # Normalize currency symbols and percentages
+        normalized = re.sub(r'[$£€][\d,]+\.?\d*', '[CURRENCY]', normalized)
+        normalized = re.sub(r'\d+\.?\d*%', '[PERCENT]', normalized)
+
+        return normalized
+
+    def warm_translation_cache(
+        self,
+        content_samples: List[str],
+        target_languages: List[str] = None,
+        priority_level: str = "standard",
+        max_memory_mb: int = 100,
+        chunk_size: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Warm translation cache with frequently used content using memory-aware chunking.
+
+        Args:
+            content_samples: List of content to pre-translate and cache
+            target_languages: Languages to warm cache for (default: fr, es)
+            priority_level: Priority level affecting cache TTL
+            max_memory_mb: Maximum memory usage for cache warming (default: 100MB)
+            chunk_size: Number of items to process per chunk (default: 5)
+
+        Returns:
+            Dictionary with warming results and statistics
+        """
+        if target_languages is None:
+            target_languages = ["fr", "es"]
+
+        warming_results = {
+            "total_content_samples": len(content_samples),
+            "target_languages": target_languages,
+            "successful_translations": 0,
+            "failed_translations": 0,
+            "cache_entries_created": 0,
+            "total_warming_time": 0,
+            "memory_usage_mb": 0,
+            "chunks_processed": 0,
+            "warming_details": []
+        }
+
+        print(f"Starting memory-aware cache warming for {len(content_samples)} content samples across {len(target_languages)} languages...")
+        print(f"Memory limit: {max_memory_mb}MB, Chunk size: {chunk_size}")
+
+        start_time = time.time()
+
+        # Process content samples in memory-aware chunks
+        total_chunks = (len(content_samples) + chunk_size - 1) // chunk_size
+
+        for chunk_idx in range(total_chunks):
+            start_idx = chunk_idx * chunk_size
+            end_idx = min(start_idx + chunk_size, len(content_samples))
+            chunk_samples = content_samples[start_idx:end_idx]
+
+            print(f"Processing chunk {chunk_idx + 1}/{total_chunks} ({len(chunk_samples)} samples)...")
+
+            # Monitor memory usage before chunk processing
+            initial_memory = self._get_memory_usage_mb()
+
+            chunk_results = self._process_warming_chunk(
+                chunk_samples, target_languages, priority_level, start_idx
+            )
+
+            # Update results
+            warming_results["successful_translations"] += chunk_results["successful"]
+            warming_results["failed_translations"] += chunk_results["failed"]
+            warming_results["cache_entries_created"] += chunk_results["cache_entries"]
+            warming_results["warming_details"].extend(chunk_results["details"])
+            warming_results["chunks_processed"] += 1
+
+            # Check memory usage after chunk
+            current_memory = self._get_memory_usage_mb()
+            memory_increase = current_memory - initial_memory
+            warming_results["memory_usage_mb"] = max(warming_results["memory_usage_mb"], current_memory)
+
+            # Memory pressure check
+            if current_memory > max_memory_mb:
+                print(f"  Memory limit reached ({current_memory:.1f}MB), triggering cache cleanup...")
+                self._cleanup_cache_memory()
+
+            # Adaptive delay between chunks based on memory pressure
+            if memory_increase > 10:  # If chunk used more than 10MB
+                time.sleep(0.5)  # Brief pause to allow GC
+
+        warming_results["total_warming_time"] = time.time() - start_time
+
+        print(f"Memory-aware cache warming completed in {warming_results['total_warming_time']:.2f}s")
+        print(f"  Successful: {warming_results['successful_translations']}")
+        print(f"  Failed: {warming_results['failed_translations']}")
+        print(f"  Cache entries created: {warming_results['cache_entries_created']}")
+        print(f"  Peak memory usage: {warming_results['memory_usage_mb']:.1f}MB")
+        print(f"  Chunks processed: {warming_results['chunks_processed']}")
+
+        return warming_results
+
+    def _process_warming_chunk(
+        self,
+        chunk_samples: List[str],
+        target_languages: List[str],
+        priority_level: str,
+        start_index: int
+    ) -> Dict[str, Any]:
+        """Process a single chunk of content samples for cache warming."""
+        chunk_results = {
+            "successful": 0,
+            "failed": 0,
+            "cache_entries": 0,
+            "details": []
+        }
+
+        for i, content in enumerate(chunk_samples):
+            if not content or not content.strip():
+                continue
+
+            content_results = {
+                "content_index": start_index + i,
+                "content_preview": content[:50] + "..." if len(content) > 50 else content,
+                "language_results": {}
+            }
+
+            for language in target_languages:
+                if language == "en":
+                    continue  # Skip English as it doesn't need translation
+
+                try:
+                    # Perform translation to warm cache
+                    translation_result = self.translate_explanation(
+                        content,
+                        target_language=language,
+                        financial_context={
+                            "cache_warming": True,
+                            "priority": priority_level
+                        }
+                    )
+
+                    if translation_result and translation_result.get("translated_text"):
+                        chunk_results["successful"] += 1
+                        content_results["language_results"][language] = {
+                            "success": True,
+                            "quality_score": translation_result.get("quality_score", 0.0),
+                            "model_used": translation_result.get("model_used", "unknown")
+                        }
+
+                        # Create additional cache entries with variations
+                        self._create_cache_warming_variations(content, language, translation_result)
+                        chunk_results["cache_entries"] += 1
+
+                    else:
+                        chunk_results["failed"] += 1
+                        content_results["language_results"][language] = {
+                            "success": False,
+                            "error": "Translation failed"
+                        }
+
+                except Exception as e:
+                    chunk_results["failed"] += 1
+                    content_results["language_results"][language] = {
+                        "success": False,
+                        "error": str(e)
+                    }
+
+            chunk_results["details"].append(content_results)
+
+        return chunk_results
+
+    def _create_cache_warming_variations(
+        self,
+        content: str,
+        language: str,
+        translation_result: Dict[str, Any]
+    ):
+        """Create cache variations for improved cache hit rates during warming."""
+        # Get cache key variations
+        cache_keys = self._generate_cache_key_variations(content, language)
+
+        # Store translation in all cache key variations
+        for cache_key in cache_keys:
+            try:
+                # Use extended TTL for warmed cache entries
+                extended_ttl = self.high_quality_cache_ttl * 2  # 4 hours for warmed content
+
+                cache.set(
+                    cache_key,
+                    translation_result,
+                    timeout=extended_ttl
+                )
+            except Exception as e:
+                logger.warning(f"Failed to create cache variation {cache_key}: {str(e)}")
+
+    def warm_common_financial_phrases(self) -> Dict[str, Any]:
+        """
+        Warm cache with common financial phrases and terminology.
+        Pre-populates cache with frequently used financial content.
+        """
+        common_phrases = [
+            "Technical analysis shows bullish signals with strong momentum indicators.",
+            "The stock demonstrates oversold conditions with potential for reversal.",
+            "Moving averages indicate a strong upward trend continuation.",
+            "RSI levels suggest the security is approaching overbought territory.",
+            "Volume surge confirms the breakout above resistance levels.",
+            "Bollinger Bands indicate increased volatility in the trading range.",
+            "MACD crossover signals potential trend change ahead.",
+            "Support and resistance levels provide key trading opportunities.",
+            "The recommendation is BUY with high confidence based on technical indicators.",
+            "HOLD recommendation due to mixed signals in current market conditions.",
+            "SELL signal activated as key support levels have been breached.",
+            "Momentum indicators suggest continuation of current trend direction.",
+            "Price action confirms strong institutional buying interest.",
+            "Risk factors include market volatility and sector rotation concerns.",
+            "Strong earnings growth supports positive technical outlook."
+        ]
+
+        return self.warm_translation_cache(
+            content_samples=common_phrases,
+            target_languages=["fr", "es"],
+            priority_level="high"
+        )
+
+    def get_cache_warming_recommendations(
+        self,
+        usage_patterns: Optional[Dict[str, Any]] = None
+    ) -> List[str]:
+        """
+        Generate cache warming recommendations based on usage patterns.
+
+        Args:
+            usage_patterns: Optional dictionary with usage statistics
+
+        Returns:
+            List of recommended content for cache warming
+        """
+        # Default recommendations based on common financial analysis patterns
+        recommendations = [
+            "Apple Inc. shows strong technical momentum with bullish indicators.",
+            "Microsoft Corporation displays mixed signals requiring careful analysis.",
+            "Google's technical analysis reveals breakthrough above key resistance.",
+            "Tesla demonstrates high volatility with momentum shift patterns.",
+            "NVIDIA shows exceptional growth indicators with strong support levels."
+        ]
+
+        # Add pattern-based recommendations if usage data available
+        if usage_patterns:
+            # Extract frequently used symbols
+            frequent_symbols = usage_patterns.get("frequent_symbols", [])
+            for symbol in frequent_symbols[:5]:  # Top 5 symbols
+                recommendations.append(
+                    f"{symbol} technical analysis shows {usage_patterns.get('common_sentiment', 'mixed')} signals."
+                )
+
+            # Add common score ranges
+            common_scores = usage_patterns.get("common_score_ranges", [])
+            for score_range in common_scores:
+                recommendations.append(
+                    f"Analysis indicates {score_range} confidence level with corresponding technical signals."
+                )
+
+        return recommendations
+
+    def _generate_translation_with_fallback(
+        self,
+        llm_service,
+        translation_prompt: str,
+        target_language: str
+    ) -> tuple:
+        """
+        Generate translation with model fallback chain.
+
+        Returns:
+            Tuple of (response, model_used)
+        """
+        # Try primary model first
+        models_to_try = [self.translation_model] + self.fallback_translation_models
+
+        for model_name in models_to_try:
+            try:
+                # Check model health
+                if hasattr(llm_service, 'health_service') and llm_service.health_service:
+                    if not llm_service.health_service.is_model_healthy(model_name, llm_service.client):
+                        logger.warning(f"Model {model_name} is unhealthy, trying next model")
+                        continue
+
+                logger.info(f"Attempting translation with model: {model_name}")
+
+                response = llm_service.client.generate(
+                    model=model_name,
+                    prompt=translation_prompt,
+                    options=self._get_translation_options(target_language)
+                )
+
+                if response and "response" in response:
+                    logger.info(f"Translation successful with model: {model_name}")
+                    return response, model_name
+
+            except Exception as e:
+                logger.warning(f"Translation failed with model {model_name}: {str(e)}")
+                continue
+
+        # All models failed
+        logger.error("All translation models failed")
+        return None, None
+
+    def _check_model_availability(self, llm_service, model_name: str) -> bool:
+        """Check if a translation model is available."""
+        try:
+            # Try to list models or ping the specific model
+            if hasattr(llm_service.client, 'list'):
+                available_models = llm_service.client.list()
+                model_names = [model.get('name', '') for model in available_models.get('models', [])]
+                return any(model_name in name for name in model_names)
+            return True  # Assume available if we can't check
+        except Exception as e:
+            logger.warning(f"Could not check availability for model {model_name}: {str(e)}")
+            return False
+
+    def _get_memory_usage_mb(self) -> float:
+        """Get current memory usage in MB."""
+        try:
+            import psutil
+            process = psutil.Process()
+            memory_info = process.memory_info()
+            return memory_info.rss / 1024 / 1024  # Convert to MB
+        except ImportError:
+            # Fallback if psutil not available
+            import sys
+            return sys.getsizeof(self) / 1024 / 1024
+
+    def _cleanup_cache_memory(self):
+        """Clean up cache memory when approaching limits."""
+        try:
+            # Force garbage collection
+            import gc
+            gc.collect()
+
+            # Log memory cleanup
+            logger.info("Cache memory cleanup triggered - garbage collection completed")
+
+        except Exception as e:
+            logger.warning(f"Cache memory cleanup failed: {str(e)}")
+
+    def _update_cache_hit_rate(self):
+        """Update cache hit rate calculation."""
+        total_requests = self.translation_metrics["cache_hits"] + self.translation_metrics["cache_misses"]
+        if total_requests > 0:
+            self.translation_metrics["cache_hit_rate"] = (
+                self.translation_metrics["cache_hits"] / total_requests
+            ) * 100
+
+    def _update_model_usage_metrics(self, model_name: str, is_fallback: bool = False):
+        """Update model usage statistics."""
+        with self._metrics_lock:
+            if model_name not in self.translation_metrics["model_usage"]:
+                self.translation_metrics["model_usage"][model_name] = 0
+            self.translation_metrics["model_usage"][model_name] += 1
+
+            if is_fallback:
+                self.translation_metrics["fallback_usage_count"] += 1
+
+    def _update_translation_time_metrics(self, translation_time: float):
+        """Update average translation time."""
+        with self._metrics_lock:
+            current_avg = self.translation_metrics["average_translation_time"]
+            total_translations = self.translation_metrics["successful_translations"]
+
+            if total_translations > 0:
+                # Running average calculation
+                self.translation_metrics["average_translation_time"] = (
+                    (current_avg * (total_translations - 1)) + translation_time
+                ) / total_translations
+
+    def get_cache_metrics(self) -> Dict[str, Any]:
+        """Get comprehensive cache and translation metrics."""
+        with self._metrics_lock:
+            metrics = self.translation_metrics.copy()
+
+            # Add real-time calculations
+            metrics["uptime_minutes"] = (time.time() - getattr(self, '_start_time', time.time())) / 60
+            metrics["cache_efficiency"] = metrics["cache_hit_rate"] / 100 if metrics["cache_hit_rate"] > 0 else 0
+
+            # Model efficiency metrics
+            if metrics["model_usage"]:
+                total_model_usage = sum(metrics["model_usage"].values())
+                metrics["primary_model_efficiency"] = (
+                    metrics["model_usage"].get(self.translation_model, 0) / total_model_usage * 100
+                    if total_model_usage > 0 else 0
+                )
+
+            return metrics
+
+    def reset_metrics(self):
+        """Reset all metrics (useful for testing)."""
+        with self._metrics_lock:
+            self.translation_metrics = {
+                "translations_requested": 0,
+                "cache_hits": 0,
+                "cache_misses": 0,
+                "cache_hit_rate": 0.0,
+                "successful_translations": 0,
+                "failed_translations": 0,
+                "average_quality_score": 0.0,
+                "model_usage": {},
+                "fallback_usage_count": 0,
+                "average_translation_time": 0.0,
+                "total_cache_entries": 0,
+                "cache_memory_usage_mb": 0.0
+            }
+            self._start_time = time.time()
 
 # Singleton instance
 _translation_service = None

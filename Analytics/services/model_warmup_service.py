@@ -35,7 +35,7 @@ class ModelPreloadConfig:
         self.default_preload_models = [
             "phi3:3.8b",
             "llama3.1:8b",
-            "qwen2:3b"
+            "qwen2:latest"
         ]
 
 

@@ -202,7 +202,7 @@ class TranslationServiceTestCase(TestCase):
         mock_llm_service = Mock()
         mock_llm_service.is_available.return_value = True
         mock_llm_service.client = Mock()
-        mock_llm_service.translation_model = "qwen2:3b"
+        mock_llm_service.translation_model = "qwen2:latest"
         
         # Mock successful translation response
         mock_response = {

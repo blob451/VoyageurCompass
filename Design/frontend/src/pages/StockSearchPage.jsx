@@ -57,7 +57,7 @@ import { analysisLogger } from '../utils/logger';
 const StockSearchPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const [searchTicker, setSearchTicker] = useState('');
   const [analysisData, setAnalysisData] = useState(null);
   const [error, setError] = useState('');
@@ -127,10 +127,11 @@ const StockSearchPage = () => {
     const analysisStartTime = performance.now();
     try {
       analysisLogger.stage(targetSymbol, 'API Request Initiated');
-      const result = await analyzeStock({ 
+      const result = await analyzeStock({
         symbol: targetSymbol.toUpperCase(),
         includeExplanation,
-        explanationDetail
+        explanationDetail,
+        language: i18n.language
       });
       
       if (result.error) {

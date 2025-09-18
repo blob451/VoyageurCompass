@@ -17,6 +17,15 @@ from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
+# Import translation service for enhanced multilingual capabilities
+try:
+    from Analytics.services.translation_service import get_translation_service
+    TRANSLATION_SERVICE_AVAILABLE = True
+except ImportError:
+    logger.info("Translation service not available - using built-in translation")
+    TRANSLATION_SERVICE_AVAILABLE = False
+    get_translation_service = lambda: None
+
 # Import monitoring components (graceful degradation if monitoring not available)
 try:
     from Analytics.monitoring.llm_monitor import llm_operation_monitor, llm_logger
@@ -24,7 +33,7 @@ try:
 except ImportError:
     logger.info("LLM monitoring not available - operating without monitoring")
     MONITORING_AVAILABLE = False
-    llm_operation_monitor = lambda func: func  # No-op decorator
+    llm_operation_monitor = lambda func: func
 
 # Conditional import for ollama - graceful degradation in CI/testing environments
 try:
@@ -47,7 +56,7 @@ class LLMCircuitBreaker:
         self.recovery_timeout = recovery_timeout
         self.failure_count = 0
         self.last_failure_time = None
-        self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+        self.state = "CLOSED"
 
     def call_llm(self, func, *args, **kwargs):
         """Circuit breaker wrapper for LLM calls."""
@@ -109,7 +118,6 @@ class LLMPerformanceMonitor:
             else:
                 self.metrics["cache_misses"] += 1
 
-            # Track model usage
             if model in self.metrics["model_usage_stats"]:
                 self.metrics["model_usage_stats"][model] += 1
             else:
@@ -120,7 +128,8 @@ class LLMPerformanceMonitor:
     def get_recent_performance(self, window_minutes: int = 10) -> Dict[str, float]:
         """Get recent performance metrics for load balancing decisions."""
         # For simplicity, use last N generations as "recent"
-        recent_generations = self.metrics["generation_times"][-10:]  # Last 10 generations
+        recent_limit = getattr(settings, 'RECENT_GENERATIONS_LIMIT', 10)
+        recent_generations = self.metrics["generation_times"][-recent_limit:]
 
         if not recent_generations:
             return {"avg_generation_time": 0, "recent_error_rate": 0, "sample_size": 0}
@@ -171,6 +180,90 @@ class SentimentEnhancedPromptBuilder:
             "eps": "earnings per share",
             "pe": "price-to-earnings ratio",
         }
+
+        # Prompt template cache for performance optimization
+        self._template_cache = {}
+        self._template_cache_max_size = getattr(settings, 'TEMPLATE_CACHE_MAX_SIZE', 100)
+
+        # Static template parts that don't change based on data
+        self._static_templates = {
+            "detailed_base": """**Investment Recommendation:** Clear BUY/HOLD/SELL decision with confidence level (1-10)
+
+**Technical Analysis Summary:** Key technical indicators and signals analysis
+
+**Risk Analysis:** Main risks, challenges, and risk mitigation strategies
+
+**Market Context:** Price outlook, catalysts, and market environment factors""",
+
+            "standard_base": "Provide a professional {expected_rec} recommendation for {symbol} in 100-120 words including:\n- Clear {expected_rec} decision with confidence level\n- 2-3 key supporting technical factors\n- Primary risk consideration\n- Brief market outlook\nEnsure complete sentences.",
+
+            "multilingual_fr": {
+                "buy": "ACHAT",
+                "hold": "CONSERVATION",
+                "sell": "VENTE",
+                "recommendation": "Recommandation d'investissement",
+                "technical_analysis": "Analyse technique"
+            },
+
+            "multilingual_es": {
+                "buy": "COMPRA",
+                "hold": "MANTENER",
+                "sell": "VENTA",
+                "recommendation": "Recomendación de inversión",
+                "technical_analysis": "Análisis técnico"
+            }
+        }
+
+    def _get_template_cache_key(self, detail_level: str, language: str, has_sentiment: bool = False) -> str:
+        """Generate cache key for prompt templates."""
+        return f"template_{detail_level}_{language}_{has_sentiment}"
+
+    def _cache_template(self, cache_key: str, template: str) -> None:
+        """Cache a prompt template with size management."""
+        if len(self._template_cache) >= self._template_cache_max_size:
+            # Remove oldest entries (simple FIFO eviction)
+            oldest_key = next(iter(self._template_cache))
+            del self._template_cache[oldest_key]
+
+        self._template_cache[cache_key] = template
+
+    def _get_cached_template(self, cache_key: str) -> Optional[str]:
+        """Retrieve cached template if available."""
+        return self._template_cache.get(cache_key)
+
+    def _build_static_instruction_template(self, detail_level: str, language: str = "en") -> str:
+        """Build static instruction template that can be cached."""
+        if language == "en":
+            if detail_level == "detailed":
+                return self._static_templates["detailed_base"]
+            else:  # standard
+                return self._static_templates["standard_base"]
+        elif language == "fr":
+            terms = self._static_templates["multilingual_fr"]
+            if detail_level == "detailed":
+                return f"""**{terms['recommendation']}:** Décision claire {terms['buy']}/{terms['hold']}/{terms['sell']} avec niveau de confiance (1-10)
+
+**{terms['technical_analysis']}:** Analyse des indicateurs techniques clés et signaux
+
+**Analyse des risques:** Risques principaux, défis et stratégies d'atténuation des risques
+
+**Contexte du marché:** Perspectives de prix, catalyseurs et facteurs d'environnement du marché"""
+            else:  # standard
+                return f"Fournissez une recommandation professionnelle pour {{symbol}} en 100-120 mots incluant :\n- Décision claire {{expected_rec}} avec niveau de confiance\n- 2-3 facteurs techniques clés de soutien\n- Considération de risque principal\n- Perspective de marché brève\nAssurez-vous d'utiliser des phrases complètes."
+        elif language == "es":
+            terms = self._static_templates["multilingual_es"]
+            if detail_level == "detailed":
+                return f"""**{terms['recommendation']}:** Decisión clara {terms['buy']}/{terms['hold']}/{terms['sell']} con nivel de confianza (1-10)
+
+**{terms['technical_analysis']}:** Análisis de indicadores técnicos clave y señales
+
+**Análisis de riesgos:** Riesgos principales, desafíos y estrategias de mitigación de riesgos
+
+**Contexto del mercado:** Perspectivas de precios, catalizadores y factores del entorno del mercado"""
+            else:  # standard
+                return f"Proporcione una recomendación profesional para {{symbol}} en 100-120 palabras incluyendo:\n- Decisión clara {{expected_rec}} con nivel de confianza\n- 2-3 factores técnicos clave de apoyo\n- Consideración de riesgo principal\n- Perspectiva de mercado breve\nAsegúrese de usar oraciones completas."
+
+        return self._static_templates["standard_base"]
 
     def build_sentiment_aware_prompt(
         self,
@@ -273,7 +366,7 @@ class SentimentEnhancedPromptBuilder:
     def _build_enhanced_instruction(
         self, symbol: str, score: float, detail_level: str, sentiment_data: Optional[Dict[str, Any]]
     ) -> str:
-        """Build enhanced instruction section with sentiment awareness and consistency rules."""
+        """Build enhanced instruction section with sentiment awareness and cached template optimization."""
 
         # Determine consistent recommendation based on score
         if score >= 7:
@@ -306,55 +399,178 @@ class SentimentEnhancedPromptBuilder:
                 elif (score >= 6.5 and sentiment_score < -0.2) or (score <= 4.5 and sentiment_score > 0.2):
                     sentiment_alignment = " Address the divergence between technical analysis and market sentiment."
 
-        # Consistency rules application
-        consistency_rules = f"""
+        # Try to get cached template
+        cache_key = self._get_template_cache_key(detail_level, "en", sentiment_influence)
+        cached_template = self._get_cached_template(cache_key)
+
+        if cached_template:
+            # Use cached template and fill in dynamic content
+            instruction = cached_template.format(
+                score=score,
+                expected_rec=expected_rec,
+                symbol=symbol,
+                sentiment_label=sentiment_data.get('sentimentLabel', 'neutral') if sentiment_data else 'neutral'
+            )
+        else:
+            # Build template and cache it
+            consistency_rules = """
 IMPORTANT: Based on the {score}/10 score, your recommendation MUST be {expected_rec}.
 - Scores 7-10 = BUY
 - Scores 4-6.9 = HOLD
 - Scores 0-3.9 = SELL"""
 
-        # Detail-level instruction with word count targets
-        if detail_level == "summary":
-            instruction = f"{consistency_rules}\n\nProvide a clear {expected_rec} recommendation for {symbol} with the primary reason. Target: 50-60 words for complete sentences."
-            if sentiment_influence:
-                instruction += sentiment_alignment
+            # Detail-level instruction with word count targets
+            if detail_level == "summary":
+                template = f"{consistency_rules}\n\nProvide a clear {{expected_rec}} recommendation for {{symbol}} with the primary reason. Target: 50-60 words for complete sentences."
+                if sentiment_influence:
+                    template += " Consider the sentiment context in your analysis."
 
-        elif detail_level == "detailed":
-            instruction = f"""{consistency_rules}
+            elif detail_level == "detailed":
+                template = f"""{consistency_rules}
 
-Generate a comprehensive {expected_rec} analysis for {symbol} in 250-300 words using this structure:
+Generate a comprehensive {{expected_rec}} analysis for {{symbol}} in 250-300 words using this structure:
 
-**Investment Thesis:** Clear {expected_rec} recommendation with confidence level and core reasoning
+**Investment Thesis:** Clear {{expected_rec}} recommendation with confidence level and core reasoning
 
-**Technical Indicators:** Detailed analysis of key indicators supporting the {expected_rec} decision
+**Technical Indicators:** Detailed analysis of key indicators supporting the {{expected_rec}} decision
 
 **Risk Analysis:** Main risks, challenges, and risk mitigation strategies
 
 **Market Context:** Price outlook, catalysts, and market environment factors"""
 
-            if sentiment_influence:
-                instruction += f"""
+                if sentiment_influence:
+                    template += """
 
-**Sentiment Impact:** How current market sentiment ({sentiment_data.get('sentimentLabel', 'neutral')}) affects the analysis"""
+**Sentiment Impact:** How current market sentiment ({sentiment_label}) affects the analysis"""
 
-            instruction += f"\n\nUse professional investment research language. Ensure all sections support the {expected_rec} recommendation."
-            if sentiment_influence and sentiment_alignment:
-                instruction += sentiment_alignment
+                template += "\n\nUse professional investment research language. Ensure all sections support the {expected_rec} recommendation."
 
-        else:  # standard
-            instruction = f"""{consistency_rules}
+            else:  # standard
+                template = f"""{consistency_rules}
 
-Provide a professional {expected_rec} recommendation for {symbol} in 100-120 words including:
-- Clear {expected_rec} decision with confidence level
+Provide a professional {{expected_rec}} recommendation for {{symbol}} in 100-120 words including:
+- Clear {{expected_rec}} decision with confidence level
 - 2-3 key supporting technical factors
 - Primary risk consideration
 - Brief market outlook
 Ensure complete sentences."""
-            if sentiment_influence:
-                instruction += "\n- How current market sentiment affects the outlook"
-                instruction += sentiment_alignment
+
+            # Cache the template
+            self._cache_template(cache_key, template)
+
+            # Apply template with dynamic values
+            instruction = template.format(
+                score=score,
+                expected_rec=expected_rec,
+                symbol=symbol,
+                sentiment_label=sentiment_data.get('sentimentLabel', 'neutral') if sentiment_data else 'neutral'
+            )
+
+        # Add sentiment alignment if applicable
+        if sentiment_influence and sentiment_alignment:
+            instruction += sentiment_alignment
 
         return instruction
+
+    def build_multilingual_prompt(
+        self,
+        analysis_data: Dict[str, Any],
+        sentiment_data: Optional[Dict[str, Any]],
+        detail_level: str,
+        language: str = "en"
+    ) -> str:
+        """
+        Build multilingual prompt with sentiment integration and template caching.
+
+        Args:
+            analysis_data: Technical analysis data
+            sentiment_data: FinBERT sentiment analysis results
+            detail_level: Level of detail for explanation
+            language: Target language code (en, fr, es)
+
+        Returns:
+            Language-specific prompt string with sentiment context
+        """
+        if language == "en":
+            return self.build_sentiment_aware_prompt(
+                analysis_data, sentiment_data, detail_level, "technical_analysis"
+            )
+
+        # Extract key information for multilingual prompt construction
+        symbol = analysis_data.get("symbol", "UNKNOWN")
+        score = analysis_data.get("score_0_10", 0)
+
+        # Try to get cached multilingual template
+        cache_key = self._get_template_cache_key(detail_level, language, sentiment_data is not None)
+        cached_template = self._get_cached_template(cache_key)
+
+        if cached_template:
+            # Use cached template and fill in dynamic content
+            base_prompt = cached_template.format(
+                symbol=symbol,
+                score=score,
+                sentiment_label=sentiment_data.get('sentimentLabel', 'neutral') if sentiment_data else 'neutral'
+            )
+        else:
+            # Build and cache multilingual template
+            if language == "fr":
+                template = "Analysez les données techniques pour {symbol} (Score: {score}/10)"
+                if sentiment_data:
+                    template += "\nContexte de sentiment: Sentiment du marché - {sentiment_label}"
+            elif language == "es":
+                template = "Analice los datos técnicos para {symbol} (Puntuación: {score}/10)"
+                if sentiment_data:
+                    template += "\nContexto de sentimiento: Sentimiento del mercado - {sentiment_label}"
+            else:
+                template = "Analyze technical data for {symbol} (Score: {score}/10)"
+                if sentiment_data:
+                    template += "\nSentiment Context: Market sentiment - {sentiment_label}"
+
+            # Cache the template
+            self._cache_template(cache_key, template)
+
+            # Apply template with dynamic values
+            base_prompt = template.format(
+                symbol=symbol,
+                score=score,
+                sentiment_label=sentiment_data.get('sentimentLabel', 'neutral') if sentiment_data else 'neutral'
+            )
+
+        # Add detailed sentiment context if available (dynamic part that doesn't get cached)
+        if sentiment_data:
+            sentiment_score = sentiment_data.get("sentimentScore", 0)
+            sentiment_confidence = sentiment_data.get("sentimentConfidence", 0)
+
+            if language == "fr":
+                sentiment_detail = f"\nScore de sentiment: {sentiment_score:.2f} (Confiance: {sentiment_confidence:.2f})"
+            elif language == "es":
+                sentiment_detail = f"\nPuntuación de sentimiento: {sentiment_score:.2f} (Confianza: {sentiment_confidence:.2f})"
+            else:
+                sentiment_detail = f"\nSentiment score: {sentiment_score:.2f} (Confidence: {sentiment_confidence:.2f})"
+
+            base_prompt += sentiment_detail
+
+        return base_prompt
+
+    def _get_top_indicators(self, analysis_data: Dict[str, Any], limit: int = 3) -> str:
+        """Extract top indicators for prompt optimisation."""
+        weighted_scores = analysis_data.get("weighted_scores", {})
+        if not weighted_scores:
+            return "technical analysis"
+
+        # Get top indicators by absolute value
+        sorted_indicators = sorted(weighted_scores.items(), key=lambda x: abs(x[1]), reverse=True)[:limit]
+        if not sorted_indicators:
+            return "technical analysis"
+
+        # Clean indicator names
+        indicator_names = []
+        for indicator, value in sorted_indicators:
+            clean_name = indicator.replace("w_", "").replace("_", " ")
+            direction = " (bullish)" if value > 0 else " (bearish)" if value < 0 else " (neutral)"
+            indicator_names.append(f"{clean_name}{direction}")
+
+        return ", ".join(indicator_names)
 
 
 class ConfidenceAdaptiveGeneration:
@@ -548,7 +764,7 @@ class LocalLLMService:
         self.summary_model = getattr(settings, "OLLAMA_SUMMARY_MODEL", "phi3:3.8b")
         self.standard_model = getattr(settings, "OLLAMA_STANDARD_MODEL", "phi3:3.8b")
         self.detailed_model = getattr(settings, "OLLAMA_DETAILED_MODEL", "llama3.1:8b")
-        self.translation_model = getattr(settings, "OLLAMA_TRANSLATION_MODEL", "qwen2:3b")
+        self.translation_model = getattr(settings, "OLLAMA_TRANSLATION_MODEL", "qwen2:latest")
         
         # Legacy model hierarchy for backward compatibility
         self.primary_model = getattr(settings, "OLLAMA_PRIMARY_MODEL", "llama3.1:8b")
@@ -581,6 +797,10 @@ class LocalLLMService:
         self.security_enabled = getattr(settings, "LLM_SECURITY_ENABLED", True)
         self.resource_management_enabled = getattr(settings, "LLM_RESOURCE_MANAGEMENT_ENABLED", True)
 
+        # Translation service integration for Phase 3
+        self._translation_service = None
+        self.enhanced_translation_enabled = getattr(settings, "LLM_ENHANCED_TRANSLATION_ENABLED", True)
+
         # Circuit breaker, monitoring and health service initialisation
         self.circuit_breaker = LLMCircuitBreaker()
         self.performance_monitor = LLMPerformanceMonitor()
@@ -605,8 +825,8 @@ class LocalLLMService:
         self.multilingual_enabled = getattr(settings, "MULTILINGUAL_LLM_ENABLED", True)
         self.language_models = getattr(settings, "LLM_MODELS_BY_LANGUAGE", {
             'en': 'llama3.1:8b',
-            'fr': 'qwen2:3b',
-            'es': 'qwen2:3b',
+            'fr': 'qwen2:latest',
+            'es': 'qwen2:latest',
         })
         self.supported_languages = list(self.language_models.keys())
         self.default_language = getattr(settings, "DEFAULT_USER_LANGUAGE", "en")
@@ -622,6 +842,27 @@ class LocalLLMService:
         # Cultural formatting configuration
         self.cultural_formatting_enabled = getattr(settings, "CULTURAL_FORMATTING_ENABLED", True)
         self.financial_formatting = getattr(settings, "FINANCIAL_FORMATTING", {})
+
+        # Dynamic TTL learning system initialization
+        self._access_patterns = {}  # Track access patterns per cache key pattern
+        self._ttl_performance = {}  # Track TTL effectiveness
+        self._access_pattern_lock = threading.Lock()
+        self.ttl_learning_enabled = getattr(settings, "DYNAMIC_TTL_LEARNING_ENABLED", True)
+        self.min_samples_for_learning = getattr(settings, "TTL_MIN_SAMPLES_FOR_LEARNING", 10)
+        self.ttl_adaptation_rate = getattr(settings, "TTL_ADAPTATION_RATE", 0.1)  # 10% adjustment rate
+
+        # Parallel generation configuration
+        self.parallel_generation_enabled = getattr(settings, "PARALLEL_MULTILINGUAL_GENERATION_ENABLED", True)
+        self.max_parallel_languages = getattr(settings, "MAX_PARALLEL_LANGUAGES", 3)
+        self.parallel_generation_timeout = getattr(settings, "PARALLEL_GENERATION_TIMEOUT", 120)  # 2 minutes
+
+        # Model preloading configuration
+        self.model_preloading_enabled = getattr(settings, "MODEL_PRELOADING_ENABLED", True)
+        self.preload_timeout = getattr(settings, "MODEL_PRELOAD_TIMEOUT", 30)  # 30 seconds
+        self.preload_retry_attempts = getattr(settings, "MODEL_PRELOAD_RETRY_ATTEMPTS", 2)
+        self._preloaded_models = set()  # Track successfully preloaded models
+        self._preload_lock = threading.Lock()
+        self._preload_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="model-preload")
 
         # Client initialisation deferred to lazy property
 
@@ -641,6 +882,14 @@ class LocalLLMService:
     def client(self, value):
         """Set the client (mainly for testing purposes)."""
         self._client = value
+
+    @property
+    def translation_service(self):
+        """Lazy-loaded translation service for enhanced multilingual support."""
+        if self._translation_service is None and TRANSLATION_SERVICE_AVAILABLE and self.enhanced_translation_enabled:
+            logger.info("Initializing enhanced translation service for LocalLLMService")
+            self._translation_service = get_translation_service()
+        return self._translation_service
 
     def _initialise_client_with_retry(self):
         """Initialize Ollama client connection with retry logic."""
@@ -945,6 +1194,7 @@ class LocalLLMService:
         sentiment_data: Optional[Dict[str, Any]] = None,
         detail_level: str = "standard",
         explanation_type: str = "technical_analysis",
+        language: str = "en",
     ) -> Optional[Dict[str, Any]]:
         """
         Generate sentiment-enhanced natural language explanation for financial analysis.
@@ -955,6 +1205,7 @@ class LocalLLMService:
             sentiment_data: Dictionary containing FinBERT sentiment analysis results
             detail_level: 'summary', 'standard', or 'detailed'
             explanation_type: Type of explanation to generate
+            language: Target language code (en, fr, es, etc.)
 
         Returns:
             Dictionary with enhanced explanation content or None if failed
@@ -963,9 +1214,24 @@ class LocalLLMService:
             logger.warning("Local LLM service not available")
             return None
 
+        # Delegate to multilingual method if non-English language requested
+        if language != "en" and hasattr(self, 'multilingual_enabled') and self.multilingual_enabled:
+            logger.info(f"[SENTIMENT+MULTILINGUAL] Using multilingual method for language: {language}")
+            # For non-English, use standard multilingual method (sentiment integration could be added later)
+            result = self.generate_multilingual_explanation(analysis_data, language, detail_level, explanation_type)
+            if result:
+                # Add sentiment data to the result if available
+                if sentiment_data:
+                    result["sentiment_data"] = sentiment_data
+                    result["sentiment_enhanced"] = True
+                return result
+            else:
+                logger.warning(f"[SENTIMENT+MULTILINGUAL] Failed to generate in {language}, falling back to English")
+                language = "en"
+
         # Sentiment-enhanced cache key generation
         cache_key = self._create_sentiment_enhanced_cache_key(
-            analysis_data, sentiment_data, detail_level, explanation_type
+            analysis_data, sentiment_data, detail_level, explanation_type, language
         )
         dynamic_ttl = self._get_sentiment_aware_ttl(analysis_data, sentiment_data)
 
@@ -974,7 +1240,12 @@ class LocalLLMService:
         if cached_result:
             logger.info(f"Retrieved sentiment-enhanced explanation from cache (TTL: {dynamic_ttl}s)")
             self.performance_monitor.record_generation(0, "cache", True, cache_hit=True)
+            # Record cache hit for TTL learning
+            self._record_cache_access(cache_key, was_hit=True, ttl_used=dynamic_ttl)
             return cached_result
+
+        # Record cache miss for TTL learning
+        self._record_cache_access(cache_key, was_hit=False, ttl_used=dynamic_ttl)
 
         try:
             # Calculate complexity and select optimal model
@@ -1100,6 +1371,7 @@ class LocalLLMService:
         analysis_data: Dict[str, Any],
         detail_level: str = "standard",
         explanation_type: str = "technical_analysis",
+        language: str = "en",
     ) -> Optional[Dict[str, Any]]:
         """
         Generate natural language explanation for financial analysis.
@@ -1108,6 +1380,7 @@ class LocalLLMService:
             analysis_data: Dictionary containing analysis results
             detail_level: 'summary', 'standard', or 'detailed'
             explanation_type: Type of explanation to generate
+            language: Target language code (en, fr, es, etc.)
 
         Returns:
             Dictionary with explanation content or None if failed
@@ -1120,24 +1393,42 @@ class LocalLLMService:
         if not analysis_data:
             logger.error("[VALIDATION] Analysis data is empty or None")
             return None
-            
+
         if detail_level not in ["summary", "standard", "detailed"]:
             logger.warning(f"[VALIDATION] Invalid detail level '{detail_level}', defaulting to 'standard'")
             detail_level = "standard"
-            
-        symbol = analysis_data.get("symbol", "UNKNOWN")
-        logger.info(f"[GENERATION START] Generating {detail_level} explanation for {symbol}")
 
-        # Create cache key with dynamic TTL
-        cache_key = self._create_cache_key(analysis_data, detail_level, explanation_type)
-        dynamic_ttl = self._get_dynamic_ttl(analysis_data)
+        symbol = analysis_data.get("symbol", "UNKNOWN")
+        logger.info(f"[GENERATION START] Generating {detail_level} explanation for {symbol} in language: {language}")
+
+        # Delegate to multilingual method if non-English language requested
+        if language != "en" and hasattr(self, 'multilingual_enabled') and self.multilingual_enabled:
+            logger.info(f"[MULTILINGUAL] Delegating to multilingual method for language: {language}")
+            result = self.generate_multilingual_explanation(analysis_data, language, detail_level, explanation_type)
+            if result:
+                # Ensure consistent result format
+                if "content" not in result and "explanation" in result:
+                    result["content"] = result["explanation"]
+                return result
+            else:
+                logger.warning(f"[MULTILINGUAL] Failed to generate in {language}, falling back to English")
+                language = "en"  # Fall back to English processing
+
+        # Create cache key with language-aware TTL
+        cache_key = self._create_cache_key(analysis_data, detail_level, explanation_type, language)
+        dynamic_ttl = self._get_language_aware_ttl(analysis_data, language, cache_key)
 
         # Cache verification
         cached_result = cache.get(cache_key)
         if cached_result:
             logger.info(f"Retrieved explanation from cache (TTL: {dynamic_ttl}s)")
             self.performance_monitor.record_generation(0, "cache", True, cache_hit=True)
+            # Record cache hit for TTL learning
+            self._record_cache_access(cache_key, was_hit=True, ttl_used=dynamic_ttl)
             return cached_result
+
+        # Record cache miss for TTL learning
+        self._record_cache_access(cache_key, was_hit=False, ttl_used=dynamic_ttl)
 
         try:
             # Calculate complexity and select optimal model
@@ -1263,6 +1554,170 @@ class LocalLLMService:
 
         except Exception:
             return 180  # Default 3 minutes
+
+    def _get_language_aware_ttl(self, analysis_data: Dict[str, Any], language: str = "en", cache_key: str = "") -> int:
+        """Calculate language-aware TTL based on usage patterns and language frequency with adaptive learning."""
+        try:
+            # Start with base TTL from technical analysis
+            base_ttl = self._get_dynamic_ttl(analysis_data)
+
+            # Language-specific TTL adjustments
+            language_multipliers = {
+                'en': 1.0,    # English: baseline TTL
+                'fr': 1.8,    # French: 80% longer (less frequent access)
+                'es': 1.6,    # Spanish: 60% longer (moderate access)
+            }
+
+            # Apply language multiplier
+            multiplier = language_multipliers.get(language, 1.5)  # Default 50% longer for other languages
+            language_ttl = int(base_ttl * multiplier)
+
+            # Apply adaptive TTL learning if cache key is provided
+            if cache_key and self.ttl_learning_enabled:
+                language_ttl = self._calculate_adaptive_ttl(language_ttl, cache_key)
+
+            # Ensure reasonable bounds
+            min_ttl = 120   # 2 minutes minimum
+            max_ttl = 3600  # 1 hour maximum
+
+            return max(min_ttl, min(language_ttl, max_ttl))
+
+        except Exception:
+            # Fallback: longer TTL for non-English
+            return 300 if language == 'en' else 450
+
+    def _get_cache_key_pattern(self, cache_key: str) -> str:
+        """Extract pattern from cache key for access pattern tracking."""
+        # Remove specific identifiers to create a pattern
+        # Example: "llm_detailed_AAPL_7.5_en" -> "llm_detailed_*_*_en"
+        parts = cache_key.split('_')
+        if len(parts) >= 4:
+            # Keep first, second, and last parts, replace middle with wildcards
+            pattern = f"{parts[0]}_{parts[1]}_*_*_{parts[-1]}" if len(parts) >= 5 else f"{parts[0]}_{parts[1]}_*_*"
+            return pattern
+        return cache_key
+
+    def _record_cache_access(self, cache_key: str, was_hit: bool, ttl_used: int):
+        """Record cache access pattern for TTL learning."""
+        if not self.ttl_learning_enabled:
+            return
+
+        try:
+            with self._access_pattern_lock:
+                pattern = self._get_cache_key_pattern(cache_key)
+                current_time = time.time()
+
+                # Initialize pattern tracking if needed
+                if pattern not in self._access_patterns:
+                    self._access_patterns[pattern] = {
+                        'total_accesses': 0,
+                        'cache_hits': 0,
+                        'cache_misses': 0,
+                        'last_access_time': current_time,
+                        'access_intervals': [],
+                        'ttl_effectiveness': []
+                    }
+
+                pattern_data = self._access_patterns[pattern]
+                pattern_data['total_accesses'] += 1
+
+                if was_hit:
+                    pattern_data['cache_hits'] += 1
+                else:
+                    pattern_data['cache_misses'] += 1
+
+                # Track access intervals for frequency analysis
+                if pattern_data['last_access_time']:
+                    interval = current_time - pattern_data['last_access_time']
+                    pattern_data['access_intervals'].append(interval)
+                    # Keep only last 20 intervals to prevent memory bloat
+                    if len(pattern_data['access_intervals']) > 20:
+                        pattern_data['access_intervals'] = pattern_data['access_intervals'][-20:]
+
+                pattern_data['last_access_time'] = current_time
+
+                # Track TTL effectiveness (was the TTL appropriate?)
+                if was_hit:
+                    # Cache hit suggests TTL was appropriate or too short
+                    pattern_data['ttl_effectiveness'].append({'ttl': ttl_used, 'effective': True, 'time': current_time})
+                else:
+                    # Cache miss might suggest TTL was too short (if accessed recently)
+                    pattern_data['ttl_effectiveness'].append({'ttl': ttl_used, 'effective': False, 'time': current_time})
+
+                # Keep only last 15 effectiveness records
+                if len(pattern_data['ttl_effectiveness']) > 15:
+                    pattern_data['ttl_effectiveness'] = pattern_data['ttl_effectiveness'][-15:]
+
+        except Exception as e:
+            logger.debug(f"Error recording cache access pattern: {e}")
+
+    def _calculate_adaptive_ttl(self, base_ttl: int, cache_key: str) -> int:
+        """Calculate adaptive TTL based on learned access patterns."""
+        if not self.ttl_learning_enabled:
+            return base_ttl
+
+        try:
+            with self._access_pattern_lock:
+                pattern = self._get_cache_key_pattern(cache_key)
+
+                if pattern not in self._access_patterns:
+                    return base_ttl
+
+                pattern_data = self._access_patterns[pattern]
+
+                # Need sufficient samples for learning
+                if pattern_data['total_accesses'] < self.min_samples_for_learning:
+                    return base_ttl
+
+                # Calculate cache hit rate
+                hit_rate = pattern_data['cache_hits'] / pattern_data['total_accesses']
+
+                # Calculate average access interval
+                intervals = pattern_data['access_intervals']
+                if not intervals:
+                    return base_ttl
+
+                avg_interval = sum(intervals) / len(intervals)
+
+                # Analyze TTL effectiveness
+                effectiveness_data = pattern_data['ttl_effectiveness']
+                if len(effectiveness_data) < 5:
+                    return base_ttl
+
+                recent_effectiveness = effectiveness_data[-5:]
+                effectiveness_rate = sum(1 for e in recent_effectiveness if e['effective']) / len(recent_effectiveness)
+
+                # Adaptive TTL calculation logic
+                adaptive_ttl = base_ttl
+
+                # If access interval is much shorter than current TTL, we can cache longer
+                if avg_interval > base_ttl * 1.5 and hit_rate > 0.7:
+                    # Accessed infrequently but high hit rate - can increase TTL
+                    adaptive_ttl = int(base_ttl * (1 + self.ttl_adaptation_rate))
+                elif avg_interval < base_ttl * 0.5 and hit_rate < 0.5:
+                    # Accessed frequently but low hit rate - decrease TTL
+                    adaptive_ttl = int(base_ttl * (1 - self.ttl_adaptation_rate))
+                elif effectiveness_rate < 0.4:
+                    # Low effectiveness suggests TTL needs adjustment
+                    if hit_rate < 0.5:
+                        # Low hit rate with low effectiveness - decrease TTL
+                        adaptive_ttl = int(base_ttl * (1 - self.ttl_adaptation_rate * 0.5))
+                    else:
+                        # High hit rate but low effectiveness - might increase TTL slightly
+                        adaptive_ttl = int(base_ttl * (1 + self.ttl_adaptation_rate * 0.3))
+
+                # Apply reasonable bounds
+                min_ttl = base_ttl // 2  # Don't go below 50% of base TTL
+                max_ttl = base_ttl * 3   # Don't exceed 300% of base TTL
+                adaptive_ttl = max(min_ttl, min(adaptive_ttl, max_ttl))
+
+                logger.debug(f"[TTL LEARNING] Pattern: {pattern}, Base: {base_ttl}s, Adaptive: {adaptive_ttl}s, Hit Rate: {hit_rate:.2f}, Avg Interval: {avg_interval:.1f}s")
+
+                return adaptive_ttl
+
+        except Exception as e:
+            logger.debug(f"Error calculating adaptive TTL: {e}")
+            return base_ttl
 
     def _build_optimized_prompt(self, analysis_data: Dict[str, Any], detail_level: str, explanation_type: str) -> str:
         """Build optimized prompt with explicit score-based consistency rules."""
@@ -2152,29 +2607,61 @@ Broader market context and sector trends support the overall investment outlook 
             logger.warning(f"[QUALITY FAILURE] All retry attempts failed for {detail_level} mode")
             return "Error: Unable to generate quality explanation", 0.1, {"is_valid": False, "issues": ["All generation attempts failed"]}
 
-    def _create_cache_key(self, analysis_data: Dict[str, Any], detail_level: str, explanation_type: str) -> str:
-        """Create a cache key for explanation results."""
-        # Use symbol, score, and key indicator values for cache key
+    def _create_cache_key(self, analysis_data: Dict[str, Any], detail_level: str, explanation_type: str, language: str = "en") -> str:
+        """Create a cache key for explanation results with optimized precision."""
+        # Use language-neutral technical base + language suffix
+        base_key = self._create_language_neutral_key(analysis_data, detail_level, explanation_type)
+
+        # Add language suffix for language-specific content
+        return f"{base_key}_{language}"
+
+    def _adaptive_precision(self, value: float, context: str) -> float:
+        """Apply adaptive precision based on context to maximize cache hits."""
+        if context == "score":
+            # Round scores to 0.5 increments for better clustering
+            # 7.2 -> 7.0, 7.6 -> 7.5, 6.8 -> 7.0
+            return round(value * 2) / 2
+        elif context == "indicator":
+            # Round indicators to 0.05 increments for better clustering
+            # 0.147 -> 0.15, 0.123 -> 0.10
+            return round(value * 20) / 20
+        elif context == "complexity":
+            # Round complexity to 1.0 increments for coarser grouping
+            # 4.7 -> 5.0, 3.2 -> 3.0
+            return round(value)
+        else:
+            # Default: round to 1 decimal place
+            return round(value, 1)
+
+    def _create_language_neutral_key(self, analysis_data: Dict[str, Any], detail_level: str, explanation_type: str) -> str:
+        """Create language-neutral cache key with adaptive precision for optimal cache hits."""
         symbol = analysis_data.get("symbol", "UNKNOWN")
         score = analysis_data.get("score_0_10", 0)
 
-        # Create a detailed hash of the analysis data
-        data_str = f"{symbol}_{score:.2f}_{detail_level}_{explanation_type}"
+        # Apply adaptive precision to score for better cache clustering
+        adaptive_score = self._adaptive_precision(score, "score")
+        data_str = f"{symbol}_{adaptive_score:.1f}_{detail_level}_{explanation_type}"
 
-        # Add all weighted scores for more specific caching
+        # Add simplified weighted scores with adaptive precision
         indicators = analysis_data.get("weighted_scores", {})
         if indicators:
-            # Sort indicators for consistent cache keys
+            # Sort indicators for consistent cache keys and apply adaptive precision
             sorted_indicators = sorted(indicators.items())
             for key, value in sorted_indicators:
-                # Include value with precision for uniqueness
-                data_str += f"_{key}_{value:.4f}"
+                # Apply adaptive precision to indicators for better clustering
+                adaptive_value = self._adaptive_precision(value, "indicator")
+                data_str += f"_{key}_{adaptive_value:.2f}"
 
-        # Add complexity score for additional uniqueness
+        # Complexity score with adaptive precision
         complexity = self._calculate_complexity_score(analysis_data)
-        data_str += f"_complexity_{complexity:.3f}"
+        adaptive_complexity = self._adaptive_precision(complexity, "complexity")
+        data_str += f"_complexity_{adaptive_complexity:.1f}"
 
-        return f"llm_explanation_{hashlib.blake2b(data_str.encode(), digest_size=16).hexdigest()}"
+        return f"llm_base_{hashlib.blake2b(data_str.encode(), digest_size=16).hexdigest()}"
+
+    def _create_language_specific_key(self, base_key: str, language: str, content_type: str = "explanation") -> str:
+        """Create language-specific cache key for translations and generated content."""
+        return f"{content_type}_{language}_{base_key}"
 
     def _create_sentiment_enhanced_cache_key(
         self,
@@ -2182,6 +2669,7 @@ Broader market context and sector trends support the overall investment outlook 
         sentiment_data: Optional[Dict[str, Any]],
         detail_level: str,
         explanation_type: str,
+        language: str = "en",
     ) -> str:
         """
         Create cache key for sentiment-enhanced explanations.
@@ -2191,12 +2679,13 @@ Broader market context and sector trends support the overall investment outlook 
             sentiment_data: Sentiment analysis data
             detail_level: Level of detail
             explanation_type: Type of explanation
+            language: Target language code
 
         Returns:
             Enhanced cache key string
         """
-        # Start with base cache key
-        base_key_data = self._create_cache_key(analysis_data, detail_level, explanation_type)
+        # Start with language-neutral base cache key
+        base_key_data = self._create_language_neutral_key(analysis_data, detail_level, explanation_type)
 
         # Add sentiment context
         sentiment_suffix = ""
@@ -2223,8 +2712,8 @@ Broader market context and sector trends support the overall investment outlook 
         Returns:
             Cache TTL in seconds
         """
-        # Start with base TTL from technical analysis
-        base_ttl = self._get_dynamic_ttl(analysis_data)
+        # Start with language-aware TTL from technical analysis
+        base_ttl = self._get_language_aware_ttl(analysis_data, language)
 
         # Adjust based on sentiment characteristics
         if sentiment_data:
@@ -2552,9 +3041,25 @@ Broader market context and sector trends support the overall investment outlook 
             # Generate native language explanation
             if target_language == "en":
                 result = self._generate_native_explanation(
-                    analysis_data, detail_level, explanation_type, model_name, target_language
+                    analysis_data, detail_level, explanation_type, model_name, target_language, None
+                )
+            elif target_language in ["fr", "es"]:
+                # Phase 2: Direct native generation for all modes with appropriate models
+                logger.info(f"[PHASE 2] Using direct native generation for {target_language} {detail_level} mode")
+
+                # Select appropriate model based on detail level
+                if detail_level == "detailed":
+                    native_model = self.detailed_model  # llama3.1:8b for detailed
+                elif detail_level == "standard":
+                    native_model = self.detailed_model  # Use llama3.1:8b for better French support
+                else:  # summary
+                    native_model = self.detailed_model  # Use llama3.1:8b for better French support
+
+                result = self._generate_native_explanation(
+                    analysis_data, detail_level, explanation_type, native_model, target_language, None
                 )
             else:
+                # Use translation for unsupported languages only
                 result = self._generate_translated_explanation(
                     analysis_data, detail_level, explanation_type, model_name, target_language
                 )
@@ -2580,12 +3085,13 @@ Broader market context and sector trends support the overall investment outlook 
         explanation_type: str,
         model_name: str,
         language: str,
+        sentiment_data: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Generate explanation directly in the target language."""
         try:
             # Build language-specific prompt
             prompt = self._build_multilingual_prompt(
-                analysis_data, detail_level, explanation_type, language
+                analysis_data, detail_level, explanation_type, language, sentiment_data
             )
 
             # Generate with language-specific model
@@ -2622,30 +3128,53 @@ Broader market context and sector trends support the overall investment outlook 
         model_name: str,
         target_language: str,
     ) -> Optional[Dict[str, Any]]:
-        """Generate explanation and translate to target language."""
+        """Generate explanation and translate to target language with enhanced translation flow."""
         try:
             # First generate in English
             english_result = self.generate_explanation(analysis_data, detail_level, explanation_type)
 
-            if not english_result or not english_result.get("explanation"):
+            if not english_result or not english_result.get("content"):
+                logger.warning(f"Failed to generate English explanation for translation to {target_language}")
                 return None
 
-            # Translate to target language
+            # Use enhanced translation flow (with TranslationService + fallback)
             translated_explanation = self._translate_text(
-                english_result["explanation"], target_language, model_name
+                english_result["content"], target_language, model_name
             )
 
             if translated_explanation:
-                return {
-                    "explanation": translated_explanation,
+                # Build enhanced result with translation metadata
+                result = {
+                    "content": translated_explanation,
                     "language": target_language,
                     "model_used": model_name,
                     "detail_level": detail_level,
                     "explanation_type": explanation_type,
-                    "generation_method": "translated",
+                    "generation_method": "enhanced_translation",
                     "original_language": "en",
                     "timestamp": datetime.now().isoformat(),
+                    "word_count": len(translated_explanation.split()),
+                    "confidence_score": english_result.get("confidence_score", 0.8),
                 }
+
+                # Add translation service metadata if available
+                if self.translation_service and self.enhanced_translation_enabled:
+                    result["translation_service_used"] = True
+                    result["fallback_translation"] = False
+                else:
+                    result["translation_service_used"] = False
+                    result["fallback_translation"] = True
+
+                return result
+            else:
+                # Translation failed completely - return English content with warning
+                logger.warning(f"Translation to {target_language} failed completely, returning English content")
+                result = english_result.copy()
+                result["language"] = "en"  # Mark as English
+                result["translation_failed"] = True
+                result["requested_language"] = target_language
+                result["generation_method"] = "english_fallback"
+                return result
 
         except Exception as e:
             logger.error(f"Error in translated explanation generation for {target_language}: {str(e)}")
@@ -2653,11 +3182,35 @@ Broader market context and sector trends support the overall investment outlook 
         return None
 
     def _translate_text(self, text: str, target_language: str, model_name: str) -> Optional[str]:
-        """Translate text to target language using financial terminology mapping."""
+        """Enhanced translation using TranslationService with fallback to built-in translation."""
         if not self.translation_enabled:
             return text
 
+        # Try enhanced translation service first (Phase 3)
+        if self.translation_service and self.enhanced_translation_enabled:
+            try:
+                logger.info(f"Using enhanced translation service for {target_language}")
+                translation_result = self.translation_service.translate_explanation(
+                    english_text=text,
+                    target_language=target_language,
+                    context={
+                        "model_name": model_name,
+                        "source": "llm_translation"
+                    }
+                )
+
+                if translation_result and translation_result.get("translated_text"):
+                    logger.info(f"Enhanced translation successful for {target_language}")
+                    return translation_result["translated_text"]
+                else:
+                    logger.warning(f"Enhanced translation failed for {target_language}, falling back to built-in")
+
+            except Exception as e:
+                logger.error(f"Enhanced translation service error for {target_language}: {str(e)}")
+
+        # Fallback to built-in translation (original implementation)
         try:
+            logger.info(f"Using built-in translation for {target_language}")
             # Build translation prompt with financial terminology context
             financial_terms = self.financial_terminology.get(target_language, {})
 
@@ -2684,10 +3237,11 @@ Broader market context and sector trends support the overall investment outlook 
             )
 
             if result and result.get("response"):
+                logger.info(f"Built-in translation successful for {target_language}")
                 return result["response"].strip()
 
         except Exception as e:
-            logger.error(f"Error translating text to {target_language}: {str(e)}")
+            logger.error(f"Error in built-in translation to {target_language}: {str(e)}")
 
         return None
 
@@ -2697,38 +3251,207 @@ Broader market context and sector trends support the overall investment outlook 
         detail_level: str,
         explanation_type: str,
         language: str,
+        sentiment_data: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Build language-specific prompt for native generation."""
+        """Build language-specific prompt for native generation with proper financial terminology."""
 
         # Base analysis information
         symbol = analysis_data.get("symbol", "N/A")
         price = analysis_data.get("currentPrice", 0)
+        score = analysis_data.get("score_0_10", 0)
+
+        # Determine recommendation based on score
+        if score >= 7:
+            recommendations = {"en": "BUY", "fr": "ACHAT", "es": "COMPRA"}
+        elif score >= 4:
+            recommendations = {"en": "HOLD", "fr": "CONSERVATION", "es": "MANTENER"}
+        else:
+            recommendations = {"en": "SELL", "fr": "VENTE", "es": "VENTA"}
+
+        recommendation = recommendations.get(language, "HOLD")
+
+        # Build technical context for multilingual prompts
+        technical_context = self._get_multilingual_technical_context(analysis_data, language)
+        sentiment_context = self._get_multilingual_sentiment_context(sentiment_data, language) if sentiment_data else ""
 
         # Language-specific prompt templates
         if language == "fr":
-            return f"""Analysez les données financières suivantes pour {symbol} et fournissez une explication détaillée en français:
+            if detail_level == "summary":
+                return f"""Analysez les données techniques pour {symbol} et fournissez une recommandation {recommendation} concise en français.
 
-Prix actuel: {price}
-Données d'analyse: {analysis_data}
+{technical_context}
+{sentiment_context}
 
-Niveau de détail requis: {detail_level}
-Type d'explication: {explanation_type}
+IMPORTANT: Votre recommandation DOIT être {recommendation} basée sur le score de {score}/10.
 
-Fournissez une analyse professionnelle en français utilisant la terminologie financière appropriée."""
+Fournissez une recommandation claire en 50-60 mots avec la raison principale. Utilisez la terminologie financière française professionnelle."""
+
+            elif detail_level == "detailed":
+                return f"""Analysez les données techniques pour {symbol} et générez une analyse d'investissement complète de 250-300 mots en français.
+
+{technical_context}
+{sentiment_context}
+
+IMPORTANT: Votre recommandation DOIT être {recommendation} basée sur le score de {score}/10.
+
+Structure requise:
+**Thèse d'investissement:** Recommandation {recommendation} claire avec niveau de confiance et raisonnement principal
+**Indicateurs techniques:** Analyse détaillée des indicateurs clés soutenant la décision {recommendation}
+**Analyse des risques:** Principaux risques, défis et stratégies d'atténuation
+**Contexte de marché:** Perspectives de prix, catalyseurs et facteurs environnementaux
+
+Utilisez un langage de recherche d'investissement professionnel français."""
+
+            else:  # standard
+                return f"""Analysez les données techniques pour {symbol} et fournissez une recommandation {recommendation} professionnelle en français.
+
+{technical_context}
+{sentiment_context}
+
+IMPORTANT: Votre recommandation DOIT être {recommendation} basée sur le score de {score}/10.
+
+Fournissez une recommandation {recommendation} professionnelle en 100-120 mots incluant:
+- Décision {recommendation} claire avec niveau de confiance
+- 2-3 facteurs techniques clés de soutien
+- Considération de risque principal
+- Perspective de marché brève
+
+Utilisez la terminologie financière française."""
 
         elif language == "es":
-            return f"""Analice los siguientes datos financieros para {symbol} y proporcione una explicación detallada en español:
+            if detail_level == "summary":
+                return f"""Analice los datos técnicos para {symbol} y proporcione una recomendación {recommendation} concisa en español.
 
-Precio actual: {price}
-Datos de análisis: {analysis_data}
+{technical_context}
+{sentiment_context}
 
-Nivel de detalle requerido: {detail_level}
-Tipo de explicación: {explanation_type}
+IMPORTANTE: Su recomendación DEBE ser {recommendation} basada en la puntuación de {score}/10.
 
-Proporcione un análisis profesional en español utilizando la terminología financiera apropiada."""
+Proporcione una recomendación clara en 50-60 palabras con la razón principal. Use terminología financiera española profesional."""
+
+            elif detail_level == "detailed":
+                return f"""Analice los datos técnicos para {symbol} y genere un análisis de inversión completo de 250-300 palabras en español.
+
+{technical_context}
+{sentiment_context}
+
+IMPORTANTE: Su recomendación DEBE ser {recommendation} basada en la puntuación de {score}/10.
+
+Estructura requerida:
+**Tesis de inversión:** Recomendación {recommendation} clara con nivel de confianza y razonamiento principal
+**Indicadores técnicos:** Análisis detallado de indicadores clave que apoyan la decisión {recommendation}
+**Análisis de riesgos:** Principales riesgos, desafíos y estrategias de mitigación
+**Contexto de mercado:** Perspectivas de precio, catalizadores y factores ambientales
+
+Use lenguaje de investigación de inversión profesional en español."""
+
+            else:  # standard
+                return f"""Analice los datos técnicos para {symbol} y proporcione una recomendación {recommendation} profesional en español.
+
+{technical_context}
+{sentiment_context}
+
+IMPORTANTE: Su recomendación DEBE ser {recommendation} basada en la puntuación de {score}/10.
+
+Proporcione una recomendación {recommendation} profesional en 100-120 palabras incluyendo:
+- Decisión {recommendation} clara con nivel de confianza
+- 2-3 factores técnicos clave de apoyo
+- Consideración de riesgo principal
+- Perspectiva de mercado breve
+
+Use terminología financiera española."""
 
         else:  # Default to English
-            return self._build_optimized_prompt(analysis_data, detail_level, explanation_type)
+            return self._build_optimized_prompt(analysis_data, detail_level, explanation_type, sentiment_data)
+
+    def _get_multilingual_technical_context(self, analysis_data: Dict[str, Any], language: str) -> str:
+        """Build technical analysis context in specified language."""
+        symbol = analysis_data.get("symbol", "UNKNOWN")
+        score = analysis_data.get("score_0_10", 0)
+        weighted_scores = analysis_data.get("weighted_scores", {})
+
+        # Get top indicators for context
+        top_indicators = []
+        if weighted_scores:
+            sorted_indicators = sorted(weighted_scores.items(), key=lambda x: abs(x[1]), reverse=True)[:3]
+            for indicator, value in sorted_indicators:
+                clean_name = indicator.replace("w_", "").upper()
+                strength = abs(value)
+                direction = "bullish" if value > 0 else "bearish"
+
+                if language == "fr":
+                    direction_fr = "haussier" if value > 0 else "baissier"
+                    strength_fr = "fort" if strength > 0.15 else "modéré" if strength > 0.08 else "faible"
+                    top_indicators.append(f"{clean_name}: signal {direction_fr} {strength_fr}")
+                elif language == "es":
+                    direction_es = "alcista" if value > 0 else "bajista"
+                    strength_es = "fuerte" if strength > 0.15 else "moderado" if strength > 0.08 else "débil"
+                    top_indicators.append(f"{clean_name}: señal {direction_es} {strength_es}")
+                else:
+                    strength_en = "strong" if strength > 0.15 else "moderate" if strength > 0.08 else "weak"
+                    top_indicators.append(f"{clean_name}: {strength_en} {direction} signal")
+
+        # Build context string
+        if language == "fr":
+            context = f"Analyse technique pour {symbol} (Score: {score}/10)\n"
+            context += f"Indicateurs principaux: {', '.join(top_indicators)}" if top_indicators else "Données techniques limitées"
+        elif language == "es":
+            context = f"Análisis técnico para {symbol} (Puntuación: {score}/10)\n"
+            context += f"Indicadores principales: {', '.join(top_indicators)}" if top_indicators else "Datos técnicos limitados"
+        else:
+            context = f"Technical analysis for {symbol} (Score: {score}/10)\n"
+            context += f"Key indicators: {', '.join(top_indicators)}" if top_indicators else "Limited technical data"
+
+        return context
+
+    def _get_multilingual_sentiment_context(self, sentiment_data: Dict[str, Any], language: str) -> str:
+        """Build sentiment analysis context in specified language."""
+        if not sentiment_data:
+            return ""
+
+        sentiment_score = sentiment_data.get("sentimentScore", 0)
+        sentiment_confidence = sentiment_data.get("sentimentConfidence", 0)
+        sentiment_label = sentiment_data.get("sentimentLabel", "neutral")
+        news_count = sentiment_data.get("newsCount", 0)
+
+        # Map sentiment labels to different languages
+        sentiment_labels = {
+            "positive": {"fr": "positif", "es": "positivo", "en": "positive"},
+            "negative": {"fr": "négatif", "es": "negativo", "en": "negative"},
+            "neutral": {"fr": "neutre", "es": "neutral", "en": "neutral"}
+        }
+
+        # Map confidence levels
+        if sentiment_confidence >= 0.8:
+            confidence_desc = {"fr": "très confiant", "es": "muy confiado", "en": "highly confident"}
+        elif sentiment_confidence >= 0.6:
+            confidence_desc = {"fr": "modérément confiant", "es": "moderadamente confiado", "en": "moderately confident"}
+        else:
+            confidence_desc = {"fr": "incertain", "es": "incierto", "en": "uncertain"}
+
+        sentiment_label_localized = sentiment_labels.get(sentiment_label, {}).get(language, sentiment_label)
+        confidence_localized = confidence_desc.get(language, "uncertain")
+
+        if language == "fr":
+            context = f"\nAnalyse de sentiment du marché:\n"
+            context += f"- Sentiment actuel: {sentiment_label_localized.upper()} ({sentiment_score:+.2f})\n"
+            context += f"- Niveau de confiance: {confidence_localized} ({sentiment_confidence:.2f})"
+            if news_count > 0:
+                context += f"\n- Basé sur {news_count} articles récents"
+        elif language == "es":
+            context = f"\nAnálisis de sentimiento del mercado:\n"
+            context += f"- Sentimiento actual: {sentiment_label_localized.upper()} ({sentiment_score:+.2f})\n"
+            context += f"- Nivel de confianza: {confidence_localized} ({sentiment_confidence:.2f})"
+            if news_count > 0:
+                context += f"\n- Basado en {news_count} artículos recientes"
+        else:
+            context = f"\nMarket sentiment analysis:\n"
+            context += f"- Current sentiment: {sentiment_label_localized.upper()} ({sentiment_score:+.2f})\n"
+            context += f"- Confidence level: {confidence_localized} ({sentiment_confidence:.2f})"
+            if news_count > 0:
+                context += f"\n- Based on {news_count} recent articles"
+
+        return context
 
     def _get_language_specific_options(self, language: str, detail_level: str) -> Dict[str, Any]:
         """Get generation options optimized for specific language."""
@@ -2786,9 +3509,9 @@ Proporcione un análisis profesional en español utilizando la terminología fin
         detail_level: str,
         explanation_type: str,
     ) -> str:
-        """Create cache key for multilingual explanations."""
-        base_key = self._create_cache_key(analysis_data, detail_level, explanation_type)
-        return f"multilingual_{language}_{base_key}"
+        """Create optimized cache key for multilingual explanations."""
+        base_key = self._create_language_neutral_key(analysis_data, detail_level, explanation_type)
+        return self._create_language_specific_key(base_key, language, "multilingual")
 
     def get_supported_languages(self) -> List[str]:
         """Get list of supported languages."""
@@ -2797,6 +3520,373 @@ Proporcione un análisis profesional en español utilizando la terminología fin
     def is_language_supported(self, language: str) -> bool:
         """Check if a language is supported."""
         return language in self.supported_languages
+
+    def _generate_single_language_explanation(self, analysis_data: Dict[str, Any], detail_level: str, explanation_type: str, language: str) -> Tuple[str, Optional[Dict[str, Any]]]:
+        """Generate explanation for a single language. Returns (language, result) tuple."""
+        try:
+            logger.info(f"[PARALLEL] Starting generation for language: {language}")
+            start_time = time.time()
+
+            result = self.generate_multilingual_explanation(
+                analysis_data, detail_level, explanation_type, language
+            )
+
+            generation_time = time.time() - start_time
+            logger.info(f"[PARALLEL] Completed {language} generation in {generation_time:.2f}s")
+
+            return (language, result)
+        except Exception as e:
+            logger.error(f"[PARALLEL] Error generating {language} explanation: {str(e)}")
+            return (language, None)
+
+    def generate_parallel_multilingual_explanations(
+        self,
+        analysis_data: Dict[str, Any],
+        detail_level: str = "standard",
+        explanation_type: str = "technical_analysis",
+        languages: Optional[List[str]] = None
+    ) -> Dict[str, Optional[Dict[str, Any]]]:
+        """
+        Generate explanations for multiple languages in parallel.
+
+        Args:
+            analysis_data: Dictionary containing analysis results
+            detail_level: 'summary', 'standard', or 'detailed'
+            explanation_type: Type of explanation to generate
+            languages: List of language codes to generate (default: all supported)
+
+        Returns:
+            Dictionary mapping language codes to explanation results
+        """
+        if not self.parallel_generation_enabled:
+            logger.info("[PARALLEL] Parallel generation disabled, falling back to sequential")
+            results = {}
+            for lang in (languages or self.supported_languages):
+                results[lang] = self.generate_multilingual_explanation(
+                    analysis_data, detail_level, explanation_type, lang
+                )
+            return results
+
+        if not self.is_available():
+            logger.warning("[PARALLEL] Local LLM service not available")
+            return {}
+
+        # Use provided languages or all supported languages
+        target_languages = languages or self.supported_languages
+
+        # Limit number of parallel languages to prevent resource exhaustion
+        if len(target_languages) > self.max_parallel_languages:
+            logger.warning(f"[PARALLEL] Limiting parallel languages from {len(target_languages)} to {self.max_parallel_languages}")
+            target_languages = target_languages[:self.max_parallel_languages]
+
+        logger.info(f"[PARALLEL] Starting parallel generation for languages: {target_languages}")
+        start_time = time.time()
+
+        # Check cache first for all languages
+        cached_results = {}
+        pending_languages = []
+
+        for language in target_languages:
+            cache_key = self._create_multilingual_cache_key(analysis_data, language, detail_level, explanation_type)
+            cached_result = cache.get(cache_key)
+
+            if cached_result:
+                logger.info(f"[PARALLEL] Found cached result for {language}")
+                cached_results[language] = cached_result
+            else:
+                pending_languages.append(language)
+
+        # If all results are cached, return immediately
+        if not pending_languages:
+            logger.info(f"[PARALLEL] All results cached, returning in {time.time() - start_time:.2f}s")
+            return cached_results
+
+        # Generate remaining languages in parallel
+        logger.info(f"[PARALLEL] Generating {len(pending_languages)} languages in parallel: {pending_languages}")
+
+        generated_results = {}
+
+        try:
+            with ThreadPoolExecutor(max_workers=min(len(pending_languages), 3), thread_name_prefix="parallel-llm") as executor:
+                # Submit generation tasks
+                future_to_language = {
+                    executor.submit(
+                        self._generate_single_language_explanation,
+                        analysis_data, detail_level, explanation_type, language
+                    ): language for language in pending_languages
+                }
+
+                # Collect results with timeout
+                for future in future_to_language:
+                    try:
+                        language, result = future.result(timeout=self.parallel_generation_timeout)
+                        if result:
+                            generated_results[language] = result
+                            logger.info(f"[PARALLEL] Successfully generated {language} explanation")
+                        else:
+                            logger.warning(f"[PARALLEL] Failed to generate {language} explanation")
+                            generated_results[language] = None
+                    except FutureTimeoutError:
+                        language = future_to_language[future]
+                        logger.error(f"[PARALLEL] Timeout generating {language} explanation after {self.parallel_generation_timeout}s")
+                        generated_results[language] = None
+                    except Exception as e:
+                        language = future_to_language[future]
+                        logger.error(f"[PARALLEL] Error in {language} generation future: {str(e)}")
+                        generated_results[language] = None
+
+        except Exception as e:
+            logger.error(f"[PARALLEL] Error in parallel execution: {str(e)}")
+            # Fallback to sequential generation for pending languages
+            for language in pending_languages:
+                try:
+                    result = self.generate_multilingual_explanation(
+                        analysis_data, detail_level, explanation_type, language
+                    )
+                    generated_results[language] = result
+                except Exception as fallback_error:
+                    logger.error(f"[PARALLEL] Fallback generation failed for {language}: {str(fallback_error)}")
+                    generated_results[language] = None
+
+        # Combine cached and generated results
+        all_results = {**cached_results, **generated_results}
+
+        total_time = time.time() - start_time
+        successful_count = sum(1 for result in all_results.values() if result is not None)
+
+        logger.info(f"[PARALLEL] Completed parallel generation in {total_time:.2f}s: {successful_count}/{len(target_languages)} successful")
+
+        return all_results
+
+    def generate_parallel_explanations_with_fallback(
+        self,
+        analysis_data: Dict[str, Any],
+        detail_level: str = "standard",
+        explanation_type: str = "technical_analysis",
+        primary_language: str = "en",
+        fallback_languages: Optional[List[str]] = None
+    ) -> Dict[str, Optional[Dict[str, Any]]]:
+        """
+        Generate explanations with primary language and fallback options in parallel.
+
+        Args:
+            analysis_data: Dictionary containing analysis results
+            detail_level: 'summary', 'standard', or 'detailed'
+            explanation_type: Type of explanation to generate
+            primary_language: Primary language to ensure we get a result
+            fallback_languages: Additional languages to try in parallel
+
+        Returns:
+            Dictionary mapping language codes to explanation results
+        """
+        if fallback_languages is None:
+            fallback_languages = [lang for lang in self.supported_languages if lang != primary_language]
+
+        all_languages = [primary_language] + fallback_languages
+
+        # Generate all languages in parallel
+        results = self.generate_parallel_multilingual_explanations(
+            analysis_data, detail_level, explanation_type, all_languages
+        )
+
+        # Ensure we have at least the primary language result
+        if not results.get(primary_language):
+            logger.warning(f"[PARALLEL] Primary language {primary_language} failed, attempting fallback generation")
+            try:
+                primary_result = self.generate_explanation(
+                    analysis_data, detail_level, explanation_type, primary_language
+                )
+                results[primary_language] = primary_result
+            except Exception as e:
+                logger.error(f"[PARALLEL] Fallback generation for {primary_language} failed: {str(e)}")
+
+        return results
+
+    def _preload_single_model(self, model_name: str) -> bool:
+        """Preload a single model by making a lightweight test call."""
+        try:
+            logger.info(f"[PRELOAD] Starting preload for model: {model_name}")
+            start_time = time.time()
+
+            if not self.client:
+                logger.warning(f"[PRELOAD] Client not available for preloading {model_name}")
+                return False
+
+            # Make a minimal test generation to load the model into memory
+            response = self.client.generate(
+                model=model_name,
+                prompt="test",
+                options={
+                    "num_predict": 1,  # Generate only 1 token
+                    "temperature": 0.1,
+                    "top_p": 0.9,
+                    "stop": ["test"]  # Stop immediately
+                }
+            )
+
+            load_time = time.time() - start_time
+
+            if response and response.get('response'):
+                with self._preload_lock:
+                    self._preloaded_models.add(model_name)
+                logger.info(f"[PRELOAD] Successfully preloaded {model_name} in {load_time:.2f}s")
+                return True
+            else:
+                logger.warning(f"[PRELOAD] No response from {model_name} during preload")
+                return False
+
+        except Exception as e:
+            logger.error(f"[PRELOAD] Failed to preload {model_name}: {str(e)}")
+            return False
+
+    def preload_models(self, models: Optional[List[str]] = None, background: bool = True) -> Dict[str, bool]:
+        """
+        Preload specified models or commonly used models.
+
+        Args:
+            models: List of model names to preload (defaults to frequently used models)
+            background: Whether to preload in background threads
+
+        Returns:
+            Dictionary mapping model names to preload success status
+        """
+        if not self.model_preloading_enabled:
+            logger.info("[PRELOAD] Model preloading disabled")
+            return {}
+
+        if not self.is_available():
+            logger.warning("[PRELOAD] LLM service not available for preloading")
+            return {}
+
+        # Use provided models or determine commonly used models
+        if models is None:
+            models = list(set([
+                self.detailed_model,     # llama3.1:8b
+                self.standard_model,     # phi3:3.8b
+                self.translation_model,  # qwen2:latest
+            ]))
+
+        # Remove already preloaded models
+        with self._preload_lock:
+            models_to_preload = [m for m in models if m not in self._preloaded_models]
+
+        if not models_to_preload:
+            logger.info("[PRELOAD] All requested models already preloaded")
+            return {model: True for model in models}
+
+        logger.info(f"[PRELOAD] Starting preload for {len(models_to_preload)} models: {models_to_preload}")
+
+        results = {}
+
+        if background and len(models_to_preload) > 1:
+            # Preload multiple models in parallel
+            logger.info(f"[PRELOAD] Using background preloading for {len(models_to_preload)} models")
+
+            future_to_model = {}
+            try:
+                for model in models_to_preload:
+                    future = self._preload_executor.submit(self._preload_single_model, model)
+                    future_to_model[future] = model
+
+                # Collect results with timeout
+                for future in future_to_model:
+                    model = future_to_model[future]
+                    try:
+                        success = future.result(timeout=self.preload_timeout)
+                        results[model] = success
+                        if success:
+                            logger.info(f"[PRELOAD] Background preload successful for {model}")
+                        else:
+                            logger.warning(f"[PRELOAD] Background preload failed for {model}")
+                    except FutureTimeoutError:
+                        logger.error(f"[PRELOAD] Timeout preloading {model} after {self.preload_timeout}s")
+                        results[model] = False
+                    except Exception as e:
+                        logger.error(f"[PRELOAD] Error in background preload for {model}: {str(e)}")
+                        results[model] = False
+
+            except Exception as e:
+                logger.error(f"[PRELOAD] Error in background preload execution: {str(e)}")
+                # Fallback to sequential preloading
+                for model in models_to_preload:
+                    if model not in results:
+                        results[model] = self._preload_single_model(model)
+        else:
+            # Sequential preloading
+            logger.info(f"[PRELOAD] Using sequential preloading for {len(models_to_preload)} models")
+            for model in models_to_preload:
+                results[model] = self._preload_single_model(model)
+
+        # Add already preloaded models to results
+        with self._preload_lock:
+            for model in models:
+                if model in self._preloaded_models and model not in results:
+                    results[model] = True
+
+        successful_preloads = sum(1 for success in results.values() if success)
+        logger.info(f"[PRELOAD] Completed preloading: {successful_preloads}/{len(models)} models successful")
+
+        return results
+
+    def is_model_preloaded(self, model_name: str) -> bool:
+        """Check if a model has been preloaded."""
+        with self._preload_lock:
+            return model_name in self._preloaded_models
+
+    def get_preloaded_models(self) -> List[str]:
+        """Get list of currently preloaded models."""
+        with self._preload_lock:
+            return list(self._preloaded_models)
+
+    def preload_for_languages(self, languages: Optional[List[str]] = None, background: bool = True) -> Dict[str, bool]:
+        """
+        Preload models for specific languages.
+
+        Args:
+            languages: List of language codes (defaults to supported languages)
+            background: Whether to preload in background
+
+        Returns:
+            Dictionary mapping model names to preload success status
+        """
+        if languages is None:
+            languages = self.supported_languages
+
+        # Get unique models for the specified languages
+        models_to_preload = []
+        for language in languages:
+            model = self.get_language_model(language)
+            if model not in models_to_preload:
+                models_to_preload.append(model)
+
+        logger.info(f"[PRELOAD] Preloading models for languages {languages}: {models_to_preload}")
+        return self.preload_models(models_to_preload, background)
+
+    def preload_common_models(self, background: bool = True) -> Dict[str, bool]:
+        """
+        Preload commonly used models based on usage patterns.
+
+        Args:
+            background: Whether to preload in background
+
+        Returns:
+            Dictionary mapping model names to preload success status
+        """
+        # Common models based on typical usage patterns
+        common_models = [
+            self.detailed_model,      # Most resource-intensive, preload first
+            self.standard_model,      # Most frequently used
+            self.translation_model,   # Used for multilingual
+        ]
+
+        # Remove duplicates while preserving order
+        unique_models = []
+        for model in common_models:
+            if model not in unique_models:
+                unique_models.append(model)
+
+        logger.info(f"[PRELOAD] Preloading common models: {unique_models}")
+        return self.preload_models(unique_models, background)
 
     def get_language_model(self, language: str) -> str:
         """Get the model assigned to a specific language."""

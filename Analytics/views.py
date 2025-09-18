@@ -155,6 +155,7 @@ def analyze_stock(request, symbol):
         sync: Whether to sync data before analysis (default: false)
         include_explanation: Generate explanation using local LLaMA model (default: false)
         explanation_detail: Explanation detail level (summary/standard/detailed, default: standard)
+        language: Language for explanation (en/fr/es, default: en)
 
     Returns:
         Comprehensive analysis with trading signals and optional explanations
@@ -169,6 +170,7 @@ def analyze_stock(request, symbol):
     sync = request.query_params.get("sync", "false").lower() == "true"
     include_explanation = request.query_params.get("include_explanation", "false").lower() == "true"
     explanation_detail = request.query_params.get("explanation_detail", "standard")
+    language = request.query_params.get("language", "en")
 
     # Parameters validated
 
@@ -314,6 +316,7 @@ def analyze_stock(request, symbol):
                         from Analytics.services.explanation_service import (
                             get_explanation_service,
                         )
+                        from Analytics.services.language_detector import detect_request_language
 
                         explanation_service = get_explanation_service()
 
@@ -323,9 +326,20 @@ def analyze_stock(request, symbol):
                             levels = existing.get("levels", {})
 
                             if "summary" not in levels or not levels["summary"].get("content"):
+                                # Smart language detection for auto-generation
+                                # Priority: explicit query param > user preferences > request headers
+                                detected_language = detect_request_language(
+                                    request,
+                                    request.user,
+                                    explicit_language=language if language != "en" else None
+                                )
+
+                                # Use detected language for auto-generation
+                                auto_language = detected_language if detected_language in ["fr", "es"] else language
+                                logger.info(f"[AUTO-GENERATION] Using language '{auto_language}' for summary auto-generation (query: {language}, detected: {detected_language})")
 
                                 result = explanation_service.explain_prediction_single(
-                                    saved_analysis, detail_level="summary", user=request.user
+                                    saved_analysis, detail_level="summary", user=request.user, language=auto_language
                                 )
 
                                 if result:
