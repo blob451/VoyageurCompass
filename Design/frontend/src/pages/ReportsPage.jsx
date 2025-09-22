@@ -119,15 +119,15 @@ const ReportsPage = () => {
   const handleRunNewAnalysis = (symbol) => {
     try {
       if (symbol) {
-        navigate('/stocks', { 
-          state: { searchTicker: symbol, autoAnalyze: true } 
+        navigate('/', {
+          state: { searchTicker: symbol, autoAnalyze: true }
         });
       } else {
-        navigate('/stocks');
+        navigate('/');
       }
     } catch (error) {
       console.error('Error navigating to stocks page:', error);
-      navigate('/stocks');
+      navigate('/');
     }
   };
 
@@ -170,7 +170,7 @@ const ReportsPage = () => {
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={() => navigate('/stocks')}
+          onClick={() => navigate('/')}
           sx={{ minWidth: 180 }}
         >
           {t('reports.createNewReport')}
@@ -369,7 +369,7 @@ const ReportsPage = () => {
               <Button
                 variant="contained"
                 startIcon={<Add />}
-                onClick={() => navigate('/stocks')}
+                onClick={() => navigate('/')}
               >
                 {t('reports.createFirstReport')}
               </Button>

@@ -192,6 +192,21 @@ def analyze_stock(request, symbol):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # Credit check and deduction
+    try:
+        user_profile = request.user.profile
+        if not user_profile.has_credits(1):
+            return Response(
+                {"error": "Insufficient credits. Please purchase more credits to continue."},
+                status=status.HTTP_402_PAYMENT_REQUIRED
+            )
+        logger.info(f"Credit check passed for user {request.user.username}. Current credits: {user_profile.credits}")
+    except AttributeError:
+        return Response(
+            {"error": "User profile not found. Please contact support."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
     # Sync data if explicitly requested (auto-sync is now handled by the engine)
     if sync:
         period = f"{months}mo" if months <= 12 else "2y"
@@ -589,6 +604,10 @@ def analyze_stock(request, symbol):
                 f"analysis_history:{request.user.id}:50:0:all:{','.join(sorted(['id', 'symbol', 'name', 'score', 'analysis_date', 'sector', 'industry', 'horizon', 'composite_raw']))}",
             ]
         )
+
+        # Deduct credit after successful analysis
+        user_profile.subtract_credits(1)
+        logger.info(f"Deducted 1 credit from user {request.user.username}. Remaining credits: {user_profile.credits}")
 
         return Response(response_data)
 

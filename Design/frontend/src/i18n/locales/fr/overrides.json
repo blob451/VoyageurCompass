@@ -1,0 +1,19 @@
+{
+  "interface": {
+    "welcome": "Bienvenue à VoyageurCompass",
+    "subtitle": "Votre guide intelligent pour les investissements boursiers",
+    "search_placeholder": "Rechercher une action (ex: AAPL, MSFT, TSLA)",
+    "analyze_button": "Analyser",
+    "loading": "Analyse en cours...",
+    "error": "Erreur lors de l'analyse",
+    "retry": "Réessayer"
+  },
+  "analysis": {
+    "recommendation": "Recommandation",
+    "score": "Score",
+    "explanation": "Explication",
+    "technical_indicators": "Indicateurs techniques",
+    "sentiment_analysis": "Analyse de sentiment",
+    "risk_warning": "Avertissement : Ceci est uniquement à des fins d'information. Consultez un conseiller financier professionnel avant de prendre des décisions d'investissement."
+  }
+}

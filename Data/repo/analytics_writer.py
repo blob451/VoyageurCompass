@@ -110,18 +110,18 @@ class AnalyticsWriter:
                     "score_0_10": score_0_10,
                     "updated_at": timezone.now(),
                     # Add sentiment fields if present in components
-                    "sentimentScore": components.get("sentiment", {}).get("raw", {}).get("sentiment"),
-                    "sentimentLabel": components.get("sentiment", {}).get("raw", {}).get("label"),
-                    "sentimentConfidence": components.get("sentiment", {}).get("raw", {}).get("confidence"),
-                    "newsCount": components.get("sentiment", {}).get("raw", {}).get("newsCount", 0),
-                    "sentimentSources": components.get("sentiment", {}).get("raw", {}).get("sources", {}),
+                    "sentimentScore": ((components or {}).get("sentiment", {}).get("raw", {}).get("sentiment")) if components else None,
+                    "sentimentLabel": ((components or {}).get("sentiment", {}).get("raw", {}).get("label")) if components else None,
+                    "sentimentConfidence": ((components or {}).get("sentiment", {}).get("raw", {}).get("confidence")) if components else None,
+                    "newsCount": ((components or {}).get("sentiment", {}).get("raw", {}).get("newsCount", 0)) if components else 0,
+                    "sentimentSources": ((components or {}).get("sentiment", {}).get("raw", {}).get("sources", {})) if components else {},
                     # Add LSTM prediction fields if present in components
-                    "prediction_1d": components.get("prediction", {}).get("raw", {}).get("predicted_price"),
+                    "prediction_1d": ((components or {}).get("prediction", {}).get("raw", {}).get("predicted_price")) if components else None,
                     "prediction_7d": None,  # Not implemented yet
                     "prediction_30d": None,  # Not implemented yet
-                    "prediction_confidence": components.get("prediction", {}).get("raw", {}).get("confidence"),
-                    "model_version": components.get("prediction", {}).get("raw", {}).get("model_version"),
-                    "prediction_timestamp": timezone.now() if components.get("prediction", {}).get("raw") else None,
+                    "prediction_confidence": ((components or {}).get("prediction", {}).get("raw", {}).get("confidence")) if components else None,
+                    "model_version": ((components or {}).get("prediction", {}).get("raw", {}).get("model_version")) if components else None,
+                    "prediction_timestamp": timezone.now() if components and ((components or {}).get("prediction", {}).get("raw")) else None,
                 },
             )
 

@@ -66,7 +66,7 @@
     "analysisHorizon": "Horizon d'Analyse",
     "rawScore": "Score Brut",
     "standard": "Standard",
-    "analysisPerformed": "Cette analyse a été effectuée le {{date}} en utilisant 12 indicateurs techniques avec une méthodologie de notation pondérée.",
+    "analysisPerformed": "Cette analyse a été effectuée le {{date}} en utilisant 14 indicateurs techniques avec une méthodologie de notation pondérée.",
     "aiExplanations": "Explications d'Analyse IA",
     "multiModelActive": "IA Multi-Modèle Active",
     "serviceUnavailable": "Service Indisponible",
@@ -108,13 +108,13 @@
     "analysisComponentContributions": "Contributions des Composants d'Analyse",
     "analysisFramework": "Cadre d'Analyse",
     "compositeScoring": "Notation Composite",
-    "compositeScoringDesc": "12 indicateurs techniques avec contributions pondérées au score final",
+    "compositeScoringDesc": "14 indicateurs techniques avec contributions pondérées au score final",
     "multiTimeframeAnalysis": "Analyse Multi-Temporelle",
     "multiTimeframeDesc": "Signaux techniques à court, moyen et long terme",
     "riskAssessment": "Évaluation des Risques",
     "riskAssessmentDesc": "Considération de la volatilité, momentum et sentiment du marché",
     "analysisMethodology": "Méthodologie d'Analyse",
-    "methodologyDesc": "Cette analyse technique utilise un cadre complet incorporant 12 indicateurs techniques incluant les moyennes mobiles (SMA), oscillateurs de momentum (RSI), indicateurs de tendance (MACD), mesures de volatilité (Bandes de Bollinger), analyse de volume, et patterns de chandeliers. Chaque indicateur est pondéré selon sa précision prédictive historique et combiné pour produire un score d'investissement composite."
+    "methodologyDesc": "Cette analyse technique utilise un cadre complet incorporant 14 indicateurs techniques incluant les moyennes mobiles (SMA), oscillateurs de momentum (RSI), indicateurs de tendance (MACD), mesures de volatilité (Bandes de Bollinger), analyse de volume, et patterns de chandeliers. Chaque indicateur est pondéré selon sa précision prédictive historique et combiné pour produire un score d'investissement composite."
   },
   "recommendations": {
     "buy": "ACHAT",
@@ -297,7 +297,7 @@
       "welcomeBonus": "Bonus de Bienvenue",
       "welcomeBonusDesc": "5 crédits gratuits pour commencer",
       "professionalAnalysis": "Analyse Professionnelle",
-      "professionalAnalysisDesc": "12 indicateurs techniques par action",
+      "professionalAnalysisDesc": "14 indicateurs techniques par action",
       "securePlatform": "Plateforme Sécurisée",
       "securePlatformDesc": "Vos données sont protégées par la sécurité d'entreprise"
     },
@@ -322,7 +322,7 @@
     "switchToLightMode": "Passer au mode clair"
   },
   "stockSearch": {
-    "description": "Obtenez une analyse technique complète pour toute action avec 12 indicateurs professionnels",
+    "description": "Obtenez une analyse technique complète pour toute action avec 14 indicateurs professionnels",
     "availableCredits": "Crédits Disponibles",
     "creditEquation": "1 Crédit = 1 Analyse",
     "buyMoreCredits": "Acheter Plus de Crédits",
@@ -336,8 +336,8 @@
     "gettingLatestData": "Obtention des dernières données boursières de Yahoo Finance (cela peut prendre 10-30 secondes)",
     "autoAnalyzing": "Auto-analyse de {{symbol}}...",
     "analyzing": "Analyse de {{symbol}}...",
-    "dashboardTriggered": "Analyse déclenchée depuis le tableau de bord • Exécution de 12 indicateurs techniques • 1 crédit sera utilisé",
-    "runningIndicators": "Exécution de 12 indicateurs techniques",
+    "dashboardTriggered": "Analyse déclenchée depuis le tableau de bord • Exécution de 14 indicateurs techniques • 1 crédit sera utilisé",
+    "runningIndicators": "Exécution de 14 indicateurs techniques",
     "analysisComplete": "Analyse terminée pour {{symbol}}",
     "analysisSuccessful": "✅ Analyse terminée avec succès ! 1 crédit utilisé.",
     "viewFullReport": "Voir le Rapport Complet",
@@ -366,7 +366,7 @@
     "analyzeForCredit": "Analyser {{symbol}} pour 1 crédit ?",
     "creditWarning": "Cela utilisera 1 crédit de votre solde ({{credits}} restants)",
     "autoStartWarning": "L'analyse commencera automatiquement après confirmation",
-    "comprehensiveAnalysis": "Obtenez une analyse technique complète pour toute action avec 12 indicateurs professionnels",
+    "comprehensiveAnalysis": "Obtenez une analyse technique complète pour toute action avec 14 indicateurs professionnels",
     "technicalIndicatorFallback": "Indicateur technique",
     "enterTickerError": "Veuillez entrer un symbole boursier",
     "insufficientCreditsError": "Crédits insuffisants. Veuillez acheter plus de crédits pour continuer.",
@@ -483,7 +483,7 @@
     "hero": {
       "title": "VoyageurCompass",
       "subtitle": "Plateforme d'Analyse Financière Professionnelle",
-      "description": "Analyse boursière complète avec 12 indicateurs techniques, comparaisons sectorielles et informations intelligentes. Conçu avec Django, React et PostgreSQL pour une analyse financière de qualité professionnelle.",
+      "description": "Analyse boursière complète avec 14 indicateurs techniques, comparaisons sectorielles et informations intelligentes. Conçu avec Django, React et PostgreSQL pour une analyse financière de qualité professionnelle.",
       "getStarted": "Commencer",
       "goToDashboard": "Aller au Tableau de Bord",
       "login": "Connexion",
@@ -504,7 +504,7 @@
       "title": "Outils d'Analyse Financière Puissants",
       "technicalAnalysis": {
         "title": "Analyse Technique",
-        "description": "12 indicateurs avancés fournissant une analyse boursière complète avec des scores de 0-10",
+        "description": "14 indicateurs avancés fournissant une analyse boursière complète avec des scores de 0-10",
         "highlight": "IA Intégrée"
       },
       "stockComparison": {
@@ -589,7 +589,7 @@
     "subtitle": "Tout ce que vous devez savoir sur l'utilisation de VoyageurCompass",
     "stats": {
       "indicators": {
-        "title": "12 Indicateurs",
+        "title": "14 Indicateurs",
         "subtitle": "Analyse professionnelle"
       },
       "analysisTime": {
@@ -597,7 +597,7 @@
         "subtitle": "Temps d'analyse"
       },
       "pricing": {
-        "title": "1€ = 1 Analyse",
+        "title": "1 Crédit = 1 Analyse",
         "subtitle": "Tarification abordable"
       },
       "mobileSupport": {
@@ -630,7 +630,7 @@
     "features": {
       "technicalAnalysis": {
         "title": "Analyse Technique",
-        "description": "12 indicateurs complets fournissant une analyse boursière détaillée",
+        "description": "14 indicateurs complets fournissant une analyse boursière détaillée",
         "details": [
           "Analyse de tendance SMA50 vs SMA200",
           "Prix vs moyenne mobile 50 jours",
@@ -680,7 +680,7 @@
     },
     "technicalGuide": {
       "title": "Guide des Indicateurs Techniques",
-      "description": "Notre moteur d'analyse technique utilise 12 indicateurs professionnels pour générer un score complet (0-10) pour chaque action. Des scores plus élevés indiquent une performance technique plus forte.",
+      "description": "Notre moteur d'analyse technique utilise 14 indicateurs professionnels pour générer un score complet (0-10) pour chaque action. Des scores plus élevés indiquent une performance technique plus forte.",
       "indicators": [
         {
           "name": "SMA50 vs SMA200",
@@ -737,15 +737,15 @@
       "items": [
         {
           "question": "Qu'est-ce que VoyageurCompass ?",
-          "answer": "VoyageurCompass est une plateforme d'analyse financière complète qui fournit une analyse boursière de qualité professionnelle utilisant 12 indicateurs techniques. Conçu pour les étudiants et les professionnels, il offre une tarification abordable de paiement par analyse sans abonnements mensuels."
+          "answer": "VoyageurCompass est une plateforme d'analyse financière complète qui fournit une analyse boursière de qualité professionnelle utilisant 14 indicateurs techniques. Conçu pour les étudiants et les professionnels, il offre une tarification abordable de paiement par analyse sans abonnements mensuels."
         },
         {
           "question": "Comment fonctionne le système de crédits ?",
-          "answer": "Notre système de crédits est simple : 1 Crédit = 1€ = 1 Analyse d'Action. Vous ne payez que pour ce que vous utilisez. Les crédits n'expirent jamais, et vous pouvez les acheter dans divers forfaits avec des remises en gros. Aucun frais mensuel ou abonnement requis."
+          "answer": "Notre système de crédits est simple : 1 Crédit = 1€ = 1 Analyse d'Action. Vous ne payez que pour ce que vous utilisez sans frais mensuels ou abonnements requis. Achetez des crédits dans divers forfaits avec des remises en gros disponibles."
         },
         {
           "question": "Quels indicateurs techniques fournissez-vous ?",
-          "answer": "Nous fournissons 12 indicateurs techniques complets incluant les tendances SMA, RSI, MACD, bandes de Bollinger, analyse de volume, OBV, performance relative et motifs de chandeliers. Chaque analyse reçoit un score de 0-10 basé sur ces indicateurs."
+          "answer": "Nous fournissons 14 indicateurs techniques complets incluant les tendances SMA, RSI, MACD, bandes de Bollinger, analyse de volume, OBV, performance relative et motifs de chandeliers. Chaque analyse reçoit un score de 0-10 basé sur ces indicateurs."
         },
         {
           "question": "D'où obtenez-vous vos données ?",
@@ -769,7 +769,7 @@
         },
         {
           "question": "Combien de temps prend l'analyse ?",
-          "answer": "L'analyse d'actions prend généralement 2-5 secondes. Le système récupère les données en temps réel, exécute 12 indicateurs techniques et calcule un score complet. Les résultats sont affichés immédiatement."
+          "answer": "L'analyse d'actions prend généralement 2-5 secondes. Le système récupère les données en temps réel, exécute 14 indicateurs techniques et calcule un score complet. Les résultats sont affichés immédiatement."
         },
         {
           "question": "Puis-je l'utiliser sur appareils mobiles ?",

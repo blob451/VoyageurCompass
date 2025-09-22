@@ -8,7 +8,6 @@ import i18n from '../../i18n';
 import { apiSlice } from '../../features/api/apiSlice';
 import authReducer from '../../features/auth/authSlice';
 import DashboardPage from '../../pages/DashboardPage';
-import StockSearchPage from '../../pages/StockSearchPage';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
 
 // Mock store setup
@@ -129,26 +128,26 @@ describe('Language Switching Integration Tests', () => {
     });
   });
 
-  describe('Stock Search Language Integration', () => {
-    test('should update search page text when language changes', async () => {
+  describe('Dashboard Stock Analysis Language Integration', () => {
+    test('should update dashboard analysis section text when language changes', async () => {
       render(
         <TestWrapper>
-          <StockSearchPage />
+          <DashboardPage />
         </TestWrapper>
       );
 
-      // Check English text
-      expect(screen.getByText(/Stock Search/i)).toBeInTheDocument();
+      // Check English text (Dashboard has integrated stock analysis)
+      expect(screen.getByText(/Stock Analysis/i)).toBeInTheDocument();
 
       // Switch to Spanish
       i18n.changeLanguage('es');
 
       await waitFor(() => {
-        expect(screen.getByText(/Búsqueda de Acciones/i)).toBeInTheDocument();
+        expect(screen.getByText(/Análisis de Acciones/i)).toBeInTheDocument();
       });
     });
 
-    test('should include language parameter in API calls', async () => {
+    test('should include language parameter in Dashboard analysis API calls', async () => {
       // Mock fetch for API calls
       global.fetch = jest.fn(() =>
         Promise.resolve({
@@ -159,18 +158,18 @@ describe('Language Switching Integration Tests', () => {
 
       render(
         <TestWrapper>
-          <StockSearchPage />
+          <DashboardPage />
         </TestWrapper>
       );
 
       // Switch to French
       i18n.changeLanguage('fr');
 
-      const searchInput = screen.getByPlaceholderText(/Enter stock symbol/i);
-      const searchButton = screen.getByText(/Search/i);
+      const searchInput = screen.getByPlaceholderText(/Enter stock ticker/i);
+      const analyzeButton = screen.getByText(/Analyze/i);
 
       fireEvent.change(searchInput, { target: { value: 'AAPL' } });
-      fireEvent.click(searchButton);
+      fireEvent.click(analyzeButton);
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(

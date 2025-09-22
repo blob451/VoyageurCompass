@@ -1,6 +1,10 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { setCredentials, logout } from '../auth/authSlice';
 
+// Token refresh mutex to prevent simultaneous refresh attempts
+let isRefreshing = false;
+let refreshPromise = null;
+
 // Get API URL from environment or use default
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -88,31 +92,66 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
   if (result?.error?.status === 401) {
     console.log('Token expired, attempting refresh...');
-    // Try to get a new token using POST method with refresh token
+
+    // Use mutex to prevent simultaneous refresh attempts
+    if (isRefreshing) {
+      console.log('Token refresh already in progress, waiting...');
+      // Wait for the existing refresh to complete
+      try {
+        await refreshPromise;
+        // Retry the original query with potentially new token
+        console.log('Using refreshed token from ongoing refresh, retrying original request...');
+        result = await baseQuery(args, api, extraOptions);
+        return result;
+      } catch (error) {
+        console.log('Waited refresh failed, not retrying');
+        return result;
+      }
+    }
+
+    // Start refresh process
+    isRefreshing = true;
+
     const state = api.getState();
     const refreshToken = state.auth.refreshToken;
-    
+
     if (refreshToken) {
-      const refreshResult = await baseQuery({
-        url: '/auth/refresh/',
-        method: 'POST',
-        body: { refresh: refreshToken },
-      }, api, extraOptions);
-      
-      if (refreshResult?.data) {
-        const user = api.getState().auth.user;
-        // Store the new token
-        api.dispatch(setCredentials({ ...refreshResult.data, user }));
-        // Retry the original query with new access token
-        console.log('Token refreshed, retrying original request...');
-        result = await baseQuery(args, api, extraOptions);
-      } else {
-        console.log('Token refresh failed, logging out...');
-        api.dispatch(logout());
+      try {
+        refreshPromise = baseQuery({
+          url: '/auth/refresh/',
+          method: 'POST',
+          body: { refresh: refreshToken },
+        }, api, extraOptions);
+
+        const refreshResult = await refreshPromise;
+
+        if (refreshResult?.data?.access) {
+          const user = api.getState().auth.user;
+          // Store the new token with correct field names
+          api.dispatch(setCredentials({
+            access: refreshResult.data.access,
+            refresh: refreshToken, // Keep existing refresh token
+            user
+          }));
+          // Retry the original query with new access token
+          console.log('Token refreshed successfully, retrying original request...');
+          result = await baseQuery(args, api, extraOptions);
+        } else {
+          console.log('Token refresh failed - invalid response, logging out...');
+          api.dispatch(logout({ reason: 'token_refresh_failed' }));
+        }
+      } catch (refreshError) {
+        console.log('Token refresh error:', refreshError);
+        api.dispatch(logout({ reason: 'token_refresh_error' }));
+      } finally {
+        isRefreshing = false;
+        refreshPromise = null;
       }
     } else {
       console.log('No refresh token available, logging out...');
-      api.dispatch(logout());
+      api.dispatch(logout({ reason: 'no_refresh_token' }));
+      isRefreshing = false;
+      refreshPromise = null;
     }
   }
 

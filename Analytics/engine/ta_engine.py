@@ -386,9 +386,31 @@ class TechnicalAnalysisEngine:
                     raw_value = None
                     weight = 0.0  # No weight for missing indicators
                 else:
-                    score = result.score
-                    raw_value = result.raw
-                    weight = adjusted_weights[indicator_name]
+                    # Handle both object and list formats from cache
+                    if isinstance(result, list):
+                        # Extract first item if it's a list (cached format)
+                        if result and len(result) > 0:
+                            result = result[0]
+                        else:
+                            # Empty list or no valid data
+                            result = None
+
+                    # Now safely access attributes
+                    if hasattr(result, 'score'):
+                        score = result.score
+                        raw_value = result.raw
+                        weight = adjusted_weights[indicator_name]
+                    elif result is None:
+                        # Handle None values (including converted empty lists)
+                        score = 0.0
+                        raw_value = None
+                        weight = 0.0
+                    else:
+                        # Fallback if format is unexpected
+                        logger.warning(f"Unexpected result format for {indicator_name}: {type(result)}")
+                        score = 0.5
+                        raw_value = None
+                        weight = adjusted_weights[indicator_name]
 
                 weighted_score = Decimal(str(score)) * Decimal(str(weight))
 

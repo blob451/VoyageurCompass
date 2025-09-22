@@ -12,8 +12,8 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { logout, selectCurrentUser } from '../../features/auth/authSlice';
-import { useLogoutMutation } from '../../features/api/apiSlice';
+import { logout, selectCurrentUser, selectCurrentToken } from '../../features/auth/authSlice';
+import { useLogoutMutation, useGetUserProfileQuery } from '../../features/api/apiSlice';
 import { 
   TrendingUp, 
   ExpandMore,
@@ -35,14 +35,18 @@ const Navbar = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector(selectCurrentUser);
+  const token = useSelector(selectCurrentToken);
   const [logoutApi] = useLogoutMutation();
   const [toolsMenuAnchor, setToolsMenuAnchor] = useState(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
   const { mode, toggleMode } = useThemeMode();
   const { t } = useTranslation();
 
-  // User credits display (temporary mock data)
-  const userCredits = 25;
+  // Get user profile data including credits - only when authenticated
+  const { data: userProfile } = useGetUserProfileQuery(undefined, {
+    skip: !user || !token
+  });
+  const userCredits = userProfile?.credits || 0;
 
   const handleLogout = async () => {
     try {
@@ -125,7 +129,7 @@ const Navbar = () => {
         </Typography>
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {user ? (
+          {user && token ? (
             <>
               <Button color="inherit" onClick={() => navigate('/dashboard')}>
                 {t('navbar.dashboard')}
@@ -144,10 +148,6 @@ const Navbar = () => {
                 open={Boolean(toolsMenuAnchor)}
                 onClose={handleToolsMenuClose}
               >
-                <MenuItem onClick={() => handleNavigation('/stocks')}>
-                  <Analytics sx={{ mr: 1 }} />
-                  {t('navbar.stockAnalysis')}
-                </MenuItem>
                 <MenuItem onClick={() => handleNavigation('/reports')}>
                   <Assessment sx={{ mr: 1 }} />
                   {t('navbar.analysisReports')}

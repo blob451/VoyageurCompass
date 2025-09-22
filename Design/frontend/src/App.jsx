@@ -15,7 +15,6 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const LogoutPage = lazy(() => import('./pages/LogoutPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
-const StockSearchPage = lazy(() => import('./pages/StockSearchPage'));
 const ComparisonPage = lazy(() => import('./pages/ComparisonPage'));
 const SectorPage = lazy(() => import('./pages/SectorPage'));
 const StorePage = lazy(() => import('./pages/StorePage'));
@@ -106,7 +105,6 @@ function App() {
               {/* Authentication-protected routes */}
               <Route element={<ProtectedRoute />}>
                 <Route path="dashboard" element={<DashboardPage />} />
-                <Route path="stocks" element={<StockSearchPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="compare" element={<ComparisonPage />} />
                 <Route path="sectors" element={<SectorPage />} />

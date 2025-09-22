@@ -66,7 +66,7 @@
     "analysisHorizon": "Analysis Horizon",
     "rawScore": "Raw Score",
     "standard": "Standard",
-    "analysisPerformed": "This analysis was performed on {{date}} using 12 technical indicators with weighted scoring methodology.",
+    "analysisPerformed": "This analysis was performed on {{date}} using 14 technical indicators with weighted scoring methodology.",
     "aiExplanations": "AI-Powered Analysis Explanations",
     "multiModelActive": "Multi-Model AI Active",
     "serviceUnavailable": "Service Unavailable",
@@ -108,13 +108,13 @@
     "analysisComponentContributions": "Analysis Component Contributions",
     "analysisFramework": "Analysis Framework",
     "compositeScoring": "Composite Scoring",
-    "compositeScoringDesc": "12 technical indicators with weighted contributions to final score",
+    "compositeScoringDesc": "14 technical indicators with weighted contributions to final score",
     "multiTimeframeAnalysis": "Multi-Timeframe Analysis",
     "multiTimeframeDesc": "Short-term, medium-term, and long-term technical signals",
     "riskAssessment": "Risk Assessment",
     "riskAssessmentDesc": "Volatility, momentum, and market sentiment consideration",
     "analysisMethodology": "Analysis Methodology",
-    "methodologyDesc": "This technical analysis uses a comprehensive framework incorporating 12 technical indicators including moving averages (SMA), momentum oscillators (RSI), trend indicators (MACD), volatility measures (Bollinger Bands), volume analysis, and candlestick patterns. Each indicator is weighted based on its historical predictive accuracy and combined to produce a composite investment score."
+    "methodologyDesc": "This technical analysis uses a comprehensive framework incorporating 14 technical indicators including moving averages (SMA), momentum oscillators (RSI), trend indicators (MACD), volatility measures (Bollinger Bands), volume analysis, and candlestick patterns. Each indicator is weighted based on its historical predictive accuracy and combined to produce a composite investment score."
   },
   "recommendations": {
     "buy": "BUY",
@@ -124,17 +124,6 @@
     "strong": "Strong",
     "moderate": "Moderate",
     "weak": "Weak"
-  },
-  "settings": {
-    "title": "Settings",
-    "language": "Language",
-    "theme": "Theme",
-    "notifications": "Notifications",
-    "privacy": "Privacy",
-    "account": "Account",
-    "about": "About",
-    "save": "Save Changes",
-    "reset": "Reset to Defaults"
   },
   "languages": {
     "en": "English (UK)",
@@ -160,7 +149,8 @@
     "strongBuy": "Strong Buy",
     "buy": "Buy",
     "hold": "Hold",
-    "sell": "Sell"
+    "sell": "Sell",
+    "strongSell": "Strong Sell"
   },
   "errors": {
     "networkError": "Network error. Please check your connection.",
@@ -280,7 +270,7 @@
       "welcomeBonus": "Welcome Bonus",
       "welcomeBonusDesc": "5 free credits to get started",
       "professionalAnalysis": "Professional Analysis",
-      "professionalAnalysisDesc": "12 technical indicators per stock",
+      "professionalAnalysisDesc": "14 technical indicators per stock",
       "securePlatform": "Secure Platform",
       "securePlatformDesc": "Your data is protected with enterprise security"
     },
@@ -305,7 +295,7 @@
     "switchToLightMode": "Switch to light mode"
   },
   "stockSearch": {
-    "description": "Get comprehensive technical analysis for any stock with 12 professional indicators",
+    "description": "Get comprehensive technical analysis for any stock with 14 professional indicators",
     "availableCredits": "Available Credits",
     "creditEquation": "1 Credit = 1 Analysis",
     "buyMoreCredits": "Buy More Credits",
@@ -319,8 +309,8 @@
     "gettingLatestData": "Getting latest stock data from Yahoo Finance (this may take 10-30 seconds)",
     "autoAnalyzing": "Auto-analyzing {{symbol}}...",
     "analyzing": "Analyzing {{symbol}}...",
-    "dashboardTriggered": "Analysis triggered from dashboard • Running 12 technical indicators • 1 credit will be used",
-    "runningIndicators": "Running 12 technical indicators",
+    "dashboardTriggered": "Analysis triggered from dashboard • Running 14 technical indicators • 1 credit will be used",
+    "runningIndicators": "Running 14 technical indicators",
     "analysisComplete": "Analysis complete for {{symbol}}",
     "analysisSuccessful": "✅ Analysis completed successfully! Used 1 credit.",
     "viewFullReport": "View Full Report",
@@ -349,7 +339,7 @@
     "analyzeForCredit": "Analyze {{symbol}} for 1 credit?",
     "creditWarning": "This will use 1 credit from your balance ({{credits}} remaining)",
     "autoStartWarning": "Analysis will start automatically after confirmation",
-    "comprehensiveAnalysis": "Get comprehensive technical analysis for any stock with 12 professional indicators",
+    "comprehensiveAnalysis": "Get comprehensive technical analysis for any stock with 14 professional indicators",
     "technicalIndicatorFallback": "Technical indicator",
     "enterTickerError": "Please enter a stock ticker symbol",
     "insufficientCreditsError": "Insufficient credits. Please purchase more credits to continue.",
@@ -483,7 +473,7 @@
     "hero": {
       "title": "VoyageurCompass",
       "subtitle": "Professional Financial Analytics Platform",
-      "description": "Comprehensive stock analysis with 12 technical indicators, sector comparisons, and intelligent insights. Built with Django, React, and PostgreSQL for professional-grade financial analysis.",
+      "description": "Comprehensive stock analysis with 14 technical indicators, sector comparisons, and intelligent insights. Built with Django, React, and PostgreSQL for professional-grade financial analysis.",
       "getStarted": "Get Started",
       "goToDashboard": "Go to Dashboard",
       "login": "Login",
@@ -504,7 +494,7 @@
       "title": "Powerful Financial Analysis Tools",
       "technicalAnalysis": {
         "title": "Technical Analysis",
-        "description": "12 advanced indicators providing comprehensive stock analysis with scores 0-10",
+        "description": "14 advanced indicators providing comprehensive stock analysis with scores 0-10",
         "highlight": "AI-Powered"
       },
       "stockComparison": {
@@ -589,7 +579,7 @@
     "subtitle": "Everything you need to know about using VoyageurCompass",
     "stats": {
       "indicators": {
-        "title": "12 Indicators",
+        "title": "14 Indicators",
         "subtitle": "Professional analysis"
       },
       "analysisTime": {
@@ -597,7 +587,7 @@
         "subtitle": "Analysis time"
       },
       "pricing": {
-        "title": "$1 = 1 Analysis",
+        "title": "1 Credit = 1 Analysis",
         "subtitle": "Affordable pricing"
       },
       "mobileSupport": {
@@ -630,7 +620,7 @@
     "features": {
       "technicalAnalysis": {
         "title": "Technical Analysis",
-        "description": "12 comprehensive indicators providing detailed stock analysis",
+        "description": "14 comprehensive indicators providing detailed stock analysis",
         "details": [
           "SMA50 vs SMA200 trend analysis",
           "Price vs 50-day moving average",
@@ -680,7 +670,7 @@
     },
     "technicalGuide": {
       "title": "Technical Indicator Guide",
-      "description": "Our technical analysis engine uses 12 professional indicators to generate a comprehensive score (0-10) for each stock. Higher scores indicate stronger technical performance.",
+      "description": "Our technical analysis engine uses 14 professional indicators to generate a comprehensive score (0-10) for each stock. Higher scores indicate stronger technical performance.",
       "indicators": [
         {
           "name": "SMA50 vs SMA200",
@@ -737,15 +727,15 @@
       "items": [
         {
           "question": "What is VoyageurCompass?",
-          "answer": "VoyageurCompass is a comprehensive financial analytics platform that provides professional-grade stock analysis using 12 technical indicators. Built for students and professionals, it offers affordable pay-per-analysis pricing without monthly subscriptions."
+          "answer": "VoyageurCompass is a comprehensive financial analytics platform that provides professional-grade stock analysis using 14 technical indicators. Built for students and professionals, it offers affordable pay-per-analysis pricing without monthly subscriptions."
         },
         {
           "question": "How does the credit system work?",
-          "answer": "Our credit system is simple: 1 Credit = $1 = 1 Stock Analysis. You only pay for what you use. Credits never expire, and you can purchase them in various packages with bulk discounts. No monthly fees or subscriptions required."
+          "answer": "Our credit system is simple: 1 Credit = $1 = 1 Stock Analysis. You only pay for what you use with no monthly fees or subscriptions required. Purchase credits in various packages with bulk discounts available."
         },
         {
           "question": "What technical indicators do you provide?",
-          "answer": "We provide 12 comprehensive technical indicators including SMA trends, RSI, MACD, Bollinger Bands, volume analysis, OBV, relative performance, and candlestick patterns. Each analysis receives a score from 0-10 based on these indicators."
+          "answer": "We provide 14 comprehensive technical indicators including SMA trends, RSI, MACD, Bollinger Bands, volume analysis, OBV, relative performance, and candlestick patterns. Each analysis receives a score from 0-10 based on these indicators."
         },
         {
           "question": "Where do you get your data?",
@@ -761,7 +751,7 @@
         },
         {
           "question": "Is this a real trading platform?",
-          "answer": "VoyageurCompass is an educational project built for a university course. Whilst it uses real market data and professional analysis techniques, it's designed for learning and demonstration purposes."
+          "answer": "VoyageurCompass is a financial analysis platform that uses real market data and professional analysis techniques. It provides research and analysis tools to help inform investment decisions but does not execute trades."
         },
         {
           "question": "Which stocks can I analyse?",
@@ -769,7 +759,7 @@
         },
         {
           "question": "How long does analysis take?",
-          "answer": "Stock analysis typically takes 2-5 seconds. The system fetches real-time data, runs 12 technical indicators, and calculates a comprehensive score. Results are displayed immediately."
+          "answer": "Stock analysis typically takes 2-5 seconds. The system fetches real-time data, runs 14 technical indicators, and calculates a comprehensive score. Results are displayed immediately."
         },
         {
           "question": "Can I use this on mobile devices?",
@@ -826,6 +816,14 @@
   "settings": {
     "title": "Account Settings",
     "subtitle": "Manage your account preferences and security",
+    "language": "Language",
+    "theme": "Theme",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "account": "Account",
+    "about": "About",
+    "save": "Save Changes",
+    "reset": "Reset to Defaults",
     "tabs": {
       "profile": "Profile",
       "security": "Security",

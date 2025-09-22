@@ -106,15 +106,23 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     portfolio_count = serializers.SerializerMethodField()
     last_login = serializers.DateTimeField(read_only=True)
+    credits = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "date_joined", "last_login", "portfolio_count"]
+        fields = ["id", "username", "email", "first_name", "last_name", "date_joined", "last_login", "portfolio_count", "credits"]
         read_only_fields = ["id", "username", "date_joined", "last_login"]
 
     def get_portfolio_count(self, obj):
         """Calculate user's portfolio count."""
         return obj.portfolios.count()
+
+    def get_credits(self, obj):
+        """Get user's credit balance."""
+        try:
+            return obj.profile.credits
+        except:
+            return 0
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):

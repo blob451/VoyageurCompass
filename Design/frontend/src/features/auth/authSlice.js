@@ -5,7 +5,15 @@ import { cleanupInvalidTokens, getValidTokensFromStorage } from '../../utils/tok
 cleanupInvalidTokens();
 
 // Get valid tokens for initial state
-const { accessToken, refreshToken } = getValidTokensFromStorage();
+const { accessToken, refreshToken, hasValidTokens, hasExpiredTokens } = getValidTokensFromStorage();
+
+// Log initial token state
+console.log('[AUTH] Initial token state:', {
+  hasValidTokens,
+  hasExpiredTokens,
+  accessTokenLength: accessToken?.length || 0,
+  refreshTokenLength: refreshToken?.length || 0
+});
 
 const authSlice = createSlice({
   name: 'auth',
@@ -23,14 +31,26 @@ const authSlice = createSlice({
       state.user = user;
       state.token = access;
       state.refreshToken = refresh;
-      
-      // Persist tokens to localStorage
+
+      // Persist tokens to localStorage with validation
       if (access) {
         localStorage.setItem('token', access);
+        console.log('[AUTH] Access token stored in localStorage');
       }
       if (refresh) {
         localStorage.setItem('refreshToken', refresh);
+        console.log('[AUTH] Refresh token stored in localStorage');
       }
+
+      // Log token storage status
+      const storedAccess = localStorage.getItem('token');
+      const storedRefresh = localStorage.getItem('refreshToken');
+      console.log('[AUTH] Token persistence status:', {
+        accessStored: !!storedAccess,
+        refreshStored: !!storedRefresh,
+        accessLength: storedAccess?.length || 0,
+        refreshLength: storedRefresh?.length || 0
+      });
     },
     logout: (state, action) => {
       // Store logout reason for the logout page

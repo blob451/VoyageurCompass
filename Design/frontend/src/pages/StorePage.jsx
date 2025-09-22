@@ -42,12 +42,14 @@ import {
   CardGiftcard
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { useGetUserProfileQuery } from '../features/api/apiSlice';
 // import { useSelector } from 'react-redux'; // Not used currently
 
 const StorePage = () => {
   const { t } = useTranslation();
   // const { user } = useSelector((state) => state.auth); // Not used currently
-  const [userCredits] = useState(25); // Mock credit balance
+  const { data: userProfile } = useGetUserProfileQuery();
+  const userCredits = userProfile?.credits || 0;
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [purchaseDialog, setPurchaseDialog] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
@@ -57,66 +59,61 @@ const StorePage = () => {
 
   // Mock purchase history
   const purchaseHistory = [
-    { id: 1, package: 'Starter Pack', credits: 10, amount: 10, date: '2025-01-12', status: 'completed' },
-    { id: 2, package: 'Value Pack', credits: 25, amount: 23, date: '2025-01-10', status: 'completed' },
+    { id: 1, package: 'Professional Pack', credits: 60, amount: 50, date: '2025-01-12', status: 'completed' },
+    { id: 2, package: 'Value Pack', credits: 25, amount: 20, date: '2025-01-10', status: 'completed' },
     { id: 3, package: 'Basic Pack', credits: 5, amount: 5, date: '2025-01-08', status: 'completed' }
   ];
 
   const creditPackages = [
     {
+      id: 'single',
+      name: 'Single Credit',
+      credits: 1,
+      price: 1,
+      originalPrice: 1,
+      discount: 0,
+      popular: false,
+      description: 'Perfect for trying out the platform'
+    },
+    {
       id: 'basic',
-      name: t('store.packages.basic.name'),
+      name: 'Basic Pack',
       credits: 5,
       price: 5,
       originalPrice: 5,
       discount: 0,
       popular: false,
-      features: t('store.packages.basic.features', { returnObjects: true }),
-      description: t('store.packages.basic.description')
-    },
-    {
-      id: 'starter',
-      name: t('store.packages.starter.name'),
-      credits: 10,
-      price: 10,
-      originalPrice: 10,
-      discount: 0,
-      popular: false,
-      features: t('store.packages.starter.features', { returnObjects: true }),
-      description: t('store.packages.starter.description')
+      description: 'Great for occasional use'
     },
     {
       id: 'value',
-      name: t('store.packages.value.name'),
+      name: 'Value Pack',
       credits: 25,
-      price: 23,
+      price: 20,
       originalPrice: 25,
-      discount: 8,
+      discount: 20,
       popular: true,
-      features: t('store.packages.value.features', { returnObjects: true }),
-      description: t('store.packages.value.description')
+      description: 'Most popular choice for regular users'
     },
     {
       id: 'professional',
-      name: t('store.packages.professional.name'),
-      credits: 50,
-      price: 45,
-      originalPrice: 50,
-      discount: 10,
+      name: 'Professional Pack',
+      credits: 60,
+      price: 50,
+      originalPrice: 60,
+      discount: 17,
       popular: false,
-      features: t('store.packages.professional.features', { returnObjects: true }),
-      description: t('store.packages.professional.description')
+      description: 'Ideal for professional traders'
     },
     {
       id: 'enterprise',
-      name: t('store.packages.enterprise.name'),
+      name: 'Enterprise Pack',
       credits: 100,
-      price: 85,
+      price: 80,
       originalPrice: 100,
-      discount: 15,
+      discount: 20,
       popular: false,
-      features: t('store.packages.enterprise.features', { returnObjects: true }),
-      description: t('store.packages.enterprise.description')
+      description: 'Perfect for heavy users and institutions'
     }
   ];
 
@@ -391,7 +388,7 @@ const StorePage = () => {
                   icon={<Star />}
                   sx={{
                     position: 'absolute',
-                    top: -12,
+                    top: 8,
                     left: '50%',
                     transform: 'translateX(-50%)',
                     zIndex: 1
@@ -431,23 +428,9 @@ const StorePage = () => {
                   )}
                 </Box>
 
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2, flexGrow: 1 }}>
                   {pkg.description}
                 </Typography>
-
-                <List dense sx={{ flexGrow: 1 }}>
-                  {pkg.features.map((feature, index) => (
-                    <ListItem key={index} sx={{ px: 0, py: 0.5 }}>
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        <CheckCircle color="success" fontSize="small" />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={feature}
-                        primaryTypographyProps={{ fontSize: '0.9rem' }}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
 
                 <Button
                   variant={pkg.popular ? "contained" : "outlined"}

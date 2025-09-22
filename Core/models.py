@@ -106,6 +106,43 @@ class PasswordResetRequest(models.Model):
         return f"Reset request for {self.user.username} - {self.status}"
 
 
+class UserProfile(models.Model):
+    """Extended user profile with credits and preferences."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    credits = models.IntegerField(default=0, help_text="User credits for premium features")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "core_user_profile"
+        verbose_name = "User Profile"
+        verbose_name_plural = "User Profiles"
+
+    def add_credits(self, amount):
+        """Add credits to user account."""
+        if amount > 0:
+            self.credits += amount
+            self.save()
+            return True
+        return False
+
+    def subtract_credits(self, amount):
+        """Subtract credits from user account if sufficient balance."""
+        if amount > 0 and self.credits >= amount:
+            self.credits -= amount
+            self.save()
+            return True
+        return False
+
+    def has_credits(self, amount):
+        """Check if user has sufficient credits."""
+        return self.credits >= amount
+
+    def __str__(self):
+        return f"Profile for {self.user.username} ({self.credits} credits)"
+
+
 class BlacklistedToken(models.Model):
     """Blacklisted JWT tokens for secure logout functionality."""
 

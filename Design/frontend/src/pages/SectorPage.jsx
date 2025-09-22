@@ -47,7 +47,7 @@ import {
   SentimentDissatisfied,
   SentimentNeutral
 } from '@mui/icons-material';
-import { useGetUserAnalysisHistoryQuery } from '../features/api/apiSlice';
+import { useGetUserAnalysisHistoryQuery, useGetUserProfileQuery } from '../features/api/apiSlice';
 import { useTranslation } from 'react-i18next';
 
 const SectorPage = () => {
@@ -57,7 +57,8 @@ const SectorPage = () => {
   const [loading, setLoading] = useState(false);
   const [sectorData, setSectorData] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(false);
-  const [userCredits] = useState(25); // Mock credit balance
+  const { data: userProfile } = useGetUserProfileQuery();
+  const userCredits = userProfile?.credits || 0;
   
   // Fetch user analysis history to get real sentiment data
   const { data: analysisHistoryData } = useGetUserAnalysisHistoryQuery({ 

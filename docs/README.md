@@ -52,10 +52,12 @@ A state-of-the-art financial analytics platform powered by AI-driven explanation
 ## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Python 3.9+
-- Node.js 16+
-- Ollama with LLaMA 3.1 models
+- Python 3.9+ (3.11 recommended)
+- Node.js 16+ and npm
+- PostgreSQL 13+ or SQLite (for development)
+- Redis (optional, for caching)
+- Ollama (for AI features)
+- Git
 
 ### Installation
 
@@ -64,21 +66,236 @@ A state-of-the-art financial analytics platform powered by AI-driven explanation
 git clone <repository-url>
 cd VoyageurCompass
 
-# Start the development environment
-docker-compose up -d
+# Create Python virtual environment (recommended)
+python -m venv venv
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
 
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Install frontend dependencies
-cd frontend && npm install
+# Navigate to frontend directory and install dependencies
+cd Design/frontend
+npm install
 
-# Run database migrations
-python manage.py migrate
+# Return to project root
+cd ../..
 
-# Install Ollama models
+# Install Ollama models (optional, for AI features)
 ollama pull llama3.1:8b
 ollama pull llama3.1:70b
+ollama pull phi3:3.8b
+ollama pull qwen2:3b
+```
+
+## Running the Project
+
+### Step 1: Database Setup
+
+```bash
+# Create database migrations
+python manage.py makemigrations
+
+# Apply migrations
+python manage.py migrate
+
+# Create a superuser account (for admin access)
+python manage.py createsuperuser
+
+# (Optional) Load demo data
+python manage.py prepopulate_demo_data
+```
+
+### Step 2: Start the Backend Server
+
+```bash
+# Make sure you're in the project root directory (VoyageurCompass)
+# and your virtual environment is activated
+
+# Start Django development server
+python manage.py runserver
+
+# The backend will be available at http://localhost:8000
+# Admin interface at http://localhost:8000/admin
+# API endpoints at http://localhost:8000/api/v1/
+```
+
+### Step 3: Start the Frontend Application
+
+Open a new terminal/command prompt:
+
+```bash
+# Navigate to frontend directory
+cd Design/frontend
+
+# Start React development server
+npm run dev
+
+# The frontend will be available at http://localhost:3000
+# It will automatically proxy API requests to the Django backend
+```
+
+### Step 4: Verify Services (Optional)
+
+```bash
+# Check if Ollama is running (for AI features)
+ollama list
+
+# Start Ollama if not running
+ollama serve
+
+# Check Redis (if using caching)
+redis-cli ping
+```
+
+## Environment Configuration
+
+Create a `.env` file in the project root:
+
+```bash
+# Backend Configuration
+DEBUG=True
+SECRET_KEY=your-secret-key-here
+DATABASE_URL=sqlite:///db.sqlite3  # Or PostgreSQL URL
+
+# Frontend Configuration (in Design/frontend/.env)
+VITE_API_URL=http://localhost:8000/api/v1
+
+# AI/ML Configuration (optional)
+OLLAMA_BASE_URL=http://localhost:11434
+ENABLE_LLM_EXPLANATIONS=true
+ENABLE_SENTIMENT_ANALYSIS=true
+ENABLE_TRANSLATIONS=true
+
+# API Keys (if needed)
+YAHOO_FINANCE_API_KEY=your-key-here
+```
+
+## Common Development Commands
+
+### Backend Commands
+
+```bash
+# Run tests
+python manage.py test
+
+# Create new app
+python manage.py startapp appname
+
+# Shell access
+python manage.py shell
+
+# Database shell
+python manage.py dbshell
+
+# Check for issues
+python manage.py check
+
+# Collect static files (for production)
+python manage.py collectstatic
+```
+
+### Frontend Commands
+
+```bash
+# Navigate to frontend first
+cd Design/frontend
+
+# Development server with hot reload
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Run tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Lint code
+npm run lint
+
+# Format code
+npm run format
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+1. **Port Already in Use**
+   ```bash
+   # Kill process on port 8000 (Django)
+   # Windows:
+   netstat -ano | findstr :8000
+   taskkill /PID <PID> /F
+
+   # macOS/Linux:
+   lsof -ti:8000 | xargs kill -9
+   ```
+
+2. **Database Connection Issues**
+   - Ensure PostgreSQL/SQLite is installed and running
+   - Check DATABASE_URL in .env file
+   - Run migrations: `python manage.py migrate`
+
+3. **Frontend Can't Connect to Backend**
+   - Ensure Django server is running on port 8000
+   - Check VITE_API_URL in frontend .env file
+   - Verify CORS settings in Django settings
+
+4. **Missing Dependencies**
+   ```bash
+   # Reinstall Python dependencies
+   pip install -r requirements.txt --force-reinstall
+
+   # Clear npm cache and reinstall
+   cd Design/frontend
+   npm cache clean --force
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+
+5. **Ollama Models Not Working**
+   ```bash
+   # Check Ollama status
+   ollama list
+
+   # Pull required models
+   ollama pull llama3.1:8b
+   ollama pull phi3:3.8b
+
+   # Start Ollama service
+   ollama serve
+   ```
+
+## Docker Alternative (Optional)
+
+If you prefer using Docker:
+
+```bash
+# Build and start all services
+docker-compose up --build
+
+# Run in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Reset everything (including volumes)
+docker-compose down -v
 ```
 
 ### Configuration

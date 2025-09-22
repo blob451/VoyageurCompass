@@ -6,7 +6,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
-from Core.models import PasswordResetRequest, UserSecurityProfile
+from Core.models import PasswordResetRequest, UserProfile, UserSecurityProfile
 
 
 class UserSecurityProfileInline(admin.StackedInline):
@@ -19,10 +19,20 @@ class UserSecurityProfileInline(admin.StackedInline):
     readonly_fields = ("failed_reset_attempts", "last_reset_attempt")
 
 
-class UserAdmin(BaseUserAdmin):
-    """Extended User admin with security profile."""
+class UserProfileInline(admin.StackedInline):
+    """Inline admin for UserProfile."""
 
-    inlines = (UserSecurityProfileInline,)
+    model = UserProfile
+    can_delete = False
+    verbose_name_plural = "User Profile"
+    fields = ("credits", "created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at")
+
+
+class UserAdmin(BaseUserAdmin):
+    """Extended User admin with security and user profiles."""
+
+    inlines = (UserSecurityProfileInline, UserProfileInline)
 
 
 @admin.register(PasswordResetRequest)

@@ -190,28 +190,34 @@ const HelpPage = () => {
 {t('help.technicalGuide.scoreInterpretation.title')}
         </Typography>
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'success.main', borderRadius: 2 }}>
-              <Typography variant="h5" color="success.main">8-10</Typography>
-              <Typography variant="body2">{t('recommendations.strongBuy')}</Typography>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'error.dark', borderRadius: 2 }}>
+              <Typography variant="h5" color="error.dark">0-2</Typography>
+              <Typography variant="body2">{t('recommendations.strongSell')}</Typography>
             </Box>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'success.light', borderRadius: 2 }}>
-              <Typography variant="h5" color="success.light">6-7</Typography>
-              <Typography variant="body2">{t('recommendations.buy')}</Typography>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'error.main', borderRadius: 2 }}>
+              <Typography variant="h5" color="error.main">2-4</Typography>
+              <Typography variant="body2">{t('recommendations.sell')}</Typography>
             </Box>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'warning.main', borderRadius: 2 }}>
-              <Typography variant="h5" color="warning.main">4-5</Typography>
+              <Typography variant="h5" color="warning.main">4-6</Typography>
               <Typography variant="body2">{t('recommendations.hold')}</Typography>
             </Box>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'error.main', borderRadius: 2 }}>
-              <Typography variant="h5" color="error.main">0-3</Typography>
-              <Typography variant="body2">{t('recommendations.sell')}</Typography>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'success.light', borderRadius: 2 }}>
+              <Typography variant="h5" color="success.light">6-8</Typography>
+              <Typography variant="body2">{t('recommendations.buy')}</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Box sx={{ textAlign: 'center', p: 2, border: '1px solid', borderColor: 'success.main', borderRadius: 2 }}>
+              <Typography variant="h5" color="success.main">8-10</Typography>
+              <Typography variant="body2">{t('recommendations.strongBuy')}</Typography>
             </Box>
           </Grid>
         </Grid>
@@ -258,15 +264,6 @@ const HelpPage = () => {
               <ListItemText
                 primary="Email Support"
                 secondary="support@voyageurcompass.edu"
-              />
-            </ListItem>
-            <ListItem>
-              <ListItemIcon>
-                <School color="primary" />
-              </ListItemIcon>
-              <ListItemText
-                primary="Academic Project"
-                secondary="University of Louisville - CM 3070"
               />
             </ListItem>
             <ListItem>
